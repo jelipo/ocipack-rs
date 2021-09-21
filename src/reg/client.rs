@@ -1,18 +1,19 @@
 use std::time::Duration;
 
 use anyhow::Result;
+use reqwest::{Method, Request, RequestBuilder, Url};
 use reqwest::blocking::Client;
 use reqwest::redirect::Policy;
 
-
+#[derive(Clone)]
 pub struct HttpClient {
     registry_addr: String,
-    http_client: Client,
+    client: Client,
 }
 
 
 impl HttpClient {
-    pub fn new_client(registry_addr: String) -> Result<HttpClient> {
+    pub fn new(registry_addr: String) -> Result<HttpClient> {
         let client = reqwest::blocking::ClientBuilder::new()
             .timeout(Duration::from_secs(10))
             .gzip(true)
@@ -23,7 +24,15 @@ impl HttpClient {
             .build()?;
         Ok(HttpClient {
             registry_addr,
-            http_client: client,
+            client,
         })
+    }
+
+    pub fn request(&self) -> Result<String> {
+        let builder = self.client.request(Method::GET, Url::parse("https://me.jelipo.com/")?);
+        let request = builder.build()?;
+        let response = self.client.execute(request)?;
+        let string = String::from_utf8(response.bytes()?.to_vec())?;
+        Ok(string)
     }
 }

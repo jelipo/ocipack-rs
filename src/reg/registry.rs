@@ -15,10 +15,9 @@ pub struct Registry {
 
 impl Registry {
     pub fn open(registry_addr: String) -> Result<Registry> {
-        let client = HttpClient::new_client(registry_addr.)?;
-
-        let image = ImageManager::new(
-            registry_addr.clone(), client.);
+        let client = HttpClient::new(registry_addr.clone())?;
+        let client_rc = Rc::new(client);
+        let image = ImageManager::new(registry_addr.clone(), client_rc.clone());
 
         Ok(Registry {
             image_manager: image,
