@@ -14,7 +14,7 @@ fn main() -> Result<()> {
         reference: "1.0".to_string()
     };
     let info = registry.image_manager.get_manifests(&reference)?;
-    println!("{}", info);
+    println!("{:?}", info);
 
     Ok(())
 }

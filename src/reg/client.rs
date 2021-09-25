@@ -4,6 +4,7 @@ use anyhow::Result;
 use reqwest::{Method, Url};
 use reqwest::blocking::Client;
 use reqwest::redirect::Policy;
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 #[derive(Clone)]
@@ -33,9 +34,9 @@ impl HttpClient {
         })
     }
 
-    pub fn request<T: Serialize + ?Sized>(
+    pub fn request<T: Serialize + ?Sized, R: DeserializeOwned>(
         &self, path: &str, method: Method, body: Option<&T>,
-    ) -> Result<String> {
+    ) -> Result<R> {
         let url = Url::parse((self.registry_addr.clone() + path).as_str())?;
         let mut builder = self.client.request(method, url)
             .basic_auth(self.username.clone(), Some(self.password.clone()));
@@ -44,7 +45,6 @@ impl HttpClient {
         }
         let request = builder.build()?;
         let response = self.client.execute(request)?;
-        let string = String::from_utf8(response.bytes()?.to_vec())?;
-        Ok(string)
+        Ok(response.json::<R>()?)
     }
 }
