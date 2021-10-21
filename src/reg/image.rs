@@ -1,6 +1,3 @@
-use std::borrow::Borrow;
-use std::cell::RefCell;
-use std::ops::Deref;
 use std::rc::Rc;
 
 use anyhow::Result;
@@ -25,9 +22,13 @@ impl ImageManager {
     }
 
     pub fn get_manifests(&self, reference: &Reference) -> Result<Manifest2> {
-        let path = format!("/v2/{}/manifests/{}", reference.image_name, reference.reference);
+        let path = format!(
+            "/v2/{}/manifests/{}",
+            reference.image_name, reference.reference
+        );
 
-        self.reg_client.request::<u8, Manifest2>(&path, Method::GET, None)
+        self.reg_client
+            .request_registry::<u8, Manifest2>(&path, Method::GET, None)
     }
 }
 

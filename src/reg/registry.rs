@@ -1,6 +1,3 @@
-use std::borrow::Borrow;
-use std::cell::RefCell;
-use std::ops::Deref;
 use std::rc::Rc;
 
 use anyhow::Result;
@@ -11,7 +8,6 @@ use crate::reg::image::ImageManager;
 pub struct Registry {
     pub image_manager: ImageManager,
 }
-
 
 impl Registry {
     pub fn open(registry_addr: String) -> Result<Registry> {

@@ -1,9 +1,11 @@
+use std::io::Read;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
-use reqwest::{Method, Url};
+use log::{debug, warn};
 use reqwest::blocking::{Client, Request};
 use reqwest::redirect::Policy;
+use reqwest::{Method, Url};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -14,7 +16,6 @@ pub struct HttpClient {
     password: String,
     client: Client,
 }
-
 
 impl HttpClient {
     pub fn new(registry_addr: String, username: &str, password: &str) -> Result<HttpClient> {
@@ -34,21 +35,41 @@ impl HttpClient {
         })
     }
 
-    pub fn request<T: Serialize + ?Sized, R: DeserializeOwned>(
-        &self, path: &str, method: Method, body: Option<&T>,
+    pub fn request_registry<T: Serialize + ?Sized, R: DeserializeOwned>(
+        &self,
+        path: &str,
+        method: Method,
+        body: Option<&T>,
     ) -> Result<R> {
-        let url = Url::parse((self.registry_addr.clone() + path).as_str())?;
-        let request = self.build_request(url.to_string(), method, body)?;
-        let response = self.client.execute(request)?;
-        return if response.status().is_success() {
-            Ok(response.json::<R>()?)
-        } else {
-            Err(Error::msg("Request to image registry failed."))
-        };
+        return self.do_request::<T, R>(path, method, body)?;
     }
 
-    fn build_request<T: Serialize + ?Sized>(&self, url: String, method: Method, body: Option<&T>) -> Result<Request> {
-        let mut builder = self.client.request(method, url)
+    fn do_request<T: Serialize + ?Sized, R: DeserializeOwned>(
+        &self,
+        path: &str,
+        method: Method,
+        body: Option<&T>,
+    ) -> Result<R> {
+        let request = self.build_request(path, method, body)?;
+        let response = self.client.execute(request)?;
+        let status_code = response.status();
+        if status_code.is_success() {
+            return Ok(response.json::<R>()?);
+        }
+        let result = response.read_to_string(&mut String::default());
+        debug!("")
+    }
+
+    fn build_request<T: Serialize + ?Sized>(
+        &self,
+        path: &str,
+        method: Method,
+        body: Option<&T>,
+    ) -> Result<Request> {
+        let url = Url::parse((self.registry_addr.clone() + path).as_str())?;
+        let mut builder = self
+            .client
+            .request(method, url)
             .basic_auth(&self.username, Some(&self.password));
         if let Some(body_o) = body {
             builder = builder.json(body_o)
