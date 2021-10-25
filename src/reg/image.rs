@@ -5,16 +5,16 @@ use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::client::HttpClient;
+use crate::reg::client::RegistryHttpClient;
 use crate::reg::Reference;
 
 pub struct ImageManager {
     registry_addr: String,
-    reg_client: Rc<HttpClient>,
+    reg_client: Rc<RegistryHttpClient>,
 }
 
 impl ImageManager {
-    pub fn new(registry_addr: String, client: Rc<HttpClient>) -> ImageManager {
+    pub fn new(registry_addr: String, client: Rc<RegistryHttpClient>) -> ImageManager {
         ImageManager {
             registry_addr,
             reg_client: client,

@@ -3,26 +3,28 @@ use std::option::Option::Some;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
+use bytes::buf::Reader;
+use bytes::{Buf, Bytes};
 use log::{debug, warn};
-use reqwest::blocking::{Client, Request};
+use reqwest::blocking::{Client, Request, Response};
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::redirect::Policy;
-use reqwest::{Method, Url};
+use reqwest::{Method, StatusCode, Url};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-
-const DOCKER_JSON_CONTENT_TYPE: &str = "application/vnd.docker.distribution.manifest.v2+json";
+use sha2::digest::DynDigest;
+use sha2::{Digest, Sha256};
 
 #[derive(Clone)]
-pub struct HttpClient {
+pub struct RegistryHttpClient {
     registry_addr: String,
     username: String,
     password: String,
     client: Client,
 }
 
-impl HttpClient {
-    pub fn new(registry_addr: String, username: &str, password: &str) -> Result<HttpClient> {
+impl RegistryHttpClient {
+    pub fn new(reg_addr: String, username: &str, password: &str) -> Result<RegistryHttpClient> {
         let client = reqwest::blocking::ClientBuilder::new()
             .timeout(Duration::from_secs(10))
             .gzip(true)
@@ -31,8 +33,8 @@ impl HttpClient {
             .deflate(true)
             .redirect(Policy::default())
             .build()?;
-        Ok(HttpClient {
-            registry_addr,
+        Ok(RegistryHttpClient {
+            registry_addr: reg_addr,
             username: username.to_string(),
             password: password.to_string(),
             client,
@@ -45,38 +47,35 @@ impl HttpClient {
         method: Method,
         body: Option<&T>,
     ) -> Result<R> {
-        return self.do_request::<T, R>(path, method, body);
+        let success_response = self.do_request(path, method, body)?;
+        let string1 = success_response.docker_content_digest()?;
+        let bytes = success_response.bytes_body()?;
+        let vec = bytes.to_vec();
+        let mut hasher = Sha256::new();
+        DynDigest::update(&mut hasher, &vec[..]);
+        let x = &hasher.finalize()[..];
+        Err(Error::msg("dsa"))
     }
 
-    fn do_request<T: Serialize + ?Sized, R: DeserializeOwned>(
+    fn do_request<T: Serialize + ?Sized>(
         &self,
         path: &str,
         method: Method,
         body: Option<&T>,
-    ) -> Result<R> {
+    ) -> Result<RegistryResponse> {
         let request = self.build_request(path, method, body)?;
-        let mut response = self.client.execute(request)?;
-        let status_code = response.status();
-        let headers = response.headers();
-        return if status_code.is_success() {
-            Ok(response.json::<R>()?)
+        let mut http_response = self.client.execute(request)?;
+        let response = RegistryResponse::new_registry_response(http_response)?;
+        return if response.is_success() {
+            Ok(response)
         } else {
-            match get_content_type(headers) {
-                None => Err(Error::msg(format!(
-                    "Request to registry failed,status_code:{}",
-                    status_code.as_str()
-                ))),
-                Some(content_type) => {
-                    let mut body = String::default();
-                    let i = response.read_to_string(&mut body)?;
-                    Err(Error::msg(format!(
-                        "Request to registry failed,status_code:{} ,content-type:{} ,body:{}",
-                        status_code.as_str(),
-                        content_type,
-                        body,
-                    )))
-                }
-            }
+            let content_type = response.get_content_type();
+            Err(Error::msg(format!(
+                "Request to registry failed,status_code:{} ,content-type:{} ,body:{}",
+                response.status_code().as_str(),
+                content_type,
+                response.body_str()?,
+            )))
         };
     }
 
@@ -98,19 +97,6 @@ impl HttpClient {
     }
 }
 
-fn get_content_type(headers: &HeaderMap<HeaderValue>) -> Option<&str> {
-    return if let Some(Ok(content_type)) = headers.get("content-type").map(|value| value.to_str()) {
-        Some(content_type)
-    } else {
-        None
-    };
-}
-
-pub enum ContentType {
-    /// application/vnd.docker.distribution.manifest.v2+json
-    ApplicationVndDockerDistributionManifestV2Json,
-}
-
 pub struct RegistryErr {
     errors: Vec<SingleRegistryError>,
 }
@@ -118,4 +104,59 @@ pub struct RegistryErr {
 pub struct SingleRegistryError {
     code: String,
     message: String,
+}
+
+pub struct RegistryResponse {
+    http_response: Response,
+    content_type: String,
+}
+
+impl RegistryResponse {
+    pub fn new_registry_response(http_response: Response) -> Result<RegistryResponse> {
+        let headers = http_response.headers();
+        let content_type_value = headers.get("content-type").ok_or(Error::msg(format!(
+            "Request to registry failed,status_code:{}",
+            http_response.status().as_str(),
+        )))?;
+        let string = String::from(content_type_value.to_str()?);
+        Ok(RegistryResponse {
+            http_response,
+            content_type: string,
+        })
+    }
+
+    pub fn get_content_type(&self) -> String {
+        self.content_type.clone()
+    }
+
+    pub fn is_success(&self) -> bool {
+        self.http_response.status().is_success()
+    }
+
+    pub fn status_code(&self) -> StatusCode {
+        self.http_response.status()
+    }
+
+    pub fn body_str(self) -> Result<String> {
+        Ok(self.http_response.text()?)
+    }
+
+    pub fn json_body<R: DeserializeOwned>(self) -> Result<R> {
+        if self.content_type.contains("json") {
+            Ok(self.http_response.json::<R>()?)
+        } else {
+            Err(Error::msg("Content-type not contains json"))
+        }
+    }
+
+    pub fn bytes_body(self) -> Result<Bytes> {
+        Ok(self.http_response.bytes()?)
+    }
+
+    pub fn docker_content_digest(&self) -> Result<String> {
+        return match self.http_response.headers().get("Docker-Content-Digest") {
+            None => Err(Error::msg("header 'Docker-Content-Digest' not found")),
+            Some(value) => Ok(value.to_str()?.to_string()),
+        };
+    }
 }
