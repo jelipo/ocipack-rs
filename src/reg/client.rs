@@ -54,18 +54,18 @@ impl RegistryHttpClient {
             .header_docker_content_digest()
             .expect("No Docker-Content-Digest header");
         let body_bytes = success_response.bytes_body();
-        let body_sha256 = format!("sha256:{}", body_sha256(body_bytes));
+        let body_sha256 = format!("sha256:{}", sha::sha256(body_bytes));
         if body_bytes.len() != 0 && body_sha256 != header_docker_content_digest {
             return Err(Error::msg("docker_content_digest verification failed"));
         }
         success_response.json_body::<R>()
     }
 
-    pub fn head_request_registry(&self, path: &str) -> SimpleRegistryResponse {
-        let http_response = self.do_request_raw(path, Method::HEAD, body)?;
-        SimpleRegistryResponse {
+    pub fn head_request_registry(&self, path: &str) -> Result<SimpleRegistryResponse> {
+        let http_response = self.do_request_raw::<u8>(path, Method::HEAD, None)?;
+        Ok(SimpleRegistryResponse {
             status_code: http_response.status(),
-        }
+        })
     }
 
     fn do_request_raw<T: Serialize + ?Sized>(
@@ -86,8 +86,8 @@ impl RegistryHttpClient {
         body: Option<&T>,
     ) -> Result<FullRegistryResponse> {
         let http_response = self.do_request_raw(path, method, body)?;
-        return if http_response.status().is_success() {
-            let response = RegistryResponse::new_registry_response(http_response)?;
+        let response = FullRegistryResponse::new_registry_response(http_response)?;
+        return if response.is_success() {
             Ok(response)
         } else {
             match response.get_content_type() {
@@ -136,7 +136,7 @@ impl FullRegistryResponse {
         let docker_content_digest_opt = get_header(headers, "Docker-Content-Digest");
         let code = http_response.status();
         let body_bytes = http_response.bytes()?;
-        Ok(RegistryResponse {
+        Ok(FullRegistryResponse {
             body_bytes,
             content_type: content_type_opt,
             docker_content_digest: docker_content_digest_opt,

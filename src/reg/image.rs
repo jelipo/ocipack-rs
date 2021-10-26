@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use anyhow::Result;
+use anyhow::{Error, Result};
 use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
@@ -26,10 +26,18 @@ impl ImageManager {
         self.reg_client.request_registry::<u8, Manifest2>(&path, Method::GET, None)
     }
 
+    /// Image是否存在
     pub fn exited(&self, refe: &Reference) -> Result<bool> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
-        let response = self.reg_client.head_request_registry(&path);
-        response.success()?
+        let response = self.reg_client.head_request_registry(&path)?;
+        match response.status_code() {
+            200..300 => Ok(true),
+            404 => Ok(false),
+            status_code => {
+                let string = format!("request registry error,status code:{}", status_code);
+                Err(Error::msg(string))
+            }
+        }
     }
 }
 
