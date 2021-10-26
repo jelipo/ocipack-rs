@@ -7,13 +7,15 @@ use bytes::buf::Reader;
 use bytes::{Buf, Bytes};
 use log::{debug, warn};
 use reqwest::blocking::{Client, Request, Response};
-use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::header::{HeaderMap, HeaderValue, ToStrError};
 use reqwest::redirect::Policy;
 use reqwest::{Method, StatusCode, Url};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sha2::digest::DynDigest;
 use sha2::{Digest, Sha256};
+
+use crate::util::sha;
 
 #[derive(Clone)]
 pub struct RegistryHttpClient {
@@ -48,13 +50,33 @@ impl RegistryHttpClient {
         body: Option<&T>,
     ) -> Result<R> {
         let success_response = self.do_request(path, method, body)?;
-        let string1 = success_response.docker_content_digest()?;
-        let bytes = success_response.bytes_body()?;
-        let vec = bytes.to_vec();
-        let mut hasher = Sha256::new();
-        DynDigest::update(&mut hasher, &vec[..]);
-        let x = &hasher.finalize()[..];
-        Err(Error::msg("dsa"))
+        let header_docker_content_digest = success_response
+            .header_docker_content_digest()
+            .expect("No Docker-Content-Digest header");
+        let body_bytes = success_response.bytes_body();
+        let body_sha256 = format!("sha256:{}", body_sha256(body_bytes));
+        if body_bytes.len() != 0 && body_sha256 != header_docker_content_digest {
+            return Err(Error::msg("docker_content_digest verification failed"));
+        }
+        success_response.json_body::<R>()
+    }
+
+    pub fn head_request_registry(&self, path: &str) -> SimpleRegistryResponse {
+        let http_response = self.do_request_raw(path, Method::HEAD, body)?;
+        SimpleRegistryResponse {
+            status_code: http_response.status(),
+        }
+    }
+
+    fn do_request_raw<T: Serialize + ?Sized>(
+        &self,
+        path: &str,
+        method: Method,
+        body: Option<&T>,
+    ) -> Result<Response> {
+        let request = self.build_request(path, method, body)?;
+        let mut http_response = self.client.execute(request)?;
+        Ok(http_response)
     }
 
     fn do_request<T: Serialize + ?Sized>(
@@ -62,20 +84,24 @@ impl RegistryHttpClient {
         path: &str,
         method: Method,
         body: Option<&T>,
-    ) -> Result<RegistryResponse> {
-        let request = self.build_request(path, method, body)?;
-        let mut http_response = self.client.execute(request)?;
-        let response = RegistryResponse::new_registry_response(http_response)?;
-        return if response.is_success() {
+    ) -> Result<FullRegistryResponse> {
+        let http_response = self.do_request_raw(path, method, body)?;
+        return if http_response.status().is_success() {
+            let response = RegistryResponse::new_registry_response(http_response)?;
             Ok(response)
         } else {
-            let content_type = response.get_content_type();
-            Err(Error::msg(format!(
-                "Request to registry failed,status_code:{} ,content-type:{} ,body:{}",
-                response.status_code().as_str(),
-                content_type,
-                response.body_str()?,
-            )))
+            match response.get_content_type() {
+                None => Err(Error::msg(format!(
+                    "Request to registry failed,status_code:{}",
+                    response.status_code().as_str()
+                ))),
+                Some(content_type) => Err(Error::msg(format!(
+                    "Request to registry failed,status_code:{} ,content-type:{} ,body:{}",
+                    response.status_code().as_str(),
+                    content_type,
+                    response.body_str(),
+                ))),
+            }
         };
     }
 
@@ -86,10 +112,8 @@ impl RegistryHttpClient {
         body: Option<&T>,
     ) -> Result<Request> {
         let url = Url::parse((self.registry_addr.clone() + path).as_str())?;
-        let mut builder = self
-            .client
-            .request(method, url)
-            .basic_auth(&self.username, Some(&self.password));
+        let mut builder =
+            self.client.request(method, url).basic_auth(&self.username, Some(&self.password));
         if let Some(body_o) = body {
             builder = builder.json::<T>(body_o)
         }
@@ -97,66 +121,83 @@ impl RegistryHttpClient {
     }
 }
 
-pub struct RegistryErr {
-    errors: Vec<SingleRegistryError>,
+pub struct FullRegistryResponse {
+    body_bytes: Bytes,
+    content_type: Option<String>,
+    docker_content_digest: Option<String>,
+    http_status: StatusCode,
 }
 
-pub struct SingleRegistryError {
-    code: String,
-    message: String,
-}
-
-pub struct RegistryResponse {
-    http_response: Response,
-    content_type: String,
-}
-
-impl RegistryResponse {
-    pub fn new_registry_response(http_response: Response) -> Result<RegistryResponse> {
+/// Registry的Response包装
+impl FullRegistryResponse {
+    pub fn new_registry_response(http_response: Response) -> Result<FullRegistryResponse> {
         let headers = http_response.headers();
-        let content_type_value = headers.get("content-type").ok_or(Error::msg(format!(
-            "Request to registry failed,status_code:{}",
-            http_response.status().as_str(),
-        )))?;
-        let string = String::from(content_type_value.to_str()?);
+        let content_type_opt = get_header(headers, "content-type");
+        let docker_content_digest_opt = get_header(headers, "Docker-Content-Digest");
+        let code = http_response.status();
+        let body_bytes = http_response.bytes()?;
         Ok(RegistryResponse {
-            http_response,
-            content_type: string,
+            body_bytes,
+            content_type: content_type_opt,
+            docker_content_digest: docker_content_digest_opt,
+            http_status: code,
         })
     }
 
-    pub fn get_content_type(&self) -> String {
-        self.content_type.clone()
+    pub fn get_content_type(&self) -> Option<&str> {
+        self.content_type.as_ref().map(|str| str.as_str())
     }
 
     pub fn is_success(&self) -> bool {
-        self.http_response.status().is_success()
+        self.status_code().is_success()
     }
 
-    pub fn status_code(&self) -> StatusCode {
-        self.http_response.status()
+    pub fn status_code(&self) -> &StatusCode {
+        &self.http_status
     }
 
-    pub fn body_str(self) -> Result<String> {
-        Ok(self.http_response.text()?)
+    pub fn body_str(&self) -> String {
+        String::from_utf8_lossy(&self.body_bytes[..]).into()
     }
 
-    pub fn json_body<R: DeserializeOwned>(self) -> Result<R> {
-        if self.content_type.contains("json") {
-            Ok(self.http_response.json::<R>()?)
-        } else {
-            Err(Error::msg("Content-type not contains json"))
-        }
+    pub fn bytes_body(&self) -> &Bytes {
+        &self.body_bytes
     }
 
-    pub fn bytes_body(self) -> Result<Bytes> {
-        Ok(self.http_response.bytes()?)
+    pub fn json_body<R: DeserializeOwned>(&self) -> Result<R> {
+        let json_result = serde_json::from_slice::<R>(self.body_bytes.as_ref());
+        Ok(json_result?)
     }
 
-    pub fn docker_content_digest(&self) -> Result<String> {
-        return match self.http_response.headers().get("Docker-Content-Digest") {
-            None => Err(Error::msg("header 'Docker-Content-Digest' not found")),
-            Some(value) => Ok(value.to_str()?.to_string()),
-        };
+    pub fn header_docker_content_digest(&self) -> Option<String> {
+        self.docker_content_digest.clone()
     }
+}
+
+pub trait RegistryResponse {
+    fn success(&self) -> bool;
+
+    fn status_code(&self) -> u16;
+}
+
+/// 一个简单的Registry的Response，只包含状态码
+pub struct SimpleRegistryResponse {
+    status_code: StatusCode,
+}
+
+impl RegistryResponse for SimpleRegistryResponse {
+    fn success(&self) -> bool {
+        self.status_code.is_success()
+    }
+
+    fn status_code(&self) -> u16 {
+        self.status_code.as_u16()
+    }
+}
+
+fn get_header(headers: &HeaderMap, header_name: &str) -> Option<String> {
+    headers.get(header_name).and_then(|value| match value.to_str() {
+        Ok(str) => Some(String::from(str)),
+        Err(_) => None,
+    })
 }

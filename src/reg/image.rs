@@ -5,7 +5,7 @@ use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::client::RegistryHttpClient;
+use crate::reg::client::{RegistryHttpClient, RegistryResponse};
 use crate::reg::Reference;
 
 pub struct ImageManager {
@@ -21,14 +21,15 @@ impl ImageManager {
         }
     }
 
-    pub fn get_manifests(&self, reference: &Reference) -> Result<Manifest2> {
-        let path = format!(
-            "/v2/{}/manifests/{}",
-            reference.image_name, reference.reference
-        );
+    pub fn get_manifests(&self, refe: &Reference) -> Result<Manifest2> {
+        let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
+        self.reg_client.request_registry::<u8, Manifest2>(&path, Method::GET, None)
+    }
 
-        self.reg_client
-            .request_registry::<u8, Manifest2>(&path, Method::GET, None)
+    pub fn exited(&self, refe: &Reference) -> Result<bool> {
+        let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
+        let response = self.reg_client.head_request_registry(&path);
+        response.success()?
     }
 }
 
