@@ -1,12 +1,13 @@
 #![feature(exclusive_range_pattern)]
 
-mod reg;
-mod registry_client;
-mod util;
+use anyhow::Result;
 
 use crate::reg::registry::Registry;
 use crate::reg::Reference;
-use anyhow::Result;
+
+mod reg;
+mod registry_client;
+mod util;
 
 fn main() -> Result<()> {
     let registry = Registry::open("https://harbor.jelipo.com".to_string())?;
@@ -14,8 +15,7 @@ fn main() -> Result<()> {
         image_name: "oci-test111/hello-world",
         reference: "1.0",
     };
-    let info = registry.image_manager.exited(&reference)?;
+    let info = registry.image_manager.manifests_exited(&reference)?;
     println!("{:?}", info);
-
     Ok(())
 }

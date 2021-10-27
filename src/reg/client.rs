@@ -3,17 +3,17 @@ use std::option::Option::Some;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
-use bytes::buf::Reader;
-use bytes::{Buf, Bytes};
-use log::{debug, warn};
+
+use bytes::{Bytes};
+
 use reqwest::blocking::{Client, Request, Response};
-use reqwest::header::{HeaderMap, HeaderValue, ToStrError};
+use reqwest::header::{HeaderMap};
 use reqwest::redirect::Policy;
 use reqwest::{Method, StatusCode, Url};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use sha2::digest::DynDigest;
-use sha2::{Digest, Sha256};
+
+use sha2::{Digest};
 
 use crate::util::sha;
 
@@ -75,7 +75,7 @@ impl RegistryHttpClient {
         body: Option<&T>,
     ) -> Result<Response> {
         let request = self.build_request(path, method, body)?;
-        let mut http_response = self.client.execute(request)?;
+        let http_response = self.client.execute(request)?;
         Ok(http_response)
     }
 

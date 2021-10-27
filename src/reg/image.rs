@@ -5,7 +5,7 @@ use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::client::{RegistryHttpClient, RegistryResponse};
+use crate::reg::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
 use crate::reg::Reference;
 
 pub struct ImageManager {
@@ -21,22 +21,34 @@ impl ImageManager {
         }
     }
 
-    pub fn get_manifests(&self, refe: &Reference) -> Result<Manifest2> {
+    /// 获取Image的Manifest
+    pub fn manifests(&self, refe: &Reference) -> Result<Manifest2> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         self.reg_client.request_registry::<u8, Manifest2>(&path, Method::GET, None)
     }
 
-    /// Image是否存在
-    pub fn exited(&self, refe: &Reference) -> Result<bool> {
+    /// Image manifests是否存在
+    pub fn manifests_exited(&self, refe: &Reference) -> Result<bool> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let response = self.reg_client.head_request_registry(&path)?;
-        match response.status_code() {
-            200..300 => Ok(true),
-            404 => Ok(false),
-            status_code => {
-                let string = format!("request registry error,status code:{}", status_code);
-                Err(Error::msg(string))
-            }
+        exited(&response)
+    }
+
+    /// Image blobs是否存在
+    pub fn blobs_exited(&self, name: &str, digest: &str) -> Result<bool> {
+        let path = format!("/v2/{}/blobs/{}", name, digest);
+        let response = self.reg_client.head_request_registry(&path)?;
+        exited(&response)
+    }
+}
+
+fn exited(simple_response: &SimpleRegistryResponse) -> Result<bool> {
+    match simple_response.status_code() {
+        200..300 => Ok(true),
+        404 => Ok(false),
+        status_code => {
+            let msg = format!("request registry error,status code:{}", status_code);
+            Err(Error::msg(msg))
         }
     }
 }
