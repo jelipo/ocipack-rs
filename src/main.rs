@@ -12,10 +12,13 @@ mod util;
 fn main() -> Result<()> {
     let registry = Registry::open("https://harbor.jelipo.com".to_string())?;
     let reference = Reference {
-        image_name: "oci-test111/hello-world",
-        reference: "1.0",
+        image_name: "private/mongo",
+        reference: "5.0.2",
     };
-    let info = registry.image_manager.manifests_exited(&reference)?;
-    println!("{:?}", info);
+    let mainfest = registry.image_manager.manifests(&reference)?;
+    let vec = mainfest.layers;
+    let layer = &vec[0];
+    let disgest = &layer.digest;
+    registry.image_manager.blobs_download(&reference.image_name, disgest)?;
     Ok(())
 }

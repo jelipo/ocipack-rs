@@ -1,4 +1,6 @@
 use std::rc::Rc;
+use std::thread::sleep;
+use std::time::Duration;
 
 use anyhow::{Error, Result};
 use reqwest::Method;
@@ -40,6 +42,23 @@ impl ImageManager {
         let response = self.reg_client.head_request_registry(&path)?;
         exited(&response)
     }
+
+    pub fn blobs_download(&self, name: &str, digest: &str) -> Result<()> {
+        let path = format!("/v2/{}/blobs/{}", name, digest);
+        let mut downloader = self.reg_client.download(&path)?;
+        let handle = downloader.start()?;
+        let download_temp_mutex = downloader.download_temp();
+        loop {
+            sleep(Duration::from_secs(1));
+            let download_temp = download_temp_mutex.lock().unwrap();
+            println!("下载了 {}MiB", download_temp.curr_size / 1024 / 1024);
+            if download_temp.done {
+                println!("下载完成 {}字节", download_temp.curr_size);
+                break;
+            }
+        }
+        Ok(())
+    }
 }
 
 fn exited(simple_response: &SimpleRegistryResponse) -> Result<bool> {
@@ -56,10 +75,10 @@ fn exited(simple_response: &SimpleRegistryResponse) -> Result<bool> {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest2 {
-    schema_version: usize,
-    media_type: String,
-    config: ManifestConfig,
-    layers: Vec<ManifestLayer>,
+    pub schema_version: usize,
+    pub media_type: String,
+    pub config: ManifestConfig,
+    pub layers: Vec<ManifestLayer>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -73,8 +92,8 @@ pub struct ManifestConfig {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ManifestLayer {
-    media_type: String,
-    size: usize,
-    digest: String,
-    urls: Option<Vec<String>>,
+    pub media_type: String,
+    pub size: usize,
+    pub digest: String,
+    pub urls: Option<Vec<String>>,
 }

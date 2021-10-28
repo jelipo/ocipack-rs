@@ -1,19 +1,22 @@
 use std::io::Read;
 use std::option::Option::Some;
+use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
 
-use bytes::{Bytes};
+use bytes::Bytes;
 
 use reqwest::blocking::{Client, Request, Response};
-use reqwest::header::{HeaderMap};
+use reqwest::header::HeaderMap;
 use reqwest::redirect::Policy;
 use reqwest::{Method, StatusCode, Url};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use sha2::{Digest};
+use sha2::Digest;
+use crate::reg::download::RegDownloader;
+use crate::reg::get_header;
 
 use crate::util::sha;
 
@@ -119,6 +122,13 @@ impl RegistryHttpClient {
         }
         Ok(builder.build()?)
     }
+
+    pub fn download(&self, path: &str, file_path: &Path) -> Result<RegDownloader> {
+        let url = format!("{}{}", &self.registry_addr, path);
+        let downloader = RegDownloader::new_reg_downloader(
+            url, self.username.clone(), self.password.clone(), self.client.clone(), file_path)?;
+        Ok(downloader)
+    }
 }
 
 pub struct FullRegistryResponse {
@@ -193,11 +203,4 @@ impl RegistryResponse for SimpleRegistryResponse {
     fn status_code(&self) -> u16 {
         self.status_code.as_u16()
     }
-}
-
-fn get_header(headers: &HeaderMap, header_name: &str) -> Option<String> {
-    headers.get(header_name).and_then(|value| match value.to_str() {
-        Ok(str) => Some(String::from(str)),
-        Err(_) => None,
-    })
 }
