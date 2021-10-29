@@ -1,23 +1,21 @@
+use std::fs::File;
 use std::io::Read;
 use std::option::Option::Some;
 use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
-
 use bytes::Bytes;
-
+use reqwest::{Method, StatusCode, Url};
 use reqwest::blocking::{Client, Request, Response};
 use reqwest::header::HeaderMap;
 use reqwest::redirect::Policy;
-use reqwest::{Method, StatusCode, Url};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-
 use sha2::Digest;
-use crate::reg::download::RegDownloader;
-use crate::reg::get_header;
 
+use crate::reg::download::{DownloadFilenameType, RegDownloader};
+use crate::reg::get_header;
 use crate::util::sha;
 
 #[derive(Clone)]
@@ -123,13 +121,14 @@ impl RegistryHttpClient {
         Ok(builder.build()?)
     }
 
-    pub fn download(&self, path: &str, file_path: &Path) -> Result<RegDownloader> {
+    pub fn download(&self, path: &str, filename_type: DownloadFilenameType) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
         let downloader = RegDownloader::new_reg_downloader(
-            url, self.username.clone(), self.password.clone(), self.client.clone(), file_path)?;
+            url, self.username.clone(), self.password.clone(), self.client.clone(), filename_type)?;
         Ok(downloader)
     }
 }
+
 
 pub struct FullRegistryResponse {
     body_bytes: Bytes,

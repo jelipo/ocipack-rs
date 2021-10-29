@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::rc::Rc;
 use std::thread::sleep;
 use std::time::Duration;
@@ -8,18 +9,23 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::reg::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
+use crate::reg::download::{CustomDownloadFileName, DownloadFilenameType, RegDownloader};
+use crate::reg::home::HomeDir;
 use crate::reg::Reference;
+use crate::util::sha::{Sha, ShaType};
 
 pub struct ImageManager {
     registry_addr: String,
     reg_client: Rc<RegistryHttpClient>,
+    home_dir: Rc<HomeDir>,
 }
 
 impl ImageManager {
-    pub fn new(registry_addr: String, client: Rc<RegistryHttpClient>) -> ImageManager {
+    pub fn new(registry_addr: String, client: Rc<RegistryHttpClient>, home_dir: Rc<HomeDir>) -> ImageManager {
         ImageManager {
             registry_addr,
             reg_client: client,
+            home_dir,
         }
     }
 
@@ -43,21 +49,28 @@ impl ImageManager {
         exited(&response)
     }
 
-    pub fn blobs_download(&self, name: &str, digest: &str) -> Result<()> {
+    pub fn blobs_download(&self, name: &str, digest: &str) -> Result<RegDownloader> {
         let path = format!("/v2/{}/blobs/{}", name, digest);
-        let mut downloader = self.reg_client.download(&path)?;
-        let handle = downloader.start()?;
-        let download_temp_mutex = downloader.download_temp();
-        loop {
-            sleep(Duration::from_secs(1));
-            let download_temp = download_temp_mutex.lock().unwrap();
-            println!("下载了 {}MiB", download_temp.curr_size / 1024 / 1024);
-            if download_temp.done {
-                println!("下载完成 {}字节", download_temp.curr_size);
-                break;
-            }
-        }
-        Ok(())
+        let blobs_cache_path = self.home_dir.cache.blobs.path.clone();
+        let filename_type = if digest.starts_with("sha256:") {
+            let sha256 = digest.replace("sha256:", "");
+            DownloadFilenameType::Custom(CustomDownloadFileName {
+                dir_path: blobs_cache_path.join("sha256").into_boxed_path(),
+                file_name: sha256.clone(),
+                sha: Some(Sha {
+                    sha_type: ShaType::Sha256,
+                    sha_str: sha256.clone(),
+                }),
+            })
+        } else {
+            DownloadFilenameType::Custom(CustomDownloadFileName {
+                dir_path: blobs_cache_path,
+                file_name: digest.to_string(),
+                sha: None,
+            })
+        };
+        let downloader = self.reg_client.download(&path, filename_type)?;
+        Ok(downloader)
     }
 }
 
