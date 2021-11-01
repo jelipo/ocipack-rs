@@ -1,13 +1,13 @@
-use std::str::FromStr;
+use anyhow::Result;
 use reqwest::blocking::{Client, Request, Response};
 use reqwest::header::HeaderMap;
 use reqwest::{Method, Url};
 use serde::Serialize;
-use anyhow::Result;
+use std::str::FromStr;
 
+pub mod auth;
 pub mod client;
 pub mod download;
-pub mod auth;
 
 #[derive(Clone)]
 pub struct RegistryAuth {
@@ -47,7 +47,7 @@ fn build_request<T: Serialize + ?Sized>(
             HttpAuth::BasicAuth { username, password } => {
                 builder = builder.basic_auth(username, Some(password));
             }
-            HttpAuth::BearerToken { token } => builder = builder.bearer_auth(token)
+            HttpAuth::BearerToken { token } => builder = builder.bearer_auth(token),
         }
     }
     if let Some(body_o) = body {
@@ -57,8 +57,10 @@ fn build_request<T: Serialize + ?Sized>(
 }
 
 fn get_header(headers: &HeaderMap, header_name: &str) -> Option<String> {
-    headers.get(header_name).and_then(|value| match value.to_str() {
-        Ok(str) => Some(String::from(str)),
-        Err(_) => None,
-    })
+    headers
+        .get(header_name)
+        .and_then(|value| match value.to_str() {
+            Ok(str) => Some(String::from(str)),
+            Err(_) => None,
+        })
 }

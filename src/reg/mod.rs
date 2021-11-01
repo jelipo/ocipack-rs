@@ -1,9 +1,7 @@
-use reqwest::header::HeaderMap;
-
-pub mod image;
-pub mod registry;
 pub mod home;
 pub mod http;
+pub mod image;
+pub mod registry;
 
 pub struct Reference<'a> {
     /// Image的名称
@@ -11,4 +9,3 @@ pub struct Reference<'a> {
     /// 可以是TAG或者digest
     pub reference: &'a str,
 }
-

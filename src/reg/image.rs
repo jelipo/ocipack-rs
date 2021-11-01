@@ -1,16 +1,13 @@
-use std::borrow::Borrow;
 use std::rc::Rc;
-use std::thread::sleep;
-use std::time::Duration;
 
 use anyhow::{Error, Result};
 use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::reg::home::HomeDir;
 use crate::reg::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
 use crate::reg::http::download::{CustomDownloadFileName, DownloadFilenameType, RegDownloader};
-use crate::reg::home::HomeDir;
 use crate::reg::Reference;
 use crate::util::sha::{Sha, ShaType};
 
@@ -21,7 +18,11 @@ pub struct ImageManager {
 }
 
 impl ImageManager {
-    pub fn new(registry_addr: String, client: Rc<RegistryHttpClient>, home_dir: Rc<HomeDir>) -> ImageManager {
+    pub fn new(
+        registry_addr: String,
+        client: Rc<RegistryHttpClient>,
+        home_dir: Rc<HomeDir>,
+    ) -> ImageManager {
         ImageManager {
             registry_addr,
             reg_client: client,
@@ -32,7 +33,8 @@ impl ImageManager {
     /// 获取Image的Manifest
     pub fn manifests(&self, refe: &Reference) -> Result<Manifest2> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
-        self.reg_client.request_registry::<u8, Manifest2>(&path, Method::GET, None)
+        self.reg_client
+            .request_registry::<u8, Manifest2>(&path, Method::GET, None)
     }
 
     /// Image manifests是否存在

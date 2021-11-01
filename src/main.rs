@@ -1,9 +1,9 @@
 #![feature(exclusive_range_pattern)]
 
+use crate::reg::http::RegistryAuth;
+use anyhow::Result;
 use std::thread::sleep;
 use std::time::Duration;
-use anyhow::Result;
-use crate::reg::http::RegistryAuth;
 
 use crate::reg::image::ManifestLayer;
 
@@ -27,15 +27,21 @@ fn main() -> Result<()> {
     let manifest = registry.image_manager.manifests(&reference)?;
     let vec = manifest.layers;
     let layer = &vec[0];
-    download(layer, &registry, &reference);
+    download(layer, &registry, &reference)?;
     sleep(Duration::from_secs(60 * 5));
     Ok(())
 }
 
-fn download(manifest_layer: &ManifestLayer, registry: &Registry, reference: &Reference) -> Result<()> {
+fn download(
+    manifest_layer: &ManifestLayer,
+    registry: &Registry,
+    reference: &Reference,
+) -> Result<()> {
     let disgest = &manifest_layer.digest;
-    let mut downloader = registry.image_manager.blobs_download(&reference.image_name, disgest)?;
-    let handle = downloader.start()?;
+    let mut downloader = registry
+        .image_manager
+        .blobs_download(&reference.image_name, disgest)?;
+    let _handle = downloader.start()?;
     let arc = downloader.download_temp();
     loop {
         sleep(Duration::from_secs(1));

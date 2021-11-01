@@ -10,9 +10,9 @@ impl HomeDir {
         HomeDir {
             cache: CacheDir {
                 blobs: BlobsDir {
-                    path: blob_cache_dir_path.into_boxed_path()
-                }
-            }
+                    path: blob_cache_dir_path.into_boxed_path(),
+                },
+            },
         }
     }
 }

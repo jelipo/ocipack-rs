@@ -1,29 +1,26 @@
-use std::borrow::Borrow;
-use std::fs::File;
 use std::io::Read;
 use std::option::Option::Some;
-use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
 use bytes::Bytes;
-use reqwest::{Method, StatusCode, Url};
-use reqwest::blocking::{Client, Request, Response};
-use reqwest::header::HeaderMap;
+use reqwest::{Method, StatusCode};
+use reqwest::blocking::{Client, Response};
 use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sha2::Digest;
 
+use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
+use crate::reg::http::auth::RegTokenHandler;
 use crate::reg::http::download::{DownloadFilenameType, RegDownloader};
-use crate::reg::http::{build_request, do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::util::sha;
 
-#[derive(Clone)]
 pub struct RegistryHttpClient {
     registry_addr: String,
     client: Client,
     basic_auth: Option<HttpAuth>,
+    reg_token_handler: RegTokenHandler,
 }
 
 impl RegistryHttpClient {
@@ -36,13 +33,15 @@ impl RegistryHttpClient {
             .deflate(true)
             .redirect(Policy::default())
             .build()?;
-        let http_auth_opt = auth.map(|reg_auth| {
-            HttpAuth::BasicAuth { username: reg_auth.username, password: reg_auth.password }
+        let http_auth_opt = auth.map(|reg_auth| HttpAuth::BasicAuth {
+            username: reg_auth.username,
+            password: reg_auth.password,
         });
         Ok(RegistryHttpClient {
-            registry_addr: reg_addr,
-            client,
-            basic_auth: http_auth_opt,
+            registry_addr: reg_addr.clone(),
+            client: client.clone(),
+            basic_auth: http_auth_opt.clone(),
+            reg_token_handler: RegTokenHandler::new_reg_token_handler(reg_addr, http_auth_opt, client),
         })
     }
 
@@ -64,21 +63,24 @@ impl RegistryHttpClient {
         success_response.json_body::<R>()
     }
 
-    pub fn head_request_registry(&self, path: &str) -> Result<SimpleRegistryResponse> {
-        let http_response = self.do_request_raw::<u8>(path, Method::HEAD, None)?;
+    pub fn head_request_registry(&mut self, path: &str, scope: &Option<String>) -> Result<SimpleRegistryResponse> {
+        let http_response = self.do_request_raw::<u8>(path, scope, Method::HEAD, None)?;
         Ok(SimpleRegistryResponse {
             status_code: http_response.status(),
         })
     }
 
     fn do_request_raw<T: Serialize + ?Sized>(
-        &self,
+        &mut self,
         path: &str,
+        scope: &Option<String>,
         method: Method,
         body: Option<&T>,
     ) -> Result<Response> {
         let url = self.registry_addr.clone() + path;
-        let http_response = do_request_raw(&self.client, url.as_str(), method, &self.basic_auth, body)?;
+        let token = self.reg_token_handler.token(scope)?;
+        let auth = Ok(HttpAuth::BearerToken { token })
+        let http_response = do_request_raw(&self.client, url.as_str(), method, &auth, body)?;
         Ok(http_response)
     }
 
@@ -108,14 +110,21 @@ impl RegistryHttpClient {
         };
     }
 
-    pub fn download(&self, path: &str, filename_type: DownloadFilenameType) -> Result<RegDownloader> {
+    pub fn download(
+        &self,
+        path: &str,
+        filename_type: DownloadFilenameType,
+    ) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
         let downloader = RegDownloader::new_reg_downloader(
-            url, self.basic_auth.clone(), self.client.clone(), filename_type)?;
+            url,
+            self.basic_auth.clone(),
+            self.client.clone(),
+            filename_type,
+        )?;
         Ok(downloader)
     }
 }
-
 
 pub struct FullRegistryResponse {
     body_bytes: Bytes,
