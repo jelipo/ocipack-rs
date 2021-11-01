@@ -13,21 +13,20 @@ use reqwest::blocking::{Client, Response};
 use reqwest::header::HeaderMap;
 use reqwest::Method;
 
-use crate::reg::client::RegistryHttpClient;
-use crate::reg::get_header;
+use crate::reg::http::client::RegistryHttpClient;
+use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::util::sha::{file_sha256, Sha, ShaType};
 
 pub struct RegDownloader {
     url: String,
-    username: String,
-    password: String,
+    auth: Option<HttpAuth>,
     client: Client,
     temp: Arc<Mutex<RegDownloaderTemp>>,
     filename_type: DownloadFilenameType,
 }
 
 impl RegDownloader {
-    pub fn new_reg_downloader(url: String, username: String, password: String, client: Client, filename_type: DownloadFilenameType) -> Result<RegDownloader> {
+    pub fn new_reg_downloader(url: String, auth: Option<HttpAuth>, client: Client, filename_type: DownloadFilenameType) -> Result<RegDownloader> {
         let temp = Arc::new(Mutex::new(RegDownloaderTemp {
             file_size: 0,
             curr_size: 0,
@@ -35,8 +34,7 @@ impl RegDownloader {
         }));
         Ok(RegDownloader {
             url,
-            username,
-            password,
+            auth,
             client,
             temp,
             filename_type,
@@ -47,8 +45,7 @@ impl RegDownloader {
         let arc = self.temp.clone();
         let reg_http_downloader = RegHttpDownloader {
             url: self.url.clone(),
-            username: self.username.clone(),
-            password: self.password.clone(),
+            auth: self.auth.clone(),
             client: self.client.clone(),
         };
         let filename_type = self.filename_type.clone();
@@ -77,12 +74,14 @@ fn downloading(temp: Arc<Mutex<RegDownloaderTemp>>, reg_http_downloader: RegHttp
     if !parent_path.exists() { std::fs::create_dir(parent_path)? }
     if file_path.exists() {
         if check_exists_file_legal(&file_path, &filename_type)? {
+            // 检查文件没有问题后不下载，直接返回
             return Ok(());
         } else {
+            // 直接删除旧文件
             std::fs::remove_file(&file_path);
         }
     }
-    // 请求HTTP
+    // 请求HTTP下载
     let mut http_response = reg_http_downloader.do_request_raw()?;
     check(&http_response)?;
     let file = File::create(file_path)?;
@@ -95,6 +94,7 @@ fn downloading(temp: Arc<Mutex<RegDownloaderTemp>>, reg_http_downloader: RegHttp
     Ok(())
 }
 
+/// 检查已经存在的文件是否符合要求
 fn check_exists_file_legal(exists_file_path: &Path, filename_type: &DownloadFilenameType) -> Result<bool> {
     match filename_type {
         DownloadFilenameType::Auto(_) => Ok(false),
@@ -104,11 +104,7 @@ fn check_exists_file_legal(exists_file_path: &Path, filename_type: &DownloadFile
                 return match shas.sha_type {
                     ShaType::Sha256 => {
                         let sha256 = file_sha256(&exists_file_path)?;
-                        if shas.sha_str == sha256 {
-                            Ok(true)
-                        } else {
-                            Ok(false)
-                        }
+                        Ok(shas.sha_str == sha256)
                     }
                     ShaType::Sha128 => Ok(false)
                 };
@@ -119,19 +115,14 @@ fn check_exists_file_legal(exists_file_path: &Path, filename_type: &DownloadFile
 
 struct RegHttpDownloader {
     url: String,
-    username: String,
-    password: String,
+    auth: Option<HttpAuth>,
     client: Client,
 }
 
 impl RegHttpDownloader {
     fn do_request_raw(&self) -> Result<Response> {
         let url = self.url.as_str();
-        let mut builder = self.client.request(Method::GET, url)
-            .basic_auth(&self.username, Some(&self.password));
-        let request = builder.build()?;
-        let http_response = self.client.execute(request)?;
-        Ok(http_response)
+        do_request_raw::<u8>(&self.client, url, Method::GET, &self.auth, None)
     }
 }
 

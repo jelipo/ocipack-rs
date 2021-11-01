@@ -3,6 +3,8 @@
 use std::thread::sleep;
 use std::time::Duration;
 use anyhow::Result;
+use crate::reg::http::RegistryAuth;
+
 use crate::reg::image::ManifestLayer;
 
 use crate::reg::registry::Registry;
@@ -13,13 +15,17 @@ mod registry_client;
 mod util;
 
 fn main() -> Result<()> {
-    let registry = Registry::open("https://harbor.jelipo.com".to_string())?;
+    let auth = RegistryAuth {
+        username: "jelipo".to_string(),
+        password: "".to_string(),
+    };
+    let registry = Registry::open("https://harbor.jelipo.com".to_string(), Some(auth))?;
     let reference = Reference {
         image_name: "private/mongo",
         reference: "5.0.2",
     };
-    let mainfest = registry.image_manager.manifests(&reference)?;
-    let vec = mainfest.layers;
+    let manifest = registry.image_manager.manifests(&reference)?;
+    let vec = manifest.layers;
     let layer = &vec[0];
     download(layer, &registry, &reference);
     sleep(Duration::from_secs(60 * 5));

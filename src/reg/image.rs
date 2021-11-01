@@ -8,8 +8,8 @@ use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
-use crate::reg::download::{CustomDownloadFileName, DownloadFilenameType, RegDownloader};
+use crate::reg::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
+use crate::reg::http::download::{CustomDownloadFileName, DownloadFilenameType, RegDownloader};
 use crate::reg::home::HomeDir;
 use crate::reg::Reference;
 use crate::util::sha::{Sha, ShaType};

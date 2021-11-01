@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::fs::File;
 use std::io::Read;
 use std::option::Option::Some;
@@ -14,20 +15,19 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sha2::Digest;
 
-use crate::reg::download::{DownloadFilenameType, RegDownloader};
-use crate::reg::get_header;
+use crate::reg::http::download::{DownloadFilenameType, RegDownloader};
+use crate::reg::http::{build_request, do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::util::sha;
 
 #[derive(Clone)]
 pub struct RegistryHttpClient {
     registry_addr: String,
-    username: String,
-    password: String,
     client: Client,
+    basic_auth: Option<HttpAuth>,
 }
 
 impl RegistryHttpClient {
-    pub fn new(reg_addr: String, username: &str, password: &str) -> Result<RegistryHttpClient> {
+    pub fn new(reg_addr: String, auth: Option<RegistryAuth>) -> Result<RegistryHttpClient> {
         let client = reqwest::blocking::ClientBuilder::new()
             .timeout(Duration::from_secs(10))
             .gzip(true)
@@ -36,11 +36,13 @@ impl RegistryHttpClient {
             .deflate(true)
             .redirect(Policy::default())
             .build()?;
+        let http_auth_opt = auth.map(|reg_auth| {
+            HttpAuth::BasicAuth { username: reg_auth.username, password: reg_auth.password }
+        });
         Ok(RegistryHttpClient {
             registry_addr: reg_addr,
-            username: username.to_string(),
-            password: password.to_string(),
             client,
+            basic_auth: http_auth_opt,
         })
     }
 
@@ -75,8 +77,8 @@ impl RegistryHttpClient {
         method: Method,
         body: Option<&T>,
     ) -> Result<Response> {
-        let request = self.build_request(path, method, body)?;
-        let http_response = self.client.execute(request)?;
+        let url = self.registry_addr.clone() + path;
+        let http_response = do_request_raw(&self.client, url.as_str(), method, &self.basic_auth, body)?;
         Ok(http_response)
     }
 
@@ -106,25 +108,10 @@ impl RegistryHttpClient {
         };
     }
 
-    fn build_request<T: Serialize + ?Sized>(
-        &self,
-        path: &str,
-        method: Method,
-        body: Option<&T>,
-    ) -> Result<Request> {
-        let url = Url::parse((self.registry_addr.clone() + path).as_str())?;
-        let mut builder =
-            self.client.request(method, url).basic_auth(&self.username, Some(&self.password));
-        if let Some(body_o) = body {
-            builder = builder.json::<T>(body_o)
-        }
-        Ok(builder.build()?)
-    }
-
     pub fn download(&self, path: &str, filename_type: DownloadFilenameType) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
         let downloader = RegDownloader::new_reg_downloader(
-            url, self.username.clone(), self.password.clone(), self.client.clone(), filename_type)?;
+            url, self.basic_auth.clone(), self.client.clone(), filename_type)?;
         Ok(downloader)
     }
 }
