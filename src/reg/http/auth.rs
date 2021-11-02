@@ -71,13 +71,10 @@ impl RegTokenHandler {
         let token_response = adapter.new_token(scope_opt, &self.basic_auth, &self.client)?;
         let scope = if let Some(scope) = scope_opt { scope } else { "" };
         let second_time_now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        self.scope_token_map.insert(
-            scope.to_string(),
-            InnerToken {
-                token: token_response.token.clone(),
-                expire_second_time: second_time_now + token_response.expires_in as u64,
-            },
-        );
+        self.scope_token_map.insert(scope.to_string(), InnerToken {
+            token: token_response.token.clone(),
+            expire_second_time: second_time_now + token_response.expires_in as u64,
+        });
         Ok(token_response.token)
     }
 

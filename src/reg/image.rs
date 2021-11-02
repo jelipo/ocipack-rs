@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use anyhow::{Error, Result};
@@ -13,14 +14,14 @@ use crate::util::sha::{Sha, ShaType};
 
 pub struct ImageManager {
     registry_addr: String,
-    reg_client: Rc<RegistryHttpClient>,
+    reg_client: RefCell<RegistryHttpClient>,
     home_dir: Rc<HomeDir>,
 }
 
 impl ImageManager {
     pub fn new(
         registry_addr: String,
-        client: Rc<RegistryHttpClient>,
+        client: RefCell<RegistryHttpClient>,
         home_dir: Rc<HomeDir>,
     ) -> ImageManager {
         ImageManager {
@@ -31,23 +32,25 @@ impl ImageManager {
     }
 
     /// 获取Image的Manifest
-    pub fn manifests(&self, refe: &Reference) -> Result<Manifest2> {
+    pub fn manifests(&mut self, refe: &Reference) -> Result<Manifest2> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
-        self.reg_client
-            .request_registry::<u8, Manifest2>(&path, Method::GET, None)
+        let scope = Some(refe.image_name.to_string());
+        self.reg_client.request_registry::<u8, Manifest2>(&path, &scope, Method::GET, None)
     }
 
     /// Image manifests是否存在
-    pub fn manifests_exited(&self, refe: &Reference) -> Result<bool> {
+    pub fn manifests_exited(&mut self, refe: &Reference) -> Result<bool> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
-        let response = self.reg_client.head_request_registry(&path)?;
+        let scope = Some(refe.image_name.to_string());
+        let response = self.reg_client.head_request_registry(&path, &scope)?;
         exited(&response)
     }
 
     /// Image blobs是否存在
-    pub fn blobs_exited(&self, name: &str, digest: &str) -> Result<bool> {
+    pub fn blobs_exited(&mut self, name: &str, digest: &str) -> Result<bool> {
         let path = format!("/v2/{}/blobs/{}", name, digest);
-        let response = self.reg_client.head_request_registry(&path)?;
+        let scope = Some(refe.image_name.to_string());
+        let response = self.reg_client.head_request_registry(&path, &scope)?;
         exited(&response)
     }
 

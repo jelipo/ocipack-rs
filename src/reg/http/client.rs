@@ -46,12 +46,13 @@ impl RegistryHttpClient {
     }
 
     pub fn request_registry<T: Serialize + ?Sized, R: DeserializeOwned>(
-        &self,
+        &mut self,
         path: &str,
+        scope: &Option<String>,
         method: Method,
         body: Option<&T>,
     ) -> Result<R> {
-        let success_response = self.do_request(path, method, body)?;
+        let success_response = self.do_request(path, scope, method, body)?;
         let header_docker_content_digest = success_response
             .header_docker_content_digest()
             .expect("No Docker-Content-Digest header");
@@ -79,18 +80,19 @@ impl RegistryHttpClient {
     ) -> Result<Response> {
         let url = self.registry_addr.clone() + path;
         let token = self.reg_token_handler.token(scope)?;
-        let auth = Ok(HttpAuth::BearerToken { token })
+        let auth = Some(HttpAuth::BearerToken { token });
         let http_response = do_request_raw(&self.client, url.as_str(), method, &auth, body)?;
         Ok(http_response)
     }
 
     fn do_request<T: Serialize + ?Sized>(
-        &self,
+        &mut self,
         path: &str,
+        scope: &Option<String>,
         method: Method,
         body: Option<&T>,
     ) -> Result<FullRegistryResponse> {
-        let http_response = self.do_request_raw(path, method, body)?;
+        let http_response = self.do_request_raw(path, scope, method, body)?;
         let response = FullRegistryResponse::new_registry_response(http_response)?;
         return if response.is_success() {
             Ok(response)
