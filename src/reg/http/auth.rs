@@ -33,8 +33,8 @@ impl RegTokenHandler {
         }
     }
 
-    pub fn token(&mut self, scope_opt: &Option<String>) -> Result<String> {
-        let scope = if let Some(ref scope) = scope_opt { scope.as_str() } else { "" };
+    pub fn token(&mut self, scope_opt: &Option<&str>) -> Result<String> {
+        let scope = if let Some(scope) = scope_opt { scope } else { "" };
         if let Some(token) = self.token_from_cache(scope)? {
             Ok(token)
         } else {
@@ -56,7 +56,7 @@ impl RegTokenHandler {
         return Ok(None);
     }
 
-    fn update_token_to_cache(&mut self, scope_opt: &Option<String>) -> Result<String> {
+    fn update_token_to_cache(&mut self, scope_opt: &Option<&str>) -> Result<String> {
         let adapter = match &self.authenticate_adapter {
             None => {
                 let new_adapter = AuthenticateAdapter::new_authenticate_adapter(
@@ -112,13 +112,13 @@ impl AuthenticateAdapter {
 
     pub fn new_token(
         &self,
-        scope: &Option<String>,
+        scope: &Option<&str>,
         basic_auth: &Option<HttpAuth>,
         client: &Client,
     ) -> Result<TokenResponse> {
         let mut url = format!("{}?service={}", &self.realm, &self.service);
         if let Some(scope_raw) = scope {
-            url = url + "&scope=repository:" + scope_raw.as_str();
+            url = url + "&scope=repository:" + scope_raw;
         }
         let http_response =
             do_request_raw::<u8>(client, url.as_str(), Method::GET, basic_auth, None)?;

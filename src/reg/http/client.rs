@@ -50,7 +50,7 @@ impl RegistryHttpClient {
     pub fn request_registry<T: Serialize + ?Sized, R: DeserializeOwned>(
         &mut self,
         path: &str,
-        scope: &Option<String>,
+        scope: &Option<&str>,
         method: Method,
         body: Option<&T>,
     ) -> Result<R> {
@@ -66,7 +66,7 @@ impl RegistryHttpClient {
         success_response.json_body::<R>()
     }
 
-    pub fn head_request_registry(&mut self, path: &str, scope: &Option<String>) -> Result<SimpleRegistryResponse> {
+    pub fn head_request_registry(&mut self, path: &str, scope: &Option<&str>) -> Result<SimpleRegistryResponse> {
         let http_response = self.do_request_raw::<u8>(path, scope, Method::HEAD, None)?;
         Ok(SimpleRegistryResponse {
             status_code: http_response.status(),
@@ -76,7 +76,7 @@ impl RegistryHttpClient {
     fn do_request_raw<T: Serialize + ?Sized>(
         &mut self,
         path: &str,
-        scope: &Option<String>,
+        scope: &Option<&str>,
         method: Method,
         body: Option<&T>,
     ) -> Result<Response> {
@@ -90,7 +90,7 @@ impl RegistryHttpClient {
     fn do_request<T: Serialize + ?Sized>(
         &mut self,
         path: &str,
-        scope: &Option<String>,
+        scope: &Option<&str>,
         method: Method,
         body: Option<&T>,
     ) -> Result<FullRegistryResponse> {

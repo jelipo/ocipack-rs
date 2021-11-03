@@ -42,7 +42,7 @@ impl RegDownloader {
         })
     }
 
-    pub fn start(&self) -> Result<JoinHandle<Result<()>>> {
+    pub fn start(&self) -> Result<JoinHandle<Result<String>>> {
         let arc = self.temp.clone();
         let reg_http_downloader = RegHttpDownloader {
             url: self.url.clone(),
@@ -50,7 +50,7 @@ impl RegDownloader {
             client: self.client.clone(),
         };
         let file_path_c = self.file_path.clone();
-        let handle = thread::spawn::<_, Result<()>>(move || {
+        let handle = thread::spawn::<_, Result<String>>(move || {
             let downloader = reg_http_downloader;
             let temp = arc.clone();
             let result = downloading(temp, file_path_c.as_str(), downloader);
@@ -59,7 +59,7 @@ impl RegDownloader {
             if let Err(err) = &result {
                 println!("{}\n{}", err, err.backtrace());
             }
-            result
+            Ok(file_path_c)
         });
         Ok(handle)
     }
