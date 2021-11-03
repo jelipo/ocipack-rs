@@ -1,5 +1,7 @@
 use std::io::Read;
 use std::option::Option::Some;
+use std::path::Path;
+use std::rc::Rc;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
@@ -115,14 +117,15 @@ impl RegistryHttpClient {
     pub fn download(
         &self,
         path: &str,
-        filename_type: DownloadFilenameType,
+        file_path: &str,
     ) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
+        let path1 = file_path.clone();
         let downloader = RegDownloader::new_reg_downloader(
             url,
             self.basic_auth.clone(),
             self.client.clone(),
-            filename_type,
+            file_path,
         )?;
         Ok(downloader)
     }

@@ -92,7 +92,7 @@ impl AuthenticateAdapter {
         registry_addr: &str,
         client: &Client,
     ) -> Result<AuthenticateAdapter> {
-        let bearer_url = format!("{}/v2", registry_addr);
+        let bearer_url = format!("{}/v2/", registry_addr);
         let http_response =
             do_request_raw::<u8>(client, bearer_url.as_str(), Method::GET, &None, None)?;
         let www_authenticate = get_header(http_response.headers(), "Www-Authenticate")
@@ -118,7 +118,7 @@ impl AuthenticateAdapter {
     ) -> Result<TokenResponse> {
         let mut url = format!("{}?service={}", &self.realm, &self.service);
         if let Some(scope_raw) = scope {
-            url = url + "&scope=" + scope_raw.as_str();
+            url = url + "&scope=repository:" + scope_raw.as_str();
         }
         let http_response =
             do_request_raw::<u8>(client, url.as_str(), Method::GET, basic_auth, None)?;

@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use anyhow::{Error, Result};
@@ -10,18 +11,18 @@ use crate::reg::home::HomeDir;
 use crate::reg::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
 use crate::reg::http::download::{CustomDownloadFileName, DownloadFilenameType, RegDownloader};
 use crate::reg::Reference;
-use crate::util::sha::{Sha, ShaType};
+use crate::util::sha::{file_sha256, Sha, sha256, ShaType};
 
 pub struct ImageManager {
     registry_addr: String,
-    reg_client: RefCell<RegistryHttpClient>,
+    reg_client: Rc<RefCell<RegistryHttpClient>>,
     home_dir: Rc<HomeDir>,
 }
 
 impl ImageManager {
     pub fn new(
         registry_addr: String,
-        client: RefCell<RegistryHttpClient>,
+        client: Rc<RefCell<RegistryHttpClient>>,
         home_dir: Rc<HomeDir>,
     ) -> ImageManager {
         ImageManager {
@@ -35,47 +36,57 @@ impl ImageManager {
     pub fn manifests(&mut self, refe: &Reference) -> Result<Manifest2> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name.to_string());
-        self.reg_client.request_registry::<u8, Manifest2>(&path, &scope, Method::GET, None)
+        let mut reg_rc = self.reg_client.borrow_mut();
+        reg_rc.request_registry::<u8, Manifest2>(&path, &scope, Method::GET, None)
     }
 
     /// Image manifests是否存在
     pub fn manifests_exited(&mut self, refe: &Reference) -> Result<bool> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name.to_string());
-        let response = self.reg_client.head_request_registry(&path, &scope)?;
+        let response = self.reg_client.borrow_mut().head_request_registry(&path, &scope)?;
         exited(&response)
     }
 
     /// Image blobs是否存在
     pub fn blobs_exited(&mut self, name: &str, digest: &str) -> Result<bool> {
         let path = format!("/v2/{}/blobs/{}", name, digest);
-        let scope = Some(refe.image_name.to_string());
-        let response = self.reg_client.head_request_registry(&path, &scope)?;
+        let scope = Some(name.to_string());
+        let response = self.reg_client.borrow_mut().head_request_registry(&path, &scope)?;
         exited(&response)
     }
 
-    pub fn blobs_download(&self, name: &str, digest: &str) -> Result<RegDownloader> {
+    pub fn blobs_download(&self, name: &str, digest: &str) -> Result<Option<RegDownloader>> {
         let path = format!("/v2/{}/blobs/{}", name, digest);
         let blobs_cache_path = self.home_dir.cache.blobs.path.clone();
-        let filename_type = if digest.starts_with("sha256:") {
-            let sha256 = digest.replace("sha256:", "");
-            DownloadFilenameType::Custom(CustomDownloadFileName {
-                dir_path: blobs_cache_path.join("sha256").into_boxed_path(),
-                file_name: sha256.clone(),
-                sha: Some(Sha {
-                    sha_type: ShaType::Sha256,
-                    sha_str: sha256.clone(),
-                }),
-            })
+        let file_name = digest.replace(":", "_");
+        let file_path = blobs_cache_path.join(file_name.as_str());
+        if !self.download_check(file_name.as_str(), file_path.as_path())? {
+            return Ok(None);
+        }
+        let downloader = self.reg_client.borrow().download(&path, file_path.to_str().unwrap())?;
+        Ok(Some(downloader))
+    }
+
+    /// 下载前置检查，是否需要下载
+    fn download_check(&self, file_name: &str, file_path: &Path) -> Result<bool> {
+        return if file_path.exists() {
+            if file_name.starts_with("sha256_") {
+                let file_sha256 = file_sha256(file_path)?;
+                let need_sha256 = file_name.replace("sha256_", "");
+                if file_sha256 == need_sha256 {
+                    Ok(false)
+                } else {
+                    std::fs::remove_file(file_path)?;
+                    Ok(true)
+                }
+            } else {
+                std::fs::remove_file(file_path)?;
+                Ok(true)
+            }
         } else {
-            DownloadFilenameType::Custom(CustomDownloadFileName {
-                dir_path: blobs_cache_path,
-                file_name: digest.to_string(),
-                sha: None,
-            })
+            Ok(true)
         };
-        let downloader = self.reg_client.download(&path, filename_type)?;
-        Ok(downloader)
     }
 }
 
