@@ -26,9 +26,9 @@ pub struct RegistryHttpClient {
 impl RegistryHttpClient {
     pub fn new(reg_addr: String, auth: Option<RegistryAuth>) -> Result<RegistryHttpClient> {
         let client = reqwest::blocking::ClientBuilder::new()
-            .timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(30))
             .gzip(true)
-            .connect_timeout(Duration::from_secs(5))
+            .connect_timeout(Duration::from_secs(10))
             .danger_accept_invalid_certs(true)
             .deflate(true)
             .redirect(Policy::default())
@@ -62,9 +62,9 @@ impl RegistryHttpClient {
             .expect("No Docker-Content-Digest header");
         let body_bytes = success_response.bytes_body();
         let body_sha256 = format!("sha256:{}", sha::sha256(body_bytes));
-        if body_bytes.len() != 0 && body_sha256 != header_docker_content_digest {
-            return Err(Error::msg("docker_content_digest verification failed"));
-        }
+        // if body_bytes.len() != 0 && body_sha256 != header_docker_content_digest {
+        //     return Err(Error::msg("docker_content_digest verification failed"));
+        // }
         success_response.json_body::<R>()
     }
 

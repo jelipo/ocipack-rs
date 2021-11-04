@@ -23,12 +23,16 @@ fn main() -> Result<()> {
     let config_file = File::open(config_path)
         .expect("Open config file failed.");
     let temp_config = serde_json::from_reader::<_, TempConfig>(config_file)?;
-    let auth = RegistryAuth {
-        username: temp_config.username,
-        password: temp_config.password,
+    let auth_opt = if temp_config.username.is_empty() {
+        None
+    } else {
+        Some(RegistryAuth {
+            username: temp_config.username,
+            password: temp_config.password,
+        })
     };
     let home_dir_path = Path::new(temp_config.home_dir.as_str());
-    let mut registry = Registry::open(temp_config.registry, Some(auth), home_dir_path)?;
+    let mut registry = Registry::open(temp_config.registry, auth_opt, home_dir_path)?;
     let reference = Reference {
         image_name: temp_config.image_name.as_str(),
         reference: temp_config.reference.as_str(),

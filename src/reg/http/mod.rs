@@ -21,6 +21,23 @@ pub enum HttpAuth {
     BearerToken { token: String },
 }
 
+pub struct RegistryAccept(&'static str);
+
+impl RegistryAccept {
+    const APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_V2JSON: Self = Self("application/vnd.docker.distribution.manifest.v2+json");
+    const ALL: Self = Self("*/*");
+
+    fn get_value(&self) ->&'static str{
+        self.0
+    }
+}
+
+fn test(accept: RegistryAccept) {
+    let value = accept.get_value();
+    println!("{}", value);
+}
+
+
 fn do_request_raw<T: Serialize + ?Sized>(
     client: &Client,
     url: &str,

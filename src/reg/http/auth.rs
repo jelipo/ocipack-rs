@@ -128,7 +128,7 @@ impl AuthenticateAdapter {
     ) -> Result<TokenResponse> {
         let mut url = format!("{}?service={}", &self.realm, &self.service);
         if let Some(scope_raw) = scope {
-            url = url + "&scope=repository:" + scope_raw;
+            url = url + "&scope=repository:" + scope_raw + ":pull";
         }
         let http_response =
             do_request_raw::<u8>(client, url.as_str(), Method::GET, basic_auth, None)?;
