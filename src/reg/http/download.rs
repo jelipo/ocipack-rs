@@ -1,7 +1,6 @@
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
@@ -11,7 +10,7 @@ use reqwest::blocking::{Client, Response};
 use reqwest::Method;
 
 use crate::reg::http::{do_request_raw, get_header, HttpAuth};
-use crate::util::sha::{file_sha256, Sha, ShaType};
+use crate::util::sha::Sha;
 
 pub struct RegDownloader {
     url: String,

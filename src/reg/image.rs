@@ -1,6 +1,6 @@
 use std::cell::RefCell;
-use std::ops::Add;
-use std::path::{Path, PathBuf};
+
+use std::path::Path;
 use std::rc::Rc;
 
 use anyhow::{Error, Result};
@@ -10,9 +10,9 @@ use serde::Serialize;
 
 use crate::reg::home::HomeDir;
 use crate::reg::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
-use crate::reg::http::download::{CustomDownloadFileName, DownloadFilenameType, RegDownloader};
+use crate::reg::http::download::RegDownloader;
 use crate::reg::Reference;
-use crate::util::sha::{file_sha256, Sha, sha256, ShaType};
+use crate::util::sha::file_sha256;
 
 pub struct ImageManager {
     registry_addr: String,

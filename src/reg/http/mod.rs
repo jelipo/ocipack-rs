@@ -4,7 +4,6 @@ use reqwest::header::HeaderMap;
 use reqwest::{Method, Url};
 use serde::Serialize;
 use std::str::FromStr;
-use crate::reg::http::auth::RegTokenHandler;
 
 pub mod auth;
 pub mod client;
@@ -58,10 +57,8 @@ fn build_request<T: Serialize + ?Sized>(
 }
 
 fn get_header(headers: &HeaderMap, header_name: &str) -> Option<String> {
-    headers
-        .get(header_name)
-        .and_then(|value| match value.to_str() {
-            Ok(str) => Some(String::from(str)),
-            Err(_) => None,
-        })
+    headers.get(header_name).and_then(|value| match value.to_str() {
+        Ok(str) => Some(String::from(str)),
+        Err(_) => None,
+    })
 }

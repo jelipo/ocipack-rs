@@ -34,7 +34,11 @@ impl RegTokenHandler {
     }
 
     pub fn token(&mut self, scope_opt: &Option<&str>) -> Result<String> {
-        let scope = if let Some(scope) = scope_opt { scope } else { "" };
+        let scope = if let Some(scope) = scope_opt {
+            scope
+        } else {
+            ""
+        };
         if let Some(token) = self.token_from_cache(scope)? {
             Ok(token)
         } else {
@@ -69,18 +73,24 @@ impl RegTokenHandler {
             Some(adapter) => adapter,
         };
         let token_response = adapter.new_token(scope_opt, &self.basic_auth, &self.client)?;
-        let scope = if let Some(scope) = scope_opt { scope } else { "" };
+        let scope = if let Some(scope) = scope_opt {
+            scope
+        } else {
+            ""
+        };
         let second_time_now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        self.scope_token_map.insert(scope.to_string(), InnerToken {
-            token: token_response.token.clone(),
-            expire_second_time: second_time_now + token_response.expires_in as u64,
-        });
+        self.scope_token_map.insert(
+            scope.to_string(),
+            InnerToken {
+                token: token_response.token.clone(),
+                expire_second_time: second_time_now + token_response.expires_in as u64,
+            },
+        );
         Ok(token_response.token)
     }
 
     fn build_adapter(&self, _scope: &Option<String>) {}
 }
-
 
 pub struct AuthenticateAdapter {
     realm: String,

@@ -1,7 +1,5 @@
 use std::io::Read;
 use std::option::Option::Some;
-use std::path::Path;
-use std::rc::Rc;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
@@ -15,7 +13,7 @@ use sha2::Digest;
 
 use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::reg::http::auth::RegTokenHandler;
-use crate::reg::http::download::{DownloadFilenameType, RegDownloader};
+use crate::reg::http::download::RegDownloader;
 use crate::util::sha;
 
 pub struct RegistryHttpClient {
@@ -43,7 +41,11 @@ impl RegistryHttpClient {
             registry_addr: reg_addr.clone(),
             client: client.clone(),
             basic_auth: http_auth_opt.clone(),
-            reg_token_handler: RegTokenHandler::new_reg_token_handler(reg_addr, http_auth_opt, client),
+            reg_token_handler: RegTokenHandler::new_reg_token_handler(
+                reg_addr,
+                http_auth_opt,
+                client,
+            ),
         })
     }
 
@@ -66,7 +68,11 @@ impl RegistryHttpClient {
         success_response.json_body::<R>()
     }
 
-    pub fn head_request_registry(&mut self, path: &str, scope: &Option<&str>) -> Result<SimpleRegistryResponse> {
+    pub fn head_request_registry(
+        &mut self,
+        path: &str,
+        scope: &Option<&str>,
+    ) -> Result<SimpleRegistryResponse> {
         let http_response = self.do_request_raw::<u8>(path, scope, Method::HEAD, None)?;
         Ok(SimpleRegistryResponse {
             status_code: http_response.status(),
@@ -114,13 +120,9 @@ impl RegistryHttpClient {
         };
     }
 
-    pub fn download(
-        &self,
-        path: &str,
-        file_path: &str,
-    ) -> Result<RegDownloader> {
+    pub fn download(&self, path: &str, file_path: &str) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
-        let path1 = file_path.clone();
+        let _path1 = file_path.clone();
         let downloader = RegDownloader::new_reg_downloader(
             url,
             self.basic_auth.clone(),

@@ -1,7 +1,7 @@
 #![feature(exclusive_range_pattern)]
 
 use std::fs::File;
-use std::io::Read;
+
 use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
@@ -11,8 +11,8 @@ use serde::Deserialize;
 
 use crate::reg::http::RegistryAuth;
 use crate::reg::image::ManifestLayer;
-use crate::reg::Reference;
 use crate::reg::registry::Registry;
+use crate::reg::Reference;
 
 mod reg;
 mod registry_client;
@@ -20,7 +20,7 @@ mod util;
 
 fn main() -> Result<()> {
     let config_path = Path::new("config.json");
-    let mut config_file = File::open(config_path)?;
+    let config_file = File::open(config_path)?;
     let temp_config = serde_json::from_reader::<_, TempConfig>(config_file)?;
     let auth = RegistryAuth {
         username: temp_config.username,
@@ -46,7 +46,7 @@ fn download(
     reference: &Reference,
 ) -> Result<()> {
     let disgest = &manifest_layer.digest;
-    let mut downloader_opt = registry.image_manager.blobs_download(&reference.image_name, disgest)?;
+    let downloader_opt = registry.image_manager.blobs_download(&reference.image_name, disgest)?;
     if let Some(downloader) = downloader_opt {
         let handle = downloader.start()?;
         let arc = downloader.download_temp();
@@ -61,7 +61,7 @@ fn download(
             }
         }
         let result = handle.join().unwrap();
-        println!("文件路径：{}",result.unwrap());
+        println!("文件路径：{}", result.unwrap());
     } else {
         println!("无需下载");
     }
