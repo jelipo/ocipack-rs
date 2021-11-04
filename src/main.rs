@@ -20,7 +20,8 @@ mod util;
 
 fn main() -> Result<()> {
     let config_path = Path::new("config.json");
-    let config_file = File::open(config_path)?;
+    let config_file = File::open(config_path)
+        .expect("Open config file failed.");
     let temp_config = serde_json::from_reader::<_, TempConfig>(config_file)?;
     let auth = RegistryAuth {
         username: temp_config.username,
@@ -34,8 +35,9 @@ fn main() -> Result<()> {
     };
     let manifest = registry.image_manager.manifests(&reference)?;
     let vec = manifest.layers;
-    let layer = &vec[0];
-    download(layer, &registry, &reference)?;
+    for layer in vec {
+        download(&layer, &registry, &reference)?;
+    }
     sleep(Duration::from_secs(60 * 5));
     Ok(())
 }
