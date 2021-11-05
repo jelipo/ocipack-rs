@@ -9,6 +9,7 @@ use anyhow::{Error, Result};
 use reqwest::blocking::{Client, Response};
 use reqwest::Method;
 
+use crate::progress::{Processor, ProcessorAsync, ProgressStatus};
 use crate::reg::http::{do_request_raw, get_header, HttpAuth};
 use crate::util::sha::Sha;
 
@@ -18,6 +19,58 @@ pub struct RegDownloader {
     client: Client,
     temp: Arc<Mutex<RegDownloaderTemp>>,
     file_path: String,
+}
+
+impl Processor<String> for RegDownloader {
+    fn start(&self) -> Box<dyn ProcessorAsync<String>> {
+        let arc = self.temp.clone();
+        let reg_http_downloader = RegHttpDownloader {
+            url: self.url.clone(),
+            auth: self.auth.clone(),
+            client: self.client.clone(),
+        };
+        let file_path_c = self.file_path.clone();
+        let handle = thread::spawn::<_, Result<String>>(move || {
+            let downloader = reg_http_downloader;
+            let temp = arc.clone();
+            let result = downloading(temp, file_path_c.as_str(), downloader);
+            let mut download_temp = arc.lock().expect("lock failed");
+            download_temp.done = true;
+            if let Err(err) = &result {
+                println!("{}\n{}", err, err.backtrace());
+            }
+            Ok(file_path_c)
+        });
+        Box::new(RegDownloadHandler {
+            join: handle
+        })
+    }
+
+    fn process_status(&self) -> Arc<Mutex<dyn ProgressStatus>> {
+        self.temp.clone()
+    }
+}
+
+
+pub struct RegDownloadHandler {
+    join: JoinHandle<Result<String>>,
+}
+
+impl ProcessorAsync<String> for RegDownloadHandler {
+    fn wait_result(self: Box<Self>) -> Result<String> {
+        let result = self.join.join();
+        result.unwrap()
+    }
+}
+
+pub struct RegDownloadHandler2 {
+    result: String,
+}
+
+impl ProcessorAsync<String> for RegDownloadHandler2 {
+    fn wait_result(self: Box<Self>) -> Result<String> {
+        Ok(self.result)
+    }
 }
 
 impl RegDownloader {
@@ -39,32 +92,6 @@ impl RegDownloader {
             temp,
             file_path: file_path.to_string(),
         })
-    }
-
-    pub fn start(&self) -> Result<JoinHandle<Result<String>>> {
-        let arc = self.temp.clone();
-        let reg_http_downloader = RegHttpDownloader {
-            url: self.url.clone(),
-            auth: self.auth.clone(),
-            client: self.client.clone(),
-        };
-        let file_path_c = self.file_path.clone();
-        let handle = thread::spawn::<_, Result<String>>(move || {
-            let downloader = reg_http_downloader;
-            let temp = arc.clone();
-            let result = downloading(temp, file_path_c.as_str(), downloader);
-            let mut download_temp = arc.lock().expect("lock failed");
-            download_temp.done = true;
-            if let Err(err) = &result {
-                println!("{}\n{}", err, err.backtrace());
-            }
-            Ok(file_path_c)
-        });
-        Ok(handle)
-    }
-
-    pub fn download_temp(&self) -> Arc<Mutex<RegDownloaderTemp>> {
-        self.temp.clone()
     }
 }
 
@@ -143,6 +170,20 @@ pub struct RegDownloaderTemp {
     file_size: usize,
     pub curr_size: usize,
     pub done: bool,
+}
+
+impl ProgressStatus for RegDownloaderTemp {
+    fn full_size(&self) -> usize {
+        self.file_size
+    }
+
+    fn now_size(&self) -> usize {
+        self.curr_size
+    }
+
+    fn is_done(&self) -> bool {
+        self.done
+    }
 }
 
 #[derive(Clone)]

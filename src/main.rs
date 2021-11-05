@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use serde::Deserialize;
+use crate::progress::Processor;
 
 use crate::reg::http::RegistryAuth;
 use crate::reg::image::ManifestLayer;
@@ -17,16 +18,17 @@ use crate::reg::Reference;
 mod reg;
 mod registry_client;
 mod util;
+mod display;
+mod progress;
 
 fn main() -> Result<()> {
     let config_path = Path::new("config.json");
     let config_file = File::open(config_path)
         .expect("Open config file failed.");
     let temp_config = serde_json::from_reader::<_, TempConfig>(config_file)?;
-    let auth_opt = if temp_config.username.is_empty() {
-        None
-    } else {
-        Some(RegistryAuth {
+    let auth_opt = match temp_config.username.as_str() {
+        "" => None,
+        _ => Some(RegistryAuth {
             username: temp_config.username,
             password: temp_config.password,
         })
@@ -55,20 +57,20 @@ fn download(
     let disgest = &manifest_layer.digest;
     let downloader_opt = registry.image_manager.blobs_download(&reference.image_name, disgest)?;
     if let Some(downloader) = downloader_opt {
-        let handle = downloader.start()?;
-        let arc = downloader.download_temp();
+        let handle = downloader.start();
+        let arc = downloader.process_status();
         loop {
             sleep(Duration::from_secs(1));
-            let temp = arc.lock().unwrap();
-            if temp.done {
+            let status = arc.lock().unwrap();
+            if status.is_done() {
                 println!("下载完成");
                 break;
             } else {
-                println!("{}", temp.curr_size);
+                println!("{}", status.now_size());
             }
         }
-        let result = handle.join().unwrap();
-        println!("文件路径：{}", result.unwrap());
+        let result = handle.wait_result().unwrap();
+        println!("文件路径：{}", result);
     } else {
         println!("无需下载");
     }
