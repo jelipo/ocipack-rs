@@ -104,7 +104,7 @@ impl AuthenticateAdapter {
     ) -> Result<AuthenticateAdapter> {
         let bearer_url = format!("{}/v2/", registry_addr);
         let http_response =
-            do_request_raw::<u8>(client, bearer_url.as_str(), Method::GET, &None, None)?;
+            do_request_raw::<u8>(client, bearer_url.as_str(), Method::GET, &None, &None, None)?;
         let www_authenticate = get_header(http_response.headers(), "Www-Authenticate")
             .expect("Www-Authenticate header not found");
         let regex = Regex::new("^Bearer realm=\"(?P<realm>.*)\",service=\"(?P<service>.*)\".*")?;
@@ -131,7 +131,7 @@ impl AuthenticateAdapter {
             url = url + "&scope=repository:" + scope_raw + ":pull";
         }
         let http_response =
-            do_request_raw::<u8>(client, url.as_str(), Method::GET, basic_auth, None)?;
+            do_request_raw::<u8>(client, url.as_str(), Method::GET, basic_auth, &None, None)?;
         let status = http_response.status();
         if !status.is_success() {
             return Err(Error::msg(format!(

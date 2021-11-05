@@ -11,6 +11,7 @@ use serde::Serialize;
 use crate::reg::home::HomeDir;
 use crate::reg::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
 use crate::reg::http::download::RegDownloader;
+use crate::reg::http::RegistryAccept;
 use crate::reg::Reference;
 use crate::util::sha::file_sha256;
 
@@ -38,7 +39,8 @@ impl ImageManager {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        reg_rc.request_registry::<u8, Manifest2>(&path, &scope, Method::GET, None)
+        let accept_opt = Some(RegistryAccept::APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_V2JSON);
+        reg_rc.request_registry::<u8, Manifest2>(&path, &scope, Method::GET, &accept_opt, None)
     }
 
     /// Image manifests是否存在
@@ -57,7 +59,7 @@ impl ImageManager {
         exited(&response)
     }
 
-    pub fn blobs_download(&self, name: &str, digest: &str) -> Result<Option<RegDownloader>> {
+    pub fn blobs_download(&mut self, name: &str, digest: &str) -> Result<Option<RegDownloader>> {
         let path = format!("/v2/{}/blobs/{}", name, digest);
         let blobs_cache_path = self.home_dir.cache.blobs.path.clone();
         let file_name = digest.replace(":", "_");
@@ -65,7 +67,7 @@ impl ImageManager {
         if !self.download_check(file_name.as_str(), file_path.as_path())? {
             return Ok(None);
         }
-        let downloader = self.reg_client.borrow().download(&path, file_path.to_str().unwrap())?;
+        let downloader = self.reg_client.borrow_mut().download(&path, file_path.to_str().unwrap(), name)?;
         Ok(Some(downloader))
     }
 

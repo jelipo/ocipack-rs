@@ -98,7 +98,7 @@ struct RegHttpDownloader {
 impl RegHttpDownloader {
     fn do_request_raw(&self) -> Result<Response> {
         let url = self.url.as_str();
-        do_request_raw::<u8>(&self.client, url, Method::GET, &self.auth, None)
+        do_request_raw::<u8>(&self.client, url, Method::GET, &self.auth, &None, None)
     }
 }
 
@@ -106,10 +106,7 @@ fn check(response: &Response) -> Result<()> {
     let headers = response.headers();
     let content_type = get_header(headers, "content-type").expect("content_type not found");
     if !content_type.contains("application/octet-stream") {
-        return Err(Error::msg(format!(
-            "Not support the content type:{}",
-            content_type
-        )));
+        return Err(Error::msg(format!("Not support the content type:{}", content_type)));
     }
     Ok(())
 }

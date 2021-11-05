@@ -40,15 +40,16 @@ fn main() -> Result<()> {
     let manifest = registry.image_manager.manifests(&reference)?;
     let vec = manifest.layers;
     for layer in vec {
-        download(&layer, &registry, &reference)?;
+        download(&layer, &mut registry, &reference)?;
     }
+    //download(&vec[0], &mut registry, &reference)?;
     sleep(Duration::from_secs(60 * 5));
     Ok(())
 }
 
 fn download(
     manifest_layer: &ManifestLayer,
-    registry: &Registry,
+    registry: &mut Registry,
     reference: &Reference,
 ) -> Result<()> {
     let disgest = &manifest_layer.digest;

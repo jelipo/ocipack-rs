@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sha2::Digest;
 
-use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
+use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAccept, RegistryAuth};
 use crate::reg::http::auth::RegTokenHandler;
 use crate::reg::http::download::RegDownloader;
 use crate::util::sha;
@@ -54,9 +54,10 @@ impl RegistryHttpClient {
         path: &str,
         scope: &Option<&str>,
         method: Method,
+        accept: &Option<RegistryAccept>,
         body: Option<&T>,
     ) -> Result<R> {
-        let success_response = self.do_request(path, scope, method, body)?;
+        let success_response = self.do_request(path, scope, method, accept, body)?;
         let header_docker_content_digest = success_response
             .header_docker_content_digest()
             .expect("No Docker-Content-Digest header");
@@ -73,7 +74,7 @@ impl RegistryHttpClient {
         path: &str,
         scope: &Option<&str>,
     ) -> Result<SimpleRegistryResponse> {
-        let http_response = self.do_request_raw::<u8>(path, scope, Method::HEAD, None)?;
+        let http_response = self.do_request_raw::<u8>(path, scope, Method::HEAD, &None, None)?;
         Ok(SimpleRegistryResponse {
             status_code: http_response.status(),
         })
@@ -84,12 +85,13 @@ impl RegistryHttpClient {
         path: &str,
         scope: &Option<&str>,
         method: Method,
+        accept: &Option<RegistryAccept>,
         body: Option<&T>,
     ) -> Result<Response> {
         let url = self.registry_addr.clone() + path;
         let token = self.reg_token_handler.token(scope)?;
         let auth = Some(HttpAuth::BearerToken { token });
-        let http_response = do_request_raw(&self.client, url.as_str(), method, &auth, body)?;
+        let http_response = do_request_raw(&self.client, url.as_str(), method, &auth, accept, body)?;
         Ok(http_response)
     }
 
@@ -98,9 +100,10 @@ impl RegistryHttpClient {
         path: &str,
         scope: &Option<&str>,
         method: Method,
+        accept: &Option<RegistryAccept>,
         body: Option<&T>,
     ) -> Result<FullRegistryResponse> {
-        let http_response = self.do_request_raw(path, scope, method, body)?;
+        let http_response = self.do_request_raw(path, scope, method, accept, body)?;
         let response = FullRegistryResponse::new_registry_response(http_response)?;
         return if response.is_success() {
             Ok(response)
@@ -120,12 +123,13 @@ impl RegistryHttpClient {
         };
     }
 
-    pub fn download(&self, path: &str, file_path: &str) -> Result<RegDownloader> {
+    pub fn download(&mut self, path: &str, file_path: &str, scope: &str) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
         let _path1 = file_path.clone();
+        let token = self.reg_token_handler.token(&Some(scope))?;
         let downloader = RegDownloader::new_reg_downloader(
             url,
-            self.basic_auth.clone(),
+            Some(HttpAuth::BearerToken { token }),
             self.client.clone(),
             file_path,
         )?;
