@@ -14,6 +14,8 @@ pub trait ProcessorAsync<R> {
 }
 
 pub trait ProgressStatus {
+    fn name(&self) -> &str;
+
     fn full_size(&self) -> usize;
 
     fn now_size(&self) -> usize;

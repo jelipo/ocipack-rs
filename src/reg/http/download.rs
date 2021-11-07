@@ -81,6 +81,7 @@ impl RegDownloader {
         file_path: &str,
     ) -> Result<RegDownloader> {
         let temp = Arc::new(Mutex::new(RegDownloaderTemp {
+            name: file_path.to_string(),
             file_size: 0,
             curr_size: 0,
             done: false,
@@ -167,12 +168,17 @@ impl Write for RegDownloaderWriter {
 }
 
 pub struct RegDownloaderTemp {
+    name: String,
     file_size: usize,
     pub curr_size: usize,
     pub done: bool,
 }
 
 impl ProgressStatus for RegDownloaderTemp {
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
     fn full_size(&self) -> usize {
         self.file_size
     }
