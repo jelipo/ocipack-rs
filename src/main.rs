@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use serde::Deserialize;
+use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
 
 use crate::reg::http::RegistryAuth;
@@ -41,6 +42,9 @@ fn main() -> Result<()> {
     };
     let manifest = registry.image_manager.manifests(&reference)?;
     let vec = manifest.layers;
+
+    // ProcessorManager::new_processor_manager()
+
     for layer in vec {
         download(&layer, &mut registry, &reference)?;
     }
