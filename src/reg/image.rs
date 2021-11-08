@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::fs::File;
 
 use std::path::Path;
 use std::rc::Rc;
@@ -59,16 +60,20 @@ impl ImageManager {
         exited(&response)
     }
 
-    pub fn blobs_download(&mut self, name: &str, digest: &str) -> Result<Option<RegDownloader>> {
+    pub fn blobs_download(&mut self, name: &str, digest: &str) -> Result<RegDownloader> {
         let path = format!("/v2/{}/blobs/{}", name, digest);
         let blobs_cache_path = self.home_dir.cache.blobs.path.clone();
         let file_name = digest.replace(":", "_");
         let file_path = blobs_cache_path.join(file_name.as_str());
         if !self.download_check(file_name.as_str(), file_path.as_path())? {
-            return Ok(None);
+            let path_str = (&file_path).to_str().expect("").to_string();
+            let file = File::open(file_path)?;
+            let finished_downloader = RegDownloader::new_finished_downloader(
+                &path_str, file.metadata()?.len() as usize)?;
+            return Ok(finished_downloader);
         }
         let downloader = self.reg_client.borrow_mut().download(&path, file_path.to_str().unwrap(), name)?;
-        Ok(Some(downloader))
+        Ok(downloader)
     }
 
     /// 下载前置检查，是否需要下载

@@ -6,7 +6,7 @@ pub mod manager;
 pub trait Processor<R> {
     fn start(&self) -> Box<dyn ProcessorAsync<R>>;
 
-    fn process_status(&self) -> Arc<Mutex<dyn ProgressStatus>>;
+    fn process_status(&self) -> Box<dyn ProgressStatus>;
 }
 
 pub trait ProcessorAsync<R> {
@@ -14,7 +14,7 @@ pub trait ProcessorAsync<R> {
 }
 
 pub trait ProgressStatus {
-    fn name(&self) -> &str;
+    fn name(&self) -> String;
 
     fn full_size(&self) -> usize;
 

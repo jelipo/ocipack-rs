@@ -14,28 +14,77 @@ use crate::reg::http::{do_request_raw, get_header, HttpAuth};
 use crate::util::sha::Sha;
 
 pub struct RegDownloader {
+    finished: bool,
     url: String,
     auth: Option<HttpAuth>,
-    client: Client,
-    temp: Arc<Mutex<RegDownloaderTemp>>,
+    client: Option<Client>,
+    temp: RegDownloaderStatus,
     file_path: String,
+}
+
+impl RegDownloader {
+    pub fn new_reg_downloader(
+        url: String, auth: Option<HttpAuth>, client: Client, file_path: &str,
+    ) -> Result<RegDownloader> {
+        let temp = RegDownloaderStatus {
+            status_core: Arc::new(Mutex::new(RegDownloaderStatusCore {
+                name: file_path.to_string(),
+                file_size: 0,
+                curr_size: 0,
+                done: false,
+            }))
+        };
+        Ok(RegDownloader {
+            finished: false,
+            url,
+            auth,
+            client: Some(client),
+            temp,
+            file_path: file_path.to_string(),
+        })
+    }
+
+    pub fn new_finished_downloader(
+        filepath: &str, file_size: usize,
+    ) -> Result<RegDownloader> {
+        let temp = RegDownloaderStatus {
+            status_core: Arc::new(Mutex::new(RegDownloaderStatusCore {
+                name: filepath.to_string(),
+                file_size: 0,
+                curr_size: 0,
+                done: false,
+            }))
+        };
+        Ok(RegDownloader {
+            finished: true,
+            url: String::default(),
+            auth: None,
+            client: None,
+            temp,
+            file_path: filepath.to_string(),
+        })
+    }
 }
 
 impl Processor<String> for RegDownloader {
     fn start(&self) -> Box<dyn ProcessorAsync<String>> {
-        let arc = self.temp.clone();
+        if self.finished {
+            return Box::new(RegFinishedDownloader {
+                result: self.file_path.clone()
+            });
+        }
+        let status = self.temp.clone();
         let reg_http_downloader = RegHttpDownloader {
             url: self.url.clone(),
             auth: self.auth.clone(),
-            client: self.client.clone(),
+            client: self.client.as_ref().unwrap().clone(),
         };
         let file_path_c = self.file_path.clone();
         let handle = thread::spawn::<_, Result<String>>(move || {
             let downloader = reg_http_downloader;
-            let temp = arc.clone();
-            let result = downloading(temp, file_path_c.as_str(), downloader);
-            let mut download_temp = arc.lock().expect("lock failed");
-            download_temp.done = true;
+            let result = downloading(status.clone(), file_path_c.as_str(), downloader);
+            let mut status_core = &mut status.status_core.lock().unwrap();
+            status_core.done = true;
             if let Err(err) = &result {
                 println!("{}\n{}", err, err.backtrace());
             }
@@ -46,8 +95,8 @@ impl Processor<String> for RegDownloader {
         })
     }
 
-    fn process_status(&self) -> Arc<Mutex<dyn ProgressStatus>> {
-        self.temp.clone()
+    fn process_status(&self) -> Box<dyn ProgressStatus> {
+        Box::new(self.temp.clone())
     }
 }
 
@@ -63,41 +112,19 @@ impl ProcessorAsync<String> for RegDownloadHandler {
     }
 }
 
-pub struct RegDownloadHandler2 {
+pub struct RegFinishedDownloader {
     result: String,
 }
 
-impl ProcessorAsync<String> for RegDownloadHandler2 {
+impl ProcessorAsync<String> for RegFinishedDownloader {
     fn wait_result(self: Box<Self>) -> Result<String> {
         Ok(self.result)
     }
 }
 
-impl RegDownloader {
-    pub fn new_reg_downloader(
-        url: String,
-        auth: Option<HttpAuth>,
-        client: Client,
-        file_path: &str,
-    ) -> Result<RegDownloader> {
-        let temp = Arc::new(Mutex::new(RegDownloaderTemp {
-            name: file_path.to_string(),
-            file_size: 0,
-            curr_size: 0,
-            done: false,
-        }));
-        Ok(RegDownloader {
-            url,
-            auth,
-            client,
-            temp,
-            file_path: file_path.to_string(),
-        })
-    }
-}
 
 fn downloading(
-    temp: Arc<Mutex<RegDownloaderTemp>>,
+    status: RegDownloaderStatus,
     file_path_str: &str,
     reg_http_downloader: RegHttpDownloader,
 ) -> Result<()> {
@@ -111,7 +138,10 @@ fn downloading(
     let mut http_response = reg_http_downloader.do_request_raw()?;
     check(&http_response)?;
     let file = File::create(file_path)?;
-    let mut writer = RegDownloaderWriter { temp, file };
+    let mut writer = RegDownloaderWriter {
+        status: status.clone(),
+        file,
+    };
     let _copy_size = std::io::copy(&mut http_response, &mut writer)?;
     writer.flush()?;
     Ok(())
@@ -151,14 +181,14 @@ fn get_filepath(url: &str, filename_type: &DownloadFilenameType) -> Result<Box<P
 }
 
 pub struct RegDownloaderWriter {
-    temp: Arc<Mutex<RegDownloaderTemp>>,
+    status: RegDownloaderStatus,
     file: File,
 }
 
 impl Write for RegDownloaderWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let download_temp = &mut self.temp.lock().unwrap();
-        download_temp.curr_size = download_temp.curr_size + buf.len();
+        let status_core = &mut self.status.status_core.lock().unwrap();
+        status_core.curr_size = status_core.curr_size + buf.len();
         self.file.write(buf)
     }
 
@@ -167,28 +197,35 @@ impl Write for RegDownloaderWriter {
     }
 }
 
-pub struct RegDownloaderTemp {
+#[derive(Clone)]
+pub struct RegDownloaderStatus {
+    status_core: Arc<Mutex<RegDownloaderStatusCore>>,
+}
+
+struct RegDownloaderStatusCore {
     name: String,
     file_size: usize,
     pub curr_size: usize,
     pub done: bool,
 }
 
-impl ProgressStatus for RegDownloaderTemp {
-    fn name(&self) -> &str {
-        self.name.as_str()
+impl ProgressStatus for RegDownloaderStatus {
+    fn name(&self) -> String {
+        let status_core = &self.status_core.lock().unwrap();
+        let string = status_core.name.to_string();
+        string
     }
 
     fn full_size(&self) -> usize {
-        self.file_size
+        self.status_core.lock().unwrap().file_size
     }
 
     fn now_size(&self) -> usize {
-        self.curr_size
+        self.status_core.lock().unwrap().curr_size
     }
 
     fn is_done(&self) -> bool {
-        self.done
+        self.status_core.lock().unwrap().done
     }
 }
 
