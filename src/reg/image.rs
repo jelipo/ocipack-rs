@@ -3,6 +3,7 @@ use std::fs::File;
 
 use std::path::Path;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use anyhow::{Error, Result};
 use reqwest::Method;
@@ -61,18 +62,19 @@ impl ImageManager {
     }
 
     pub fn blobs_download(&mut self, name: &str, digest: &str) -> Result<RegDownloader> {
-        let path = format!("/v2/{}/blobs/{}", name, digest);
+        let url_path = format!("/v2/{}/blobs/{}", name, digest);
         let blobs_cache_path = self.home_dir.cache.blobs.path.clone();
         let file_name = digest.replace(":", "_");
         let file_path = blobs_cache_path.join(file_name.as_str());
+        let file_path_string = file_path.to_str().unwrap().to_string();
+        let file_path_arc = Arc::new(file_path_string);
         if !self.download_check(file_name.as_str(), file_path.as_path())? {
-            let path_str = (&file_path).to_str().expect("").to_string();
             let file = File::open(file_path)?;
             let finished_downloader = RegDownloader::new_finished_downloader(
-                &path_str, file.metadata()?.len() as usize)?;
+                file_path_arc.clone(), file.metadata()?.len() as usize)?;
             return Ok(finished_downloader);
         }
-        let downloader = self.reg_client.borrow_mut().download(&path, file_path.to_str().unwrap(), name)?;
+        let downloader = self.reg_client.borrow_mut().download(&url_path, file_path_arc.clone(), name)?;
         Ok(downloader)
     }
 

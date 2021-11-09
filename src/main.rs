@@ -50,8 +50,8 @@ fn main() -> Result<()> {
     }
     println!("创建manager");
     let manager = ProcessorManager::new_processor_manager(reg_downloader_vec)?;
-    manager.wait_all_done();
-
+    manager.wait_all_done()?;
+    println!("全部下载完成");
     Ok(())
 }
 

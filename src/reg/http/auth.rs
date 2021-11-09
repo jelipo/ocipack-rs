@@ -20,9 +20,7 @@ pub struct RegTokenHandler {
 
 impl RegTokenHandler {
     pub fn new_reg_token_handler(
-        registry_addr: String,
-        basic_auth: Option<HttpAuth>,
-        client: Client,
+        registry_addr: String, basic_auth: Option<HttpAuth>, client: Client,
     ) -> RegTokenHandler {
         RegTokenHandler {
             registry_addr,
@@ -47,9 +45,7 @@ impl RegTokenHandler {
         }
     }
 
-    fn request() {}
-
-    /// 从缓存中拿取未过期的Token
+    /// 从内存缓存中拿取未过期的Token
     fn token_from_cache(&self, scope: &str) -> Result<Option<String>> {
         if let Some(inner_token) = self.scope_token_map.get(scope) {
             let second_time_now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
@@ -121,10 +117,7 @@ impl AuthenticateAdapter {
     }
 
     pub fn new_token(
-        &self,
-        scope: &Option<&str>,
-        basic_auth: &Option<HttpAuth>,
-        client: &Client,
+        &self, scope: &Option<&str>, basic_auth: &Option<HttpAuth>, client: &Client,
     ) -> Result<TokenResponse> {
         let mut url = format!("{}?service={}", &self.realm, &self.service);
         if let Some(scope_raw) = scope {
@@ -144,7 +137,7 @@ impl AuthenticateAdapter {
 }
 
 #[derive(Deserialize)]
-struct TokenResponse {
+pub struct TokenResponse {
     token: String,
     expires_in: usize,
 }

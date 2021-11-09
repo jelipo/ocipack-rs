@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -9,9 +9,10 @@ use anyhow::{Error, Result};
 use reqwest::blocking::{Client, Response};
 use reqwest::Method;
 
-use crate::progress::{Processor, ProcessorAsync, ProgressStatus};
+use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProgressStatus};
 use crate::reg::http::{do_request_raw, get_header, HttpAuth};
 use crate::util::sha::Sha;
+
 
 pub struct RegDownloader {
     finished: bool,
@@ -19,16 +20,16 @@ pub struct RegDownloader {
     auth: Option<HttpAuth>,
     client: Option<Client>,
     temp: RegDownloaderStatus,
-    file_path: String,
+    file_path: Arc<String>,
 }
 
 impl RegDownloader {
     pub fn new_reg_downloader(
-        url: String, auth: Option<HttpAuth>, client: Client, file_path: &str,
+        url: String, auth: Option<HttpAuth>, client: Client, file_path: Arc<String>,
     ) -> Result<RegDownloader> {
         let temp = RegDownloaderStatus {
             status_core: Arc::new(Mutex::new(RegDownloaderStatusCore {
-                name: file_path.to_string(),
+                name: file_path.clone(),
                 file_size: 0,
                 curr_size: 0,
                 done: false,
@@ -40,17 +41,17 @@ impl RegDownloader {
             auth,
             client: Some(client),
             temp,
-            file_path: file_path.to_string(),
+            file_path: file_path.clone(),
         })
     }
 
     pub fn new_finished_downloader(
-        filepath: &str, file_size: usize,
+        file_path: Arc<String>, file_size: usize,
     ) -> Result<RegDownloader> {
         let temp = RegDownloaderStatus {
             status_core: Arc::new(Mutex::new(RegDownloaderStatusCore {
-                name: filepath.to_string(),
-                file_size: 0,
+                name: file_path.clone(),
+                file_size,
                 curr_size: 0,
                 done: false,
             }))
@@ -61,7 +62,7 @@ impl RegDownloader {
             auth: None,
             client: None,
             temp,
-            file_path: filepath.to_string(),
+            file_path: file_path.clone(),
         })
     }
 }
@@ -79,16 +80,16 @@ impl Processor<String> for RegDownloader {
             auth: self.auth.clone(),
             client: self.client.as_ref().unwrap().clone(),
         };
-        let file_path_c = self.file_path.clone();
+        let file_path_clone = self.file_path.clone();
         let handle = thread::spawn::<_, Result<String>>(move || {
             let downloader = reg_http_downloader;
-            let result = downloading(status.clone(), file_path_c.as_str(), downloader);
+            let result = downloading(status.clone(), file_path_clone.clone(), downloader);
             let mut status_core = &mut status.status_core.lock().unwrap();
             status_core.done = true;
             if let Err(err) = &result {
                 println!("{}\n{}", err, err.backtrace());
             }
-            Ok(file_path_c)
+            Ok(file_path_clone.to_string())
         });
         Box::new(RegDownloadHandler {
             join: handle
@@ -113,23 +114,23 @@ impl ProcessorAsync<String> for RegDownloadHandler {
 }
 
 pub struct RegFinishedDownloader {
-    result: String,
+    result: Arc<String>,
 }
 
 impl ProcessorAsync<String> for RegFinishedDownloader {
     fn wait_result(self: Box<Self>) -> Result<String> {
-        Ok(self.result)
+        Ok(self.result.to_string())
     }
 }
 
 
 fn downloading(
     status: RegDownloaderStatus,
-    file_path_str: &str,
+    file_path_arc: Arc<String>,
     reg_http_downloader: RegHttpDownloader,
 ) -> Result<()> {
     //检查本地是否存在已有
-    let file_path = Path::new(file_path_str);
+    let file_path = Path::new(file_path_arc.as_str());
     let parent_path = file_path.parent().expect("未找到目录");
     if !parent_path.exists() {
         std::fs::create_dir(parent_path)?
@@ -202,30 +203,23 @@ pub struct RegDownloaderStatus {
     status_core: Arc<Mutex<RegDownloaderStatusCore>>,
 }
 
+
 struct RegDownloaderStatusCore {
-    name: String,
+    name: Arc<String>,
     file_size: usize,
     pub curr_size: usize,
     pub done: bool,
 }
 
 impl ProgressStatus for RegDownloaderStatus {
-    fn name(&self) -> String {
-        let status_core = &self.status_core.lock().unwrap();
-        let string = status_core.name.to_string();
-        string
-    }
-
-    fn full_size(&self) -> usize {
-        self.status_core.lock().unwrap().file_size
-    }
-
-    fn now_size(&self) -> usize {
-        self.status_core.lock().unwrap().curr_size
-    }
-
-    fn is_done(&self) -> bool {
-        self.status_core.lock().unwrap().done
+    fn status(&self) -> CoreStatus {
+        let core = &self.status_core.lock().unwrap();
+        CoreStatus {
+            name: core.name.clone(),
+            full_size: core.file_size,
+            now_size: core.curr_size,
+            is_done: core.done,
+        }
     }
 }
 

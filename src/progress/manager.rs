@@ -1,3 +1,4 @@
+
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
@@ -23,10 +24,13 @@ impl<R> ProcessorManager<R> {
     pub fn wait_all_done(self) -> Result<()> {
         println!("开始等待");
         loop {
-            for (async_processor, status) in &self.statuses {
-                println!("{} 进度,下载了 {} KiB", status.name(), status.now_size() / 1024)
+            let mut done_vec = vec![false; self.statuses.len()];
+            for (index, (_, progress_status)) in self.statuses.iter().enumerate() {
+                let status = progress_status.status();
+                done_vec[index] = status.is_done;
+                println!("{} 进度,下载了 {} KiB", status.name.as_str(), status.now_size / 1024);
             }
-            if processors_all_done(&self.statuses) {
+            if processors_all_done(&done_vec[..]) {
                 break;
             }
             sleep(Duration::from_secs(1))
@@ -35,11 +39,9 @@ impl<R> ProcessorManager<R> {
     }
 }
 
-fn processors_all_done<R>(status: &Vec<(Box<dyn ProcessorAsync<R>>, Box<dyn ProgressStatus>)>) -> bool {
-    for (_, status) in status {
-        if !status.is_done() {
-            return false;
-        }
+fn processors_all_done(done_vec: &[bool]) -> bool {
+    for is_done in done_vec {
+        if !is_done { return false; }
     }
     true
 }

@@ -1,5 +1,6 @@
 use std::io::Read;
 use std::option::Option::Some;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
@@ -123,9 +124,8 @@ impl RegistryHttpClient {
         };
     }
 
-    pub fn download(&mut self, path: &str, file_path: &str, scope: &str) -> Result<RegDownloader> {
+    pub fn download(&mut self, path: &str, file_path: Arc<String>, scope: &str) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
-        let _path1 = file_path.clone();
         let token = self.reg_token_handler.token(&Some(scope))?;
         let downloader = RegDownloader::new_reg_downloader(
             url,

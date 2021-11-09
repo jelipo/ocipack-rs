@@ -13,12 +13,13 @@ pub trait ProcessorAsync<R> {
     fn wait_result(self: Box<Self>) -> Result<R>;
 }
 
+pub struct CoreStatus {
+    pub name: Arc<String>,
+    pub full_size: usize,
+    pub now_size: usize,
+    pub is_done: bool,
+}
+
 pub trait ProgressStatus {
-    fn name(&self) -> String;
-
-    fn full_size(&self) -> usize;
-
-    fn now_size(&self) -> usize;
-
-    fn is_done(&self) -> bool;
+    fn status(&self) -> CoreStatus;
 }
