@@ -2,36 +2,31 @@
 
 use std::fs::File;
 use std::path::Path;
-use std::thread::sleep;
-use std::time::Duration;
 
 use anyhow::Result;
 use serde::Deserialize;
 
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
-use crate::reg::http::download::RegDownloader;
 use crate::reg::http::RegistryAuth;
-use crate::reg::image::ManifestLayer;
 use crate::reg::Reference;
 use crate::reg::registry::Registry;
 
+mod progress;
 mod reg;
 mod registry_client;
 mod util;
-mod progress;
 
 fn main() -> Result<()> {
     let config_path = Path::new("config.json");
-    let config_file = File::open(config_path)
-        .expect("Open config file failed.");
+    let config_file = File::open(config_path).expect("Open config file failed.");
     let temp_config = serde_json::from_reader::<_, TempConfig>(config_file)?;
     let auth_opt = match temp_config.username.as_str() {
         "" => None,
-        _ => Some(RegistryAuth {
+        _username => Some(RegistryAuth {
             username: temp_config.username,
             password: temp_config.password,
-        })
+        }),
     };
     let home_dir_path = Path::new(temp_config.home_dir.as_str());
     let mut registry = Registry::open(temp_config.registry, auth_opt, home_dir_path)?;
