@@ -51,12 +51,8 @@ impl RegistryHttpClient {
     }
 
     pub fn request_registry<T: Serialize + ?Sized, R: DeserializeOwned>(
-        &mut self,
-        path: &str,
-        scope: &Option<&str>,
-        method: Method,
-        accept: &Option<RegistryAccept>,
-        body: Option<&T>,
+        &mut self, path: &str, scope: &Option<&str>, method: Method,
+        accept: &Option<RegistryAccept>, body: Option<&T>,
     ) -> Result<R> {
         let success_response = self.do_request(path, scope, method, accept, body)?;
         let header_docker_content_digest = success_response
@@ -70,11 +66,7 @@ impl RegistryHttpClient {
         success_response.json_body::<R>()
     }
 
-    pub fn head_request_registry(
-        &mut self,
-        path: &str,
-        scope: &Option<&str>,
-    ) -> Result<SimpleRegistryResponse> {
+    pub fn head_request_registry(&mut self, path: &str, scope: &Option<&str>) -> Result<SimpleRegistryResponse> {
         let http_response = self.do_request_raw::<u8>(path, scope, Method::HEAD, &None, None)?;
         Ok(SimpleRegistryResponse {
             status_code: http_response.status(),
@@ -82,12 +74,8 @@ impl RegistryHttpClient {
     }
 
     fn do_request_raw<T: Serialize + ?Sized>(
-        &mut self,
-        path: &str,
-        scope: &Option<&str>,
-        method: Method,
-        accept: &Option<RegistryAccept>,
-        body: Option<&T>,
+        &mut self, path: &str, scope: &Option<&str>, method: Method,
+        accept: &Option<RegistryAccept>, body: Option<&T>,
     ) -> Result<Response> {
         let url = self.registry_addr.clone() + path;
         let token = self.reg_token_handler.token(scope)?;
@@ -97,12 +85,8 @@ impl RegistryHttpClient {
     }
 
     fn do_request<T: Serialize + ?Sized>(
-        &mut self,
-        path: &str,
-        scope: &Option<&str>,
-        method: Method,
-        accept: &Option<RegistryAccept>,
-        body: Option<&T>,
+        &mut self, path: &str, scope: &Option<&str>, method: Method,
+        accept: &Option<RegistryAccept>, body: Option<&T>,
     ) -> Result<FullRegistryResponse> {
         let http_response = self.do_request_raw(path, scope, method, accept, body)?;
         let response = FullRegistryResponse::new_registry_response(http_response)?;

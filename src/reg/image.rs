@@ -45,6 +45,15 @@ impl ImageManager {
         reg_rc.request_registry::<u8, Manifest2>(&path, &scope, Method::GET, &accept_opt, None)
     }
 
+    /// 获取Image的Manifest
+    pub fn manifests_list(&mut self, refe: &Reference) -> Result<Manifest2> {
+        let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
+        let scope = Some(refe.image_name);
+        let mut reg_rc = self.reg_client.borrow_mut();
+        let accept_opt = Some(RegistryAccept::APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_LIST_V2JSON);
+        let string = reg_rc.request_registry::<u8, String>(&path, &scope, Method::GET, &accept_opt, None)?;
+    }
+
     /// Image manifests是否存在
     pub fn manifests_exited(&mut self, refe: &Reference) -> Result<bool> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);

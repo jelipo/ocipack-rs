@@ -27,6 +27,7 @@ pub struct RegistryAccept(&'static str);
 
 impl RegistryAccept {
     pub const APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_V2JSON: Self = Self("application/vnd.docker.distribution.manifest.v2+json");
+    pub const APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_LIST_V2JSON: Self = Self("application/vnd.docker.distribution.manifest.list.v2+json");
     pub const ALL: Self = Self("*/*");
 
     fn get_value(&self) -> &'static str {
