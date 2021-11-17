@@ -14,7 +14,7 @@ use crate::reg::home::HomeDir;
 use crate::reg::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
 use crate::reg::http::download::RegDownloader;
 use crate::reg::http::RegistryAccept;
-use crate::reg::Reference;
+use crate::reg::{BlobType, Reference};
 use crate::util::sha::file_sha256;
 
 pub struct ImageManager {
@@ -45,14 +45,14 @@ impl ImageManager {
         reg_rc.request_registry::<u8, Manifest2>(&path, &scope, Method::GET, &accept_opt, None)
     }
 
-    /// 获取Image的Manifest
-    pub fn manifests_list(&mut self, refe: &Reference) -> Result<Manifest2> {
-        let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
-        let scope = Some(refe.image_name);
-        let mut reg_rc = self.reg_client.borrow_mut();
-        let accept_opt = Some(RegistryAccept::APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_LIST_V2JSON);
-        let string = reg_rc.request_registry::<u8, String>(&path, &scope, Method::GET, &accept_opt, None)?;
-    }
+    // /// 获取Image的Manifest
+    // pub fn manifests_list(&mut self, refe: &Reference) -> Result<Manifest2> {
+    //     let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
+    //     let scope = Some(refe.image_name);
+    //     let mut reg_rc = self.reg_client.borrow_mut();
+    //     let accept_opt = Some(RegistryAccept::APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_LIST_V2JSON);
+    //     let string = reg_rc.request_registry::<u8, String>(&path, &scope, Method::GET, &accept_opt, None)?;
+    // }
 
     /// Image manifests是否存在
     pub fn manifests_exited(&mut self, refe: &Reference) -> Result<bool> {
@@ -70,9 +70,12 @@ impl ImageManager {
         exited(&response)
     }
 
-    pub fn blobs_download(&mut self, name: &str, digest: &str) -> Result<RegDownloader> {
+    pub fn blobs_download(&mut self, name: &str, digest: &str, blob_type: BlobType) -> Result<RegDownloader> {
         let url_path = format!("/v2/{}/blobs/{}", name, digest);
-        let blobs_cache_path = self.home_dir.cache.blobs.path.clone();
+        let blobs_cache_path = match blob_type {
+            BlobType::Layers => self.home_dir.cache.blobs.layers_path.clone(),
+            BlobType::Config => self.home_dir.cache.blobs.config_path.clone()
+        };
         let file_name = digest.replace(":", "_");
         let file_path = blobs_cache_path.join(file_name.as_str());
         let file_path_string = file_path.to_str().unwrap().to_string();

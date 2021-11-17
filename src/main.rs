@@ -9,7 +9,7 @@ use serde::Deserialize;
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
 use crate::reg::http::RegistryAuth;
-use crate::reg::Reference;
+use crate::reg::{BlobType, Reference};
 use crate::reg::registry::Registry;
 
 mod progress;
@@ -40,7 +40,7 @@ fn main() -> Result<()> {
     let mut reg_downloader_vec = Vec::<Box<dyn Processor<String>>>::new();
     for layer in manifest_layers {
         let disgest = &layer.digest;
-        let downloader = registry.image_manager.blobs_download(&reference.image_name, disgest)?;
+        let downloader = registry.image_manager.blobs_download(&reference.image_name, disgest,BlobType::Layers)?;
         reg_downloader_vec.push(Box::new(downloader))
     }
     println!("创建manager");

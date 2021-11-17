@@ -9,3 +9,8 @@ pub struct Reference<'a> {
     /// 可以是TAG或者digest
     pub reference: &'a str,
 }
+
+pub enum BlobType {
+    Layers,
+    Config,
+}
