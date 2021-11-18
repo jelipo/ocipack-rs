@@ -1,7 +1,6 @@
 pub mod home;
-pub mod http;
-pub mod image;
-pub mod registry;
+pub mod docker;
+
 
 pub struct Reference<'a> {
     /// Image的名称

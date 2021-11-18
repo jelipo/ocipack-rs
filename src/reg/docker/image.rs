@@ -11,9 +11,9 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::reg::home::HomeDir;
-use crate::reg::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
-use crate::reg::http::download::RegDownloader;
-use crate::reg::http::RegistryAccept;
+use crate::reg::docker::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
+use crate::reg::docker::http::download::RegDownloader;
+use crate::reg::docker::http::RegistryAccept;
 use crate::reg::{BlobType, Reference};
 use crate::util::sha::file_sha256;
 

@@ -10,7 +10,7 @@ use reqwest::blocking::{Client, Response};
 use reqwest::Method;
 
 use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProgressStatus};
-use crate::reg::http::{do_request_raw, get_header, HttpAuth};
+use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth};
 use crate::util::sha::Sha;
 
 

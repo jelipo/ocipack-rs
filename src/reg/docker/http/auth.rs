@@ -8,7 +8,7 @@ use reqwest::blocking::Client;
 use reqwest::Method;
 use serde::Deserialize;
 
-use crate::reg::http::{do_request_raw, get_header, HttpAuth};
+use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth};
 
 pub struct RegTokenHandler {
     registry_addr: String,

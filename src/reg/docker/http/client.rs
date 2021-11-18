@@ -12,9 +12,9 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sha2::Digest;
 
-use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAccept, RegistryAuth};
-use crate::reg::http::auth::RegTokenHandler;
-use crate::reg::http::download::RegDownloader;
+use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth, RegistryAccept, RegistryAuth};
+use crate::reg::docker::http::auth::RegTokenHandler;
+use crate::reg::docker::http::download::RegDownloader;
 use crate::util::sha;
 
 pub struct RegistryHttpClient {
