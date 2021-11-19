@@ -16,6 +16,7 @@ mod progress;
 mod reg;
 mod registry_client;
 mod util;
+mod bar;
 
 fn main() -> Result<()> {
     let config_path = Path::new("config.json");
