@@ -1,6 +1,8 @@
+use std::borrow::BorrowMut;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
@@ -12,7 +14,6 @@ use reqwest::Method;
 use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProgressStatus};
 use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth};
 use crate::util::sha::Sha;
-
 
 pub struct RegDownloader {
     finished: bool,
@@ -125,19 +126,25 @@ impl ProcessorAsync<String> for RegFinishedDownloader {
 
 
 fn downloading(
-    status: RegDownloaderStatus,
-    file_path_arc: Arc<String>,
-    reg_http_downloader: RegHttpDownloader,
+    status: RegDownloaderStatus, file_path_arc: Arc<String>, reg_http_downloader: RegHttpDownloader,
 ) -> Result<()> {
     //检查本地是否存在已有
     let file_path = Path::new(file_path_arc.as_str());
-    let parent_path = file_path.parent().expect("未找到目录");
+    let parent_path = file_path.parent().expect("find file parent dir failed");
     if !parent_path.exists() {
         std::fs::create_dir(parent_path)?
     }
     // 请求HTTP下载
     let mut http_response = reg_http_downloader.do_request_raw()?;
     check(&http_response)?;
+    let content_length_value = http_response.headers().get("content-length")
+        .expect("content-length not found");
+    let content_len_str = content_length_value.to_str().expect("content_length to str failed");
+    let content_length = u32::from_str(content_len_str)?;
+    {
+        let mut status_core = status.status_core.lock().expect("lock failed");
+        status_core.borrow_mut().file_size = content_length as usize;
+    }
     let file = File::create(file_path)?;
     let mut writer = RegDownloaderWriter {
         status: status.clone(),

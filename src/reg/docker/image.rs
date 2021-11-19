@@ -72,15 +72,11 @@ impl ImageManager {
 
     pub fn blobs_download(&mut self, name: &str, digest: &str, blob_type: BlobType) -> Result<RegDownloader> {
         let url_path = format!("/v2/{}/blobs/{}", name, digest);
-        let blobs_cache_path = match blob_type {
-            BlobType::Layers => self.home_dir.cache.blobs.layers_path.clone(),
-            BlobType::Config => self.home_dir.cache.blobs.config_path.clone()
-        };
-        let file_name = digest.replace(":", "_");
-        let file_path = blobs_cache_path.join(file_name.as_str());
+        let (file_path, file_name) = self.home_dir.cache.blobs.digest_path(digest, blob_type);
         let file_path_string = file_path.to_str().unwrap().to_string();
         let file_path_arc = Arc::new(file_path_string);
-        if !self.download_check(file_name.as_str(), file_path.as_path())? {
+        let file_sha256 = digest.replace("sha256:","");
+        if !self.home_dir.cache.blobs.download_pre_processing(&file_path, file_sha256)? {
             let file = File::open(file_path)?;
             let finished_downloader = RegDownloader::new_finished_downloader(
                 file_path_arc.clone(), file.metadata()?.len() as usize)?;
@@ -88,27 +84,6 @@ impl ImageManager {
         }
         let downloader = self.reg_client.borrow_mut().download(&url_path, file_path_arc.clone(), name)?;
         Ok(downloader)
-    }
-
-    /// 下载前置检查，是否需要下载
-    fn download_check(&self, file_name: &str, file_path: &Path) -> Result<bool> {
-        return if file_path.exists() {
-            if file_name.starts_with("sha256_") {
-                let file_sha256 = file_sha256(file_path)?;
-                let need_sha256 = file_name.replace("sha256_", "");
-                if file_sha256 == need_sha256 {
-                    Ok(false)
-                } else {
-                    std::fs::remove_file(file_path)?;
-                    Ok(true)
-                }
-            } else {
-                std::fs::remove_file(file_path)?;
-                Ok(true)
-            }
-        } else {
-            Ok(true)
-        };
     }
 }
 

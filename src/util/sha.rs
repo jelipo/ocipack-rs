@@ -1,9 +1,10 @@
-use anyhow::Result;
-use bytes::Bytes;
-use sha2::digest::DynDigest;
-use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::path::Path;
+
+use anyhow::Result;
+use bytes::Bytes;
+use sha2::{Digest, Sha256};
+use sha2::digest::DynDigest;
 
 pub fn sha256(bytes: &Bytes) -> String {
     let mut hasher = Sha256::new();
@@ -12,6 +13,7 @@ pub fn sha256(bytes: &Bytes) -> String {
     hex::encode(sha256)
 }
 
+/// 计算文件的sha256值,并返回Hex
 pub fn file_sha256(file_path: &Path) -> Result<String> {
     let mut file = File::open(file_path)?;
     let mut sha256 = Sha256::new();
