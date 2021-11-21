@@ -35,7 +35,7 @@ pub struct BlobsDir {
 }
 
 impl BlobsDir {
-    pub fn digest_path(&self, digest: &str, blob_type: BlobType) -> (Box<Path>, String) {
+    pub fn digest_path(&self, digest: &str, blob_type: &BlobType) -> (Box<Path>, String) {
         let file_parent_dir = match blob_type {
             BlobType::Layers => self.blob_path.join("config"),
             BlobType::Config => self.blob_path.join("layers")

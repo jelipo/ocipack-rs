@@ -14,7 +14,7 @@ use crate::reg::home::HomeDir;
 use crate::reg::docker::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
 use crate::reg::docker::http::download::RegDownloader;
 use crate::reg::docker::http::RegistryAccept;
-use crate::reg::{BlobType, Reference};
+use crate::reg::{BlobDownConfig, BlobType, Reference};
 use crate::util::sha::file_sha256;
 
 pub struct ImageManager {
@@ -72,17 +72,22 @@ impl ImageManager {
 
     pub fn blobs_download(&mut self, name: &str, digest: &str, blob_type: BlobType) -> Result<RegDownloader> {
         let url_path = format!("/v2/{}/blobs/{}", name, digest);
-        let (file_path, file_name) = self.home_dir.cache.blobs.digest_path(digest, blob_type);
-        let file_path_string = file_path.to_str().unwrap().to_string();
-        let file_path_arc = Arc::new(file_path_string);
-        let file_sha256 = digest.replace("sha256:","");
-        if !self.home_dir.cache.blobs.download_pre_processing(&file_path, file_sha256)? {
-            let file = File::open(file_path)?;
+        let (file_path, file_name) = self.home_dir.cache.blobs.digest_path(digest, &blob_type);
+        let down_config = BlobDownConfig {
+            file_path,
+            file_name,
+            digest: digest.to_string(),
+            short_hash: digest[..12].to_string(),
+            blob_type,
+        };
+        let file_sha256 = digest.replace("sha256:", "");
+        if !self.home_dir.cache.blobs.download_pre_processing(&down_config.file_path, file_sha256)? {
+            let file = File::open(&down_config.file_path)?;
             let finished_downloader = RegDownloader::new_finished_downloader(
-                file_path_arc.clone(), file.metadata()?.len() as usize)?;
+                down_config, file.metadata()?.len() as usize)?;
             return Ok(finished_downloader);
         }
-        let downloader = self.reg_client.borrow_mut().download(&url_path, file_path_arc.clone(), name)?;
+        let downloader = self.reg_client.borrow_mut().download(&url_path, down_config, name)?;
         Ok(downloader)
     }
 }

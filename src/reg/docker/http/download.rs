@@ -12,6 +12,7 @@ use reqwest::blocking::{Client, Response};
 use reqwest::Method;
 
 use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProgressStatus};
+use crate::reg::BlobDownConfig;
 use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth};
 use crate::util::sha::Sha;
 
@@ -21,16 +22,17 @@ pub struct RegDownloader {
     auth: Option<HttpAuth>,
     client: Option<Client>,
     temp: RegDownloaderStatus,
-    file_path: Arc<String>,
+    blob_down_config: Arc<BlobDownConfig>,
 }
 
 impl RegDownloader {
     pub fn new_reg_downloader(
-        url: String, auth: Option<HttpAuth>, client: Client, file_path: Arc<String>,
+        url: String, auth: Option<HttpAuth>, client: Client, blob_down_config: BlobDownConfig,
     ) -> Result<RegDownloader> {
+        let blob_down_config_arc = Arc::new(blob_down_config);
         let temp = RegDownloaderStatus {
             status_core: Arc::new(Mutex::new(RegDownloaderStatusCore {
-                name: file_path.clone(),
+                blob_down_config: blob_down_config_arc.clone(),
                 file_size: 0,
                 curr_size: 0,
                 done: false,
@@ -42,16 +44,17 @@ impl RegDownloader {
             auth,
             client: Some(client),
             temp,
-            file_path: file_path.clone(),
+            blob_down_config: blob_down_config_arc.clone(),
         })
     }
 
     pub fn new_finished_downloader(
-        file_path: Arc<String>, file_size: usize,
+        blob_down_config: BlobDownConfig, file_size: usize,
     ) -> Result<RegDownloader> {
+        let blob_down_config_arc = Arc::new(blob_down_config);
         let temp = RegDownloaderStatus {
             status_core: Arc::new(Mutex::new(RegDownloaderStatusCore {
-                name: file_path.clone(),
+                blob_down_config: blob_down_config_arc.clone(),
                 file_size,
                 curr_size: 0,
                 done: false,
@@ -63,7 +66,7 @@ impl RegDownloader {
             auth: None,
             client: None,
             temp,
-            file_path: file_path.clone(),
+            blob_down_config: blob_down_config_arc.clone(),
         })
     }
 }
@@ -72,7 +75,7 @@ impl Processor<String> for RegDownloader {
     fn start(&self) -> Box<dyn ProcessorAsync<String>> {
         if self.finished {
             return Box::new(RegFinishedDownloader {
-                result: self.file_path.clone()
+                result: self.blob_down_config.file_path.to_str().unwrap().to_string()
             });
         }
         let status = self.temp.clone();
@@ -81,16 +84,16 @@ impl Processor<String> for RegDownloader {
             auth: self.auth.clone(),
             client: self.client.as_ref().unwrap().clone(),
         };
-        let file_path_clone = self.file_path.clone();
+        let file_path_clone = self.blob_down_config.file_path.to_str().unwrap().to_string();
         let handle = thread::spawn::<_, Result<String>>(move || {
             let downloader = reg_http_downloader;
-            let result = downloading(status.clone(), file_path_clone.clone(), downloader);
-            let mut status_core = &mut status.status_core.lock().unwrap();
+            let result = downloading(status.clone(), file_path_clone.clone().as_str(), downloader);
+            let status_core = &mut status.status_core.lock().unwrap();
             status_core.done = true;
             if let Err(err) = &result {
                 println!("{}\n{}", err, err.backtrace());
             }
-            Ok(file_path_clone.to_string())
+            Ok(file_path_clone)
         });
         Box::new(RegDownloadHandler {
             join: handle
@@ -115,7 +118,7 @@ impl ProcessorAsync<String> for RegDownloadHandler {
 }
 
 pub struct RegFinishedDownloader {
-    result: Arc<String>,
+    result: String,
 }
 
 impl ProcessorAsync<String> for RegFinishedDownloader {
@@ -126,10 +129,10 @@ impl ProcessorAsync<String> for RegFinishedDownloader {
 
 
 fn downloading(
-    status: RegDownloaderStatus, file_path_arc: Arc<String>, reg_http_downloader: RegHttpDownloader,
+    status: RegDownloaderStatus, file_path: &str, reg_http_downloader: RegHttpDownloader,
 ) -> Result<()> {
     //检查本地是否存在已有
-    let file_path = Path::new(file_path_arc.as_str());
+    let file_path = Path::new(file_path);
     let parent_path = file_path.parent().expect("find file parent dir failed");
     if !parent_path.exists() {
         std::fs::create_dir(parent_path)?
@@ -212,7 +215,7 @@ pub struct RegDownloaderStatus {
 
 
 struct RegDownloaderStatusCore {
-    name: Arc<String>,
+    blob_down_config: Arc<BlobDownConfig>,
     file_size: usize,
     pub curr_size: usize,
     pub done: bool,
@@ -222,7 +225,7 @@ impl ProgressStatus for RegDownloaderStatus {
     fn status(&self) -> CoreStatus {
         let core = &self.status_core.lock().unwrap();
         CoreStatus {
-            name: core.name.clone(),
+            blob_down_config: core.blob_down_config.clone(),
             full_size: core.file_size,
             now_size: core.curr_size,
             is_done: core.done,

@@ -1,25 +1,31 @@
-use std::sync::Arc;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct Bar {
-    bar_core: Arc<BarCore>,
+    bar_core: Rc<RefCell<BarCore>>,
 }
 
 impl Bar {
     pub fn add_size(&mut self, size: usize) {
-        self.bar_core.curr_file_size = self.bar_core.curr_file_size + size;
+        let mut bar_core_mut = self.bar_core.borrow_mut();
+        bar_core_mut.curr_file_size = bar_core_mut.curr_file_size + size;
     }
 
-    pub fn finish(&self, success: bool) {}
+    pub fn finish(&mut self, success: bool) {
+        let mut bar_core_mut = self.bar_core.borrow_mut();
+        bar_core_mut.finished = true;
+    }
 }
 
 struct BarCore {
     curr_file_size: usize,
-    finish: bool,
+    finished: bool,
 }
 
 
 pub struct MultiBar {
-    bar_vec: Vec<(String, usize, Arc<BarCore>)>,
+    /// name,total,core
+    bar_vec: Vec<(String, usize, Rc<RefCell<BarCore>>)>,
 }
 
 impl MultiBar {
@@ -30,14 +36,22 @@ impl MultiBar {
     }
 
     pub fn add_new_bar(&mut self, short_digest: String, file_count: usize) -> Bar {
-        let bar_core_arc = Arc::new(BarCore {
+        let bar_core = Rc::new(RefCell::new(BarCore {
             curr_file_size: 0,
-            finish: false,
-        });
-        let bar_data = (short_digest, file_count, bar_core_arc.clone());
+            finished: false,
+        }));
+        let bar_data = (short_digest, file_count, bar_core.clone());
         self.bar_vec.push(bar_data);
         Bar {
-            bar_core: bar_core_arc
+            bar_core
+        }
+    }
+
+    pub fn update(&self) {
+        print!("\x1b[{}A", self.bar_vec.len());
+        for (name, ds, bar_core) in &self.bar_vec {
+            let bar_core = bar_core.borrow();
+            println!("{} {}\r", name, bar_core.curr_file_size);
         }
     }
 }
