@@ -1,6 +1,5 @@
 use std::io::Read;
 use std::option::Option::Some;
-use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
@@ -10,8 +9,8 @@ use reqwest::blocking::{Client, Response};
 use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use crate::reg::BlobDownConfig;
 
+use crate::reg::BlobDownConfig;
 use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth, RegistryAccept, RegistryAuth};
 use crate::reg::docker::http::auth::RegTokenHandler;
 use crate::reg::docker::http::download::RegDownloader;
@@ -55,11 +54,11 @@ impl RegistryHttpClient {
         accept: &Option<RegistryAccept>, body: Option<&T>,
     ) -> Result<R> {
         let success_response = self.do_request(path, scope, method, accept, body)?;
-        let header_docker_content_digest = success_response
+        let _header_docker_content_digest = success_response
             .header_docker_content_digest()
             .expect("No Docker-Content-Digest header");
         let body_bytes = success_response.bytes_body();
-        let body_sha256 = format!("sha256:{}", sha::sha256(body_bytes));
+        let _body_sha256 = format!("sha256:{}", sha::sha256(body_bytes));
         // if body_bytes.len() != 0 && body_sha256 != header_docker_content_digest {
         //     return Err(Error::msg("docker_content_digest verification failed"));
         // }

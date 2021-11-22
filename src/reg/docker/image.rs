@@ -1,9 +1,9 @@
 use std::cell::RefCell;
 use std::fs::File;
 
-use std::path::Path;
+
 use std::rc::Rc;
-use std::sync::Arc;
+
 
 use anyhow::{Error, Result};
 use reqwest::Method;
@@ -15,7 +15,7 @@ use crate::reg::docker::http::client::{RegistryHttpClient, RegistryResponse, Sim
 use crate::reg::docker::http::download::RegDownloader;
 use crate::reg::docker::http::RegistryAccept;
 use crate::reg::{BlobDownConfig, BlobType, Reference};
-use crate::util::sha::file_sha256;
+
 
 pub struct ImageManager {
     registry_addr: String,
@@ -77,7 +77,7 @@ impl ImageManager {
             file_path,
             file_name,
             digest: digest.to_string(),
-            short_hash: digest[..12].to_string(),
+            short_hash: digest.replace("sha256:", "")[..12].to_string(),
             blob_type,
         };
         let file_sha256 = digest.replace("sha256:", "");

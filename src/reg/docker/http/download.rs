@@ -1,6 +1,6 @@
 use std::borrow::BorrowMut;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
@@ -57,7 +57,7 @@ impl RegDownloader {
                 blob_down_config: blob_down_config_arc.clone(),
                 file_size,
                 curr_size: 0,
-                done: false,
+                done: true,
             }))
         };
         Ok(RegDownloader {

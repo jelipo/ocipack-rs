@@ -11,7 +11,7 @@ impl Bar {
         bar_core_mut.curr_file_size = bar_core_mut.curr_file_size + size;
     }
 
-    pub fn finish(&mut self, success: bool) {
+    pub fn finish(&mut self, _success: bool) {
         let mut bar_core_mut = self.bar_core.borrow_mut();
         bar_core_mut.finished = true;
     }
@@ -49,7 +49,7 @@ impl MultiBar {
 
     pub fn update(&self) {
         print!("\x1b[{}A", self.bar_vec.len());
-        for (name, ds, bar_core) in &self.bar_vec {
+        for (name, _ds, bar_core) in &self.bar_vec {
             let bar_core = bar_core.borrow();
             println!("{} {}\r", name, bar_core.curr_file_size);
         }

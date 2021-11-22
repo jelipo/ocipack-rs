@@ -1,11 +1,9 @@
-use std::io::Stdout;
-use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 
-use anyhow::{Error, Result};
-use crate::bar::{Bar, MultiBar};
+use anyhow::Result;
 
+use crate::bar::{Bar, MultiBar};
 use crate::progress::{Processor, ProcessorAsync, ProgressStatus};
 
 pub struct ProcessorManager<R> {
