@@ -4,11 +4,10 @@ use std::rc::Rc;
 
 use anyhow::Result;
 
-use crate::reg::home::HomeDir;
 use crate::reg::docker::http::client::RegistryHttpClient;
 use crate::reg::docker::http::RegistryAuth;
-use crate::reg::docker::image::ImageManager;
-
+use crate::reg::docker::ImageManager;
+use crate::reg::home::HomeDir;
 
 pub struct Registry {
     pub image_manager: ImageManager,
