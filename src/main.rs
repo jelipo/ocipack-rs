@@ -36,12 +36,15 @@ fn main() -> Result<()> {
         reference: temp_config.reference.as_str(),
     };
     let manifest = registry.image_manager.manifests(&reference)?;
-    let manifest_layers = manifest.layers;
+    let config_digest = &manifest.config.digest;
+    let config_blob = registry.image_manager.config_blob(temp_config.image_name.as_str(), config_digest.as_str())?;
+
+    let manifest_layers = &manifest.layers;
 
     let mut reg_downloader_vec = Vec::<Box<dyn Processor<String>>>::new();
     for layer in manifest_layers {
         let disgest = &layer.digest;
-        let downloader = registry.image_manager.blobs_download(&reference.image_name, disgest, BlobType::Layers)?;
+        let downloader = registry.image_manager.layer_blob_download(&reference.image_name, disgest)?;
         reg_downloader_vec.push(Box::new(downloader))
     }
     println!("创建manager");

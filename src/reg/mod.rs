@@ -21,5 +21,4 @@ pub struct BlobDownConfig {
     pub file_name: String,
     pub digest: String,
     pub short_hash: String,
-    pub blob_type: BlobType,
 }

@@ -1,9 +1,10 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Root {
+pub struct ConfigBlob {
     pub created: Option<String>,
     pub author: Option<String>,
     pub architecture: String,
@@ -19,13 +20,13 @@ pub struct Config {
     #[serde(rename = "User")]
     pub user: String,
     #[serde(rename = "Memory")]
-    pub memory: u64,
+    pub memory: Option<u64>,
     #[serde(rename = "MemorySwap")]
-    pub memory_swap: u64,
+    pub memory_swap: Option<u64>,
     #[serde(rename = "CpuShares")]
-    pub cpu_shares: u64,
+    pub cpu_shares: Option<u64>,
     #[serde(rename = "ExposedPorts")]
-    pub exposed_ports: ExposedPorts,
+    pub exposed_ports: Option<ExposedPorts>,
     #[serde(rename = "Env")]
     pub env: Vec<String>,
     #[serde(rename = "Entrypoint")]
@@ -33,16 +34,16 @@ pub struct Config {
     #[serde(rename = "Cmd")]
     pub cmd: Vec<String>,
     #[serde(rename = "Volumes")]
-    pub volumes: Volumes,
+    pub volumes: Option<Volumes>,
     #[serde(rename = "WorkingDir")]
-    pub working_dir: String,
+    pub working_dir: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExposedPorts {
     #[serde(rename = "8080/tcp")]
-    pub n8080_tcp: N8080tcp,
+    pub n8080_tcp: Option<N8080tcp>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -53,9 +54,9 @@ pub struct N8080tcp {}
 #[serde(rename_all = "camelCase")]
 pub struct Volumes {
     #[serde(rename = "/var/job-result-data")]
-    pub var_job_result_data: VarJobResultData,
+    pub var_job_result_data: Option<VarJobResultData>,
     #[serde(rename = "/var/log/my-app-logs")]
-    pub var_log_my_app_logs: VarLogMyAppLogs,
+    pub var_log_my_app_logs: Option<VarLogMyAppLogs>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

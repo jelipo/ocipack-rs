@@ -1,25 +1,23 @@
-pub mod registry;
-pub mod image;
-pub mod http;
-
-
 use std::cell::RefCell;
 use std::fs::File;
-
-
 use std::rc::Rc;
 
-
 use anyhow::{Error, Result};
+use log::debug;
 use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::home::HomeDir;
+use crate::reg::{BlobDownConfig, BlobType, Reference};
 use crate::reg::docker::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
 use crate::reg::docker::http::download::RegDownloader;
 use crate::reg::docker::http::RegistryAccept;
-use crate::reg::{BlobDownConfig, BlobType, Reference};
+use crate::reg::docker::image::ConfigBlob;
+use crate::reg::home::HomeDir;
+
+pub mod registry;
+pub mod image;
+pub mod http;
 
 
 pub struct ImageManager {
@@ -75,15 +73,21 @@ impl ImageManager {
         exited(&response)
     }
 
-    pub fn blobs_download(&mut self, name: &str, digest: &str, blob_type: BlobType) -> Result<RegDownloader> {
+    pub fn config_blob(&mut self, name: &str, digest: &str) -> Result<ConfigBlob> {
         let url_path = format!("/v2/{}/blobs/{}", name, digest);
-        let (file_path, file_name) = self.home_dir.cache.blobs.digest_path(digest, &blob_type);
+        let scope = Some(name);
+        let mut reg_rc = self.reg_client.borrow_mut();
+        reg_rc.request_registry::<u8, ConfigBlob>(&url_path, &scope, Method::GET, &None, None)
+    }
+
+    pub fn layer_blob_download(&mut self, name: &str, digest: &str) -> Result<RegDownloader> {
+        let url_path = format!("/v2/{}/blobs/{}", name, digest);
+        let (file_path, file_name) = self.home_dir.cache.blobs.digest_path(digest, &BlobType::Layers);
         let down_config = BlobDownConfig {
             file_path,
             file_name,
             digest: digest.to_string(),
             short_hash: digest.replace("sha256:", "")[..12].to_string(),
-            blob_type,
         };
         let file_sha256 = digest.replace("sha256:", "");
         if !self.home_dir.cache.blobs.download_pre_processing(&down_config.file_path, file_sha256)? {
@@ -120,9 +124,9 @@ pub struct Manifest2 {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ManifestConfig {
-    media_type: String,
-    size: usize,
-    digest: String,
+    pub media_type: String,
+    pub size: usize,
+    pub digest: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

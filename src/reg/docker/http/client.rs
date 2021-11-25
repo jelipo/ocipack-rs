@@ -54,9 +54,9 @@ impl RegistryHttpClient {
         accept: &Option<RegistryAccept>, body: Option<&T>,
     ) -> Result<R> {
         let success_response = self.do_request(path, scope, method, accept, body)?;
-        let _header_docker_content_digest = success_response
-            .header_docker_content_digest()
-            .expect("No Docker-Content-Digest header");
+        // let _header_docker_content_digest = success_response
+        //     .header_docker_content_digest()
+        //     .expect("No Docker-Content-Digest header");
         let body_bytes = success_response.bytes_body();
         let _body_sha256 = format!("sha256:{}", sha::sha256(body_bytes));
         // if body_bytes.len() != 0 && body_sha256 != header_docker_content_digest {
@@ -131,6 +131,9 @@ pub struct FullRegistryResponse {
 impl FullRegistryResponse {
     pub fn new_registry_response(http_response: Response) -> Result<FullRegistryResponse> {
         let headers = http_response.headers();
+        for (l, v) in headers {
+            println!("{}:", l.as_str())
+        }
         let content_type_opt = get_header(headers, "content-type");
         let docker_content_digest_opt = get_header(headers, "Docker-Content-Digest");
         let code = http_response.status();
