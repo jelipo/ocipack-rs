@@ -73,23 +73,23 @@ impl ImageManager {
         exited(&response)
     }
 
-    pub fn config_blob(&mut self, name: &str, digest: &str) -> Result<ConfigBlob> {
-        let url_path = format!("/v2/{}/blobs/{}", name, digest);
+    pub fn config_blob(&mut self, name: &str, blob_digest: &str) -> Result<ConfigBlob> {
+        let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let scope = Some(name);
         let mut reg_rc = self.reg_client.borrow_mut();
         reg_rc.request_registry::<u8, ConfigBlob>(&url_path, &scope, Method::GET, &None, None)
     }
 
-    pub fn layer_blob_download(&mut self, name: &str, digest: &str) -> Result<RegDownloader> {
-        let url_path = format!("/v2/{}/blobs/{}", name, digest);
-        let (file_path, file_name) = self.home_dir.cache.blobs.digest_path(digest, &BlobType::Layers);
+    pub fn layer_blob_download(&mut self, name: &str, blob_digest: &str) -> Result<RegDownloader> {
+        let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
+        let (file_path, file_name) = self.home_dir.cache.blobs.digest_path(blob_digest, &BlobType::Layers);
         let down_config = BlobDownConfig {
             file_path,
             file_name,
-            digest: digest.to_string(),
-            short_hash: digest.replace("sha256:", "")[..12].to_string(),
+            digest: blob_digest.to_string(),
+            short_hash: blob_digest.replace("sha256:", "")[..12].to_string(),
         };
-        let file_sha256 = digest.replace("sha256:", "");
+        let file_sha256 = blob_digest.replace("sha256:", "");
         if !self.home_dir.cache.blobs.download_pre_processing(&down_config.file_path, file_sha256)? {
             let file = File::open(&down_config.file_path)?;
             let finished_downloader = RegDownloader::new_finished_downloader(
@@ -98,6 +98,10 @@ impl ImageManager {
         }
         let downloader = self.reg_client.borrow_mut().download(&url_path, down_config, name)?;
         Ok(downloader)
+    }
+
+    pub fn layer_blob_upload(&mut self, name: &str,blob_digest: &str,file_local_path:&str) {
+
     }
 }
 
