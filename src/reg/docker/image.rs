@@ -18,7 +18,7 @@ pub struct ConfigBlob {
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     #[serde(rename = "User")]
-    pub user: String,
+    pub user: Option<String>,
     #[serde(rename = "Memory")]
     pub memory: Option<u64>,
     #[serde(rename = "MemorySwap")]
@@ -28,11 +28,11 @@ pub struct Config {
     #[serde(rename = "ExposedPorts")]
     pub exposed_ports: Option<ExposedPorts>,
     #[serde(rename = "Env")]
-    pub env: Vec<String>,
+    pub env: Option<Vec<String>>,
     #[serde(rename = "Entrypoint")]
-    pub entrypoint: Vec<String>,
+    pub entrypoint: Option<Vec<String>>,
     #[serde(rename = "Cmd")]
-    pub cmd: Vec<String>,
+    pub cmd: Option<Vec<String>>,
     #[serde(rename = "Volumes")]
     pub volumes: Option<Volumes>,
     #[serde(rename = "WorkingDir")]
