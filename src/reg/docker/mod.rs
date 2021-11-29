@@ -7,6 +7,7 @@ use log::debug;
 use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
+use url::Url;
 
 use crate::reg::{BlobDownConfig, BlobType, Reference};
 use crate::reg::docker::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
@@ -45,7 +46,7 @@ impl ImageManager {
         let scope = Some(refe.image_name);
         let mut reg_rc = self.reg_client.borrow_mut();
         let accept_opt = Some(RegistryAccept::APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_V2JSON);
-        reg_rc.request_registry::<u8, Manifest2>(&path, &scope, Method::GET, &accept_opt, None)
+        reg_rc.request_registry_body::<u8, Manifest2>(&path, &scope, Method::GET, &accept_opt, None)
     }
 
     // /// 获取Image的Manifest
@@ -66,8 +67,8 @@ impl ImageManager {
     }
 
     /// Image blobs是否存在
-    pub fn blobs_exited(&mut self, name: &str, digest: &str) -> Result<bool> {
-        let path = format!("/v2/{}/blobs/{}", name, digest);
+    pub fn blobs_exited(&mut self, name: &str, blob_digest: &str) -> Result<bool> {
+        let path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let scope = Some(name);
         let response = self.reg_client.borrow_mut().head_request_registry(&path, &scope)?;
         exited(&response)
@@ -77,7 +78,7 @@ impl ImageManager {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let scope = Some(name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        reg_rc.request_registry::<u8, ConfigBlob>(&url_path, &scope, Method::GET, &None, None)
+        reg_rc.request_registry_body::<u8, ConfigBlob>(&url_path, &scope, Method::GET, &None, None)
     }
 
     pub fn layer_blob_download(&mut self, name: &str, blob_digest: &str) -> Result<RegDownloader> {
@@ -100,8 +101,22 @@ impl ImageManager {
         Ok(downloader)
     }
 
-    pub fn layer_blob_upload(&mut self, name: &str,blob_digest: &str,file_local_path:&str) {
+    pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &str, file_local_path: &str) -> Result<()> {
+        if self.blobs_exited(name, blob_digest)? {
+            return Ok(());
+        }
 
+        Ok(())
+    }
+
+    fn layer_blob_upload_ready(&mut self, name: &str) -> Result<()> {
+        let url_path = format!("/v2/{}/blobs/uploads/", name);
+        let scope = Some(name);
+        let mut reg_rc = self.reg_client.borrow_mut();
+        let success_resp = reg_rc.request_registry::<u8>(&url_path, &scope, Method::POST, &None, None)?;
+        let location = success_resp.location_header().expect("location header not found");
+        let location_url = format!("{}:{}", self.registry_addr, location);
+        let url = Url::parse(location_url.as_str())?;
     }
 }
 

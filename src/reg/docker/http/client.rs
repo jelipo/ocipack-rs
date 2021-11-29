@@ -49,7 +49,7 @@ impl RegistryHttpClient {
         })
     }
 
-    pub fn request_registry<T: Serialize + ?Sized, R: DeserializeOwned>(
+    pub fn request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(
         &mut self, path: &str, scope: &Option<&str>, method: Method,
         accept: &Option<RegistryAccept>, body: Option<&T>,
     ) -> Result<R> {
@@ -63,6 +63,13 @@ impl RegistryHttpClient {
         //     return Err(Error::msg("docker_content_digest verification failed"));
         // }
         success_response.json_body::<R>()
+    }
+
+    pub fn request_registry<T: Serialize + ?Sized>(
+        &mut self, path: &str, scope: &Option<&str>, method: Method,
+        accept: &Option<RegistryAccept>, body: Option<&T>,
+    ) -> Result<FullRegistryResponse> {
+        self.do_request(path, scope, method, accept, body)
     }
 
     pub fn head_request_registry(&mut self, path: &str, scope: &Option<&str>) -> Result<SimpleRegistryResponse> {
@@ -124,6 +131,7 @@ pub struct FullRegistryResponse {
     body_bytes: Bytes,
     content_type: Option<String>,
     docker_content_digest: Option<String>,
+    location_header: Option<String>,
     http_status: StatusCode,
 }
 
@@ -136,12 +144,14 @@ impl FullRegistryResponse {
         }
         let content_type_opt = get_header(headers, "content-type");
         let docker_content_digest_opt = get_header(headers, "Docker-Content-Digest");
+        let location_header = get_header(headers, "Location");
         let code = http_response.status();
         let body_bytes = http_response.bytes()?;
         Ok(FullRegistryResponse {
             body_bytes,
             content_type: content_type_opt,
             docker_content_digest: docker_content_digest_opt,
+            location_header,
             http_status: code,
         })
     }
@@ -173,6 +183,10 @@ impl FullRegistryResponse {
 
     pub fn header_docker_content_digest(&self) -> Option<String> {
         self.docker_content_digest.clone()
+    }
+
+    pub fn location_header(&self) -> &Option<String> {
+        &self.location_header
     }
 }
 
