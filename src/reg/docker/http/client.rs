@@ -125,6 +125,10 @@ impl RegistryHttpClient {
         )?;
         Ok(downloader)
     }
+
+    pub fn upload(&mut self, file_local_path: &str) {
+        
+    }
 }
 
 pub struct FullRegistryResponse {
@@ -139,9 +143,6 @@ pub struct FullRegistryResponse {
 impl FullRegistryResponse {
     pub fn new_registry_response(http_response: Response) -> Result<FullRegistryResponse> {
         let headers = http_response.headers();
-        for (l, v) in headers {
-            println!("{}:", l.as_str())
-        }
         let content_type_opt = get_header(headers, "content-type");
         let docker_content_digest_opt = get_header(headers, "Docker-Content-Digest");
         let location_header = get_header(headers, "Location");

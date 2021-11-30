@@ -3,7 +3,7 @@ use std::fs::File;
 use std::rc::Rc;
 
 use anyhow::{Error, Result};
-use log::debug;
+use log::{debug, info};
 use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
@@ -101,22 +101,29 @@ impl ImageManager {
         Ok(downloader)
     }
 
+    /// 上传layer类型的blob文件
     pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &str, file_local_path: &str) -> Result<()> {
         if self.blobs_exited(name, blob_digest)? {
+            // TODO 返回一个已经完成的结果
             return Ok(());
         }
+        let mut location_url = self.layer_blob_upload_ready(name)?;
+        location_url.query_pairs_mut().append_pair("digest", blob_digest);
+        let blob_upload_url = location_url.as_str();
+        info!("blob_upload_url is {}",blob_upload_url);
 
         Ok(())
     }
 
-    fn layer_blob_upload_ready(&mut self, name: &str) -> Result<()> {
+    /// 向仓库获取上传blob的URL
+    fn layer_blob_upload_ready(&mut self, name: &str) -> Result<Url> {
         let url_path = format!("/v2/{}/blobs/uploads/", name);
         let scope = Some(name);
         let mut reg_rc = self.reg_client.borrow_mut();
         let success_resp = reg_rc.request_registry::<u8>(&url_path, &scope, Method::POST, &None, None)?;
-        let location = success_resp.location_header().expect("location header not found");
-        let location_url = format!("{}:{}", self.registry_addr, location);
-        let url = Url::parse(location_url.as_str())?;
+        let location = success_resp.location_header().as_ref().expect("location header not found");
+        let url = Url::parse(location)?;
+        Ok(url)
     }
 }
 

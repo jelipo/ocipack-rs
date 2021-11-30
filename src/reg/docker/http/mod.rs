@@ -9,6 +9,7 @@ use serde::Serialize;
 pub mod auth;
 pub mod client;
 pub mod download;
+pub mod upload;
 
 #[derive(Clone)]
 pub struct RegistryAuth {

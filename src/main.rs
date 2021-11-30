@@ -4,6 +4,7 @@ use std::fs::File;
 use std::path::Path;
 
 use anyhow::Result;
+use env_logger::Env;
 use serde::Deserialize;
 
 use crate::progress::manager::ProcessorManager;
@@ -19,6 +20,10 @@ mod util;
 mod bar;
 
 fn main() -> Result<()> {
+    let env = Env::default()
+        .default_filter_or("info");
+    env_logger::init_from_env(env);
+
     let config_path = Path::new("config.json");
     let config_file = File::open(config_path).expect("Open config file failed.");
     let temp_config = serde_json::from_reader::<_, TempConfig>(config_file)?;
@@ -31,6 +36,12 @@ fn main() -> Result<()> {
     };
     let home_dir_path = Path::new(temp_config.home_dir.as_str());
     let mut registry = Registry::open(temp_config.registry, auth_opt, home_dir_path)?;
+
+    registry.image_manager.layer_blob_upload(temp_config.image_name.as_str(),
+                                             "sha256:7b1a6ab2e44dbac178598dabe7cff59bd67233dba0b27e4fbd1f9d4b3c877a53",
+                                             "")?;
+
+
     let reference = Reference {
         image_name: temp_config.image_name.as_str(),
         reference: temp_config.reference.as_str(),
