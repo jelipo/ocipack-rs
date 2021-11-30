@@ -12,7 +12,7 @@ use reqwest::blocking::{Client, Response};
 use reqwest::Method;
 
 use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProgressStatus};
-use crate::reg::BlobDownConfig;
+use crate::reg::BlobConfig;
 use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth};
 use crate::util::sha::Sha;
 
@@ -22,17 +22,17 @@ pub struct RegDownloader {
     auth: Option<HttpAuth>,
     client: Option<Client>,
     temp: RegDownloaderStatus,
-    blob_down_config: Arc<BlobDownConfig>,
+    blob_down_config: Arc<BlobConfig>,
 }
 
 impl RegDownloader {
     pub fn new_reg_downloader(
-        url: String, auth: Option<HttpAuth>, client: Client, blob_down_config: BlobDownConfig,
+        url: String, auth: Option<HttpAuth>, client: Client, blob_down_config: BlobConfig,
     ) -> Result<RegDownloader> {
         let blob_down_config_arc = Arc::new(blob_down_config);
         let temp = RegDownloaderStatus {
             status_core: Arc::new(Mutex::new(RegDownloaderStatusCore {
-                blob_down_config: blob_down_config_arc.clone(),
+                blob_config: blob_down_config_arc.clone(),
                 file_size: 0,
                 curr_size: 0,
                 done: false,
@@ -49,12 +49,12 @@ impl RegDownloader {
     }
 
     pub fn new_finished_downloader(
-        blob_down_config: BlobDownConfig, file_size: usize,
+        blob_down_config: BlobConfig, file_size: usize,
     ) -> Result<RegDownloader> {
         let blob_down_config_arc = Arc::new(blob_down_config);
         let temp = RegDownloaderStatus {
             status_core: Arc::new(Mutex::new(RegDownloaderStatusCore {
-                blob_down_config: blob_down_config_arc.clone(),
+                blob_config: blob_down_config_arc.clone(),
                 file_size,
                 curr_size: 0,
                 done: true,
@@ -215,7 +215,7 @@ pub struct RegDownloaderStatus {
 
 
 struct RegDownloaderStatusCore {
-    blob_down_config: Arc<BlobDownConfig>,
+    blob_config: Arc<BlobConfig>,
     file_size: usize,
     pub curr_size: usize,
     pub done: bool,
@@ -225,7 +225,7 @@ impl ProgressStatus for RegDownloaderStatus {
     fn status(&self) -> CoreStatus {
         let core = &self.status_core.lock().unwrap();
         CoreStatus {
-            blob_down_config: core.blob_down_config.clone(),
+            blob_config: core.blob_config.clone(),
             full_size: core.file_size,
             now_size: core.curr_size,
             is_done: core.done,

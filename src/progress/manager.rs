@@ -18,7 +18,7 @@ impl<R> ProcessorManager<R> {
             let async_processor = processor.start();
             let status = processor.process_status();
             let status_core = status.status();
-            let name = status_core.blob_down_config.short_hash.clone();
+            let name = status_core.blob_config.short_hash.clone();
             let bar = mb.add_new_bar(name, status_core.full_size);
             (async_processor, status, bar)
         }).collect::<Vec<(Box<dyn ProcessorAsync<R>>, Box<dyn ProgressStatus>, Bar)>>();

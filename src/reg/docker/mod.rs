@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use url::Url;
 
-use crate::reg::{BlobDownConfig, BlobType, Reference};
+use crate::reg::{BlobConfig, BlobType, Reference};
 use crate::reg::docker::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
 use crate::reg::docker::http::download::RegDownloader;
 use crate::reg::docker::http::RegistryAccept;
@@ -84,7 +84,7 @@ impl ImageManager {
     pub fn layer_blob_download(&mut self, name: &str, blob_digest: &str) -> Result<RegDownloader> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let (file_path, file_name) = self.home_dir.cache.blobs.digest_path(blob_digest, &BlobType::Layers);
-        let down_config = BlobDownConfig {
+        let down_config = BlobConfig {
             file_path,
             file_name,
             digest: blob_digest.to_string(),

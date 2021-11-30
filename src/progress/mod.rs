@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
-use crate::reg::BlobDownConfig;
+use crate::reg::BlobConfig;
 
 pub mod manager;
 
@@ -17,7 +17,7 @@ pub trait ProcessorAsync<R> {
 }
 
 pub struct CoreStatus {
-    pub blob_down_config: Arc<BlobDownConfig>,
+    pub blob_config: Arc<BlobConfig>,
     pub full_size: usize,
     pub now_size: usize,
     pub is_done: bool,

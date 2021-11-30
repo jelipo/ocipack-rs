@@ -16,7 +16,7 @@ pub enum BlobType {
     Config,
 }
 
-pub struct BlobDownConfig {
+pub struct BlobConfig {
     pub file_path: Box<Path>,
     pub file_name: String,
     pub digest: String,

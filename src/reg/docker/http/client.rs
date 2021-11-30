@@ -10,7 +10,7 @@ use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::reg::BlobDownConfig;
+use crate::reg::BlobConfig;
 use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth, RegistryAccept, RegistryAuth};
 use crate::reg::docker::http::auth::RegTokenHandler;
 use crate::reg::docker::http::download::RegDownloader;
@@ -114,7 +114,7 @@ impl RegistryHttpClient {
         };
     }
 
-    pub fn download(&mut self, path: &str, blob_down_config: BlobDownConfig, scope: &str) -> Result<RegDownloader> {
+    pub fn download(&mut self, path: &str, blob_down_config: BlobConfig, scope: &str) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
         let token = self.reg_token_handler.token(&Some(scope))?;
         let downloader = RegDownloader::new_reg_downloader(
