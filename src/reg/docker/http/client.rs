@@ -86,7 +86,7 @@ impl RegistryHttpClient {
         let url = self.registry_addr.clone() + path;
         let token = self.reg_token_handler.token(scope)?;
         let auth = Some(HttpAuth::BearerToken { token });
-        let http_response = do_request_raw(&self.client, url.as_str(), method, &auth, accept, body)?;
+        let http_response = do_request_raw(&self.client, url.as_str(), method, auth.as_ref(), accept, body)?;
         Ok(http_response)
     }
 
@@ -126,9 +126,7 @@ impl RegistryHttpClient {
         Ok(downloader)
     }
 
-    pub fn upload(&mut self, file_local_path: &str) {
-        
-    }
+    pub fn upload(&mut self, _file_local_path: &str) {}
 }
 
 pub struct FullRegistryResponse {

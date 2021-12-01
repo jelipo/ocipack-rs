@@ -48,7 +48,7 @@ fn main() -> Result<()> {
     };
     let manifest = registry.image_manager.manifests(&reference)?;
     let config_digest = &manifest.config.digest;
-    let config_blob = registry.image_manager.config_blob(temp_config.image_name.as_str(), config_digest.as_str())?;
+    let _config_blob = registry.image_manager.config_blob(temp_config.image_name.as_str(), config_digest.as_str())?;
 
     let manifest_layers = &manifest.layers;
 

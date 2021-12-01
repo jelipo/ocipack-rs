@@ -68,7 +68,7 @@ impl RegTokenHandler {
             }
             Some(adapter) => adapter,
         };
-        let token_response = adapter.new_token(scope_opt, &self.basic_auth, &self.client)?;
+        let token_response = adapter.new_token(scope_opt, self.basic_auth.as_ref(), &self.client)?;
         let scope = if let Some(scope) = scope_opt {
             scope
         } else {
@@ -100,7 +100,7 @@ impl AuthenticateAdapter {
     ) -> Result<AuthenticateAdapter> {
         let bearer_url = format!("{}/v2/", registry_addr);
         let http_response =
-            do_request_raw::<u8>(client, bearer_url.as_str(), Method::GET, &None, &None, None)?;
+            do_request_raw::<u8>(client, bearer_url.as_str(), Method::GET, None, &None, None)?;
         let www_authenticate = get_header(http_response.headers(), "Www-Authenticate")
             .expect("Www-Authenticate header not found");
         let regex = Regex::new("^Bearer realm=\"(?P<realm>.*)\",service=\"(?P<service>.*)\".*")?;
@@ -117,7 +117,7 @@ impl AuthenticateAdapter {
     }
 
     pub fn new_token(
-        &self, scope: &Option<&str>, basic_auth: &Option<HttpAuth>, client: &Client,
+        &self, scope: &Option<&str>, basic_auth: Option<&HttpAuth>, client: &Client,
     ) -> Result<TokenResponse> {
         let mut url = format!("{}?service={}", &self.realm, &self.service);
         if let Some(scope_raw) = scope {

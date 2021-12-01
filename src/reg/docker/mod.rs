@@ -3,7 +3,7 @@ use std::fs::File;
 use std::rc::Rc;
 
 use anyhow::{Error, Result};
-use log::{debug, info};
+use log::{info};
 use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
@@ -102,7 +102,7 @@ impl ImageManager {
     }
 
     /// 上传layer类型的blob文件
-    pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &str, file_local_path: &str) -> Result<()> {
+    pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &str, _file_local_path: &str) -> Result<()> {
         if self.blobs_exited(name, blob_digest)? {
             // TODO 返回一个已经完成的结果
             return Ok(());

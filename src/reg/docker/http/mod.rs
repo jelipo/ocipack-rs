@@ -1,8 +1,10 @@
+use std::io::Read;
 use std::str::FromStr;
 
 use anyhow::Result;
+
 use reqwest::{Method, Url};
-use reqwest::blocking::{Client, Request, Response};
+use reqwest::blocking::{Body, Client, Request, Response};
 use reqwest::header::HeaderMap;
 use serde::Serialize;
 
@@ -25,6 +27,11 @@ pub enum HttpAuth {
 
 pub struct RegistryAccept(&'static str);
 
+pub enum RequestBody<'a, T: Serialize + ?Sized> {
+    JSON(&'a T),
+    Read(Body),
+}
+
 impl RegistryAccept {
     pub const APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_V2JSON: Self = Self("application/vnd.docker.distribution.manifest.v2+json");
     pub const APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_LIST_V2JSON: Self = Self("application/vnd.docker.distribution.manifest.list.v2+json");
@@ -36,41 +43,45 @@ impl RegistryAccept {
 }
 
 fn do_request_raw<T: Serialize + ?Sized>(
-    client: &Client,
-    url: &str,
-    method: Method,
-    http_auth_opt: &Option<HttpAuth>,
-    accept: &Option<RegistryAccept>,
-    body: Option<&T>,
+    client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
+    accept: &Option<RegistryAccept>, body: Option<&T>,
 ) -> Result<Response> {
-    let request = build_request(client, url, method, http_auth_opt, accept, body)?;
+    let request_body = body.map(|json| RequestBody::JSON(json));
+    let request = build_request::<T>(client, url, method, http_auth_opt, accept, request_body)?;
+    let http_response = client.execute(request)?;
+    Ok(http_response)
+}
+
+fn do_request_raw_read<R: Read + Send + 'static>(
+    client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
+    accept: &Option<RegistryAccept>, body: Option<R>, size: u64,
+) -> Result<Response> {
+    let request_body = body.map(|read| RequestBody::Read(Body::sized(read, size)));
+    let request = build_request::<String>(client, url, method, http_auth_opt, accept, request_body)?;
     let http_response = client.execute(request)?;
     Ok(http_response)
 }
 
 fn build_request<T: Serialize + ?Sized>(
-    client: &Client,
-    url: &str,
-    method: Method,
-    http_auth_opt: &Option<HttpAuth>,
-    accept: &Option<RegistryAccept>,
-    body: Option<&T>,
+    client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
+    accept: &Option<RegistryAccept>, body: Option<RequestBody<T>>,
 ) -> Result<Request> {
     let url = Url::from_str(url)?;
     let mut builder = client.request(method, url);
-    if let Some(http_auth) = http_auth_opt {
-        match http_auth {
-            HttpAuth::BasicAuth { username, password } => {
-                builder = builder.basic_auth(username, Some(password));
-            }
-            HttpAuth::BearerToken { token } => builder = builder.bearer_auth(token),
+    match http_auth_opt {
+        None => {}
+        Some(HttpAuth::BasicAuth { username, password }) => {
+            builder = builder.basic_auth(username, Some(password));
         }
+        Some(HttpAuth::BearerToken { token }) => builder = builder.bearer_auth(token)
     }
     if let Some(reg_accept) = accept {
         builder = builder.header("Accept", reg_accept.get_value());
     }
-    if let Some(body_o) = body {
-        builder = builder.json::<T>(body_o)
+    match body {
+        None => {}
+        Some(RequestBody::JSON(json_body)) => builder = builder.json::<T>(json_body),
+        Some(RequestBody::Read(read)) => builder = builder.body(read)
     }
     Ok(builder.build()?)
 }
