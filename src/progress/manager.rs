@@ -28,14 +28,13 @@ impl<R> ProcessorManager<R> {
         })
     }
 
-    pub fn wait_all_done(self) -> Result<()> {
+    pub fn wait_all_done(self) -> Result<Vec<R>> {
         println!("开始等待");
         let mut statuses = self.statuses;
         loop {
             let mut done_vec = vec![false; statuses.len()];
             for index in 0..statuses.len() {
-                let (processor, progress_status, bar) = &mut statuses[index];
-                let r = processor.wait_result()?;
+                let (_, progress_status, bar) = &mut statuses[index];
                 let status = progress_status.status();
                 done_vec[index] = status.is_done;
                 bar.add_size(status.now_size);
@@ -49,10 +48,10 @@ impl<R> ProcessorManager<R> {
             sleep(Duration::from_secs(1));
             self.multi_progress.update();
         }
-        for index in 0..statuses.len() {
-            let (processor, _, _) = &mut statuses[index];
-        }
-        Ok(())
+        let results = statuses.into_iter().map(|(process, _, _)| {
+            process.wait_result()
+        }).collect::<Result<Vec<R>>>()?;
+        Ok(results)
     }
 }
 
