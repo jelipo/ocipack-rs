@@ -34,7 +34,8 @@ impl<R> ProcessorManager<R> {
         loop {
             let mut done_vec = vec![false; statuses.len()];
             for index in 0..statuses.len() {
-                let (_, progress_status, bar) = &mut statuses[index];
+                let (processor, progress_status, bar) = &mut statuses[index];
+                let r = processor.wait_result()?;
                 let status = progress_status.status();
                 done_vec[index] = status.is_done;
                 bar.add_size(status.now_size);
@@ -47,6 +48,9 @@ impl<R> ProcessorManager<R> {
             }
             sleep(Duration::from_secs(1));
             self.multi_progress.update();
+        }
+        for index in 0..statuses.len() {
+            let (processor, _, _) = &mut statuses[index];
         }
         Ok(())
     }

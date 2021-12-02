@@ -99,18 +99,12 @@ impl RegistryHttpClient {
         return if response.is_success() {
             Ok(response)
         } else {
-            match response.get_content_type() {
-                None => Err(Error::msg(format!(
-                    "Request to registry failed,status_code:{}",
-                    response.status_code().as_str()
-                ))),
-                Some(content_type) => Err(Error::msg(format!(
+            Err(Error::msg(match response.get_content_type() {
+                None => format!("Request to registry failed,status_code:{}", response.status_code().as_str()),
+                Some(content_type) => format!(
                     "Request to registry failed,status_code:{} ,content-type:{} ,body:{}",
-                    response.status_code().as_str(),
-                    content_type,
-                    response.body_str(),
-                ))),
-            }
+                    response.status_code().as_str(), content_type, response.body_str()),
+            }))
         };
     }
 
