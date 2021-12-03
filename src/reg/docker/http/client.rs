@@ -50,7 +50,7 @@ impl RegistryHttpClient {
     }
 
     pub fn request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(
-        &mut self, path: &str, scope: &Option<&str>, method: Method,
+        &mut self, path: &str, scope: Option<&str>, method: Method,
         accept: &Option<RegistryAccept>, body: Option<&T>,
     ) -> Result<R> {
         let success_response = self.do_request(path, scope, method, accept, body)?;
@@ -66,13 +66,13 @@ impl RegistryHttpClient {
     }
 
     pub fn request_registry<T: Serialize + ?Sized>(
-        &mut self, path: &str, scope: &Option<&str>, method: Method,
+        &mut self, path: &str, scope: Option<&str>, method: Method,
         accept: &Option<RegistryAccept>, body: Option<&T>,
     ) -> Result<FullRegistryResponse> {
         self.do_request(path, scope, method, accept, body)
     }
 
-    pub fn head_request_registry(&mut self, path: &str, scope: &Option<&str>) -> Result<SimpleRegistryResponse> {
+    pub fn head_request_registry(&mut self, path: &str, scope: Option<&str>) -> Result<SimpleRegistryResponse> {
         let http_response = self.do_request_raw::<u8>(path, scope, Method::HEAD, &None, None)?;
         Ok(SimpleRegistryResponse {
             status_code: http_response.status(),
@@ -80,7 +80,7 @@ impl RegistryHttpClient {
     }
 
     fn do_request_raw<T: Serialize + ?Sized>(
-        &mut self, path: &str, scope: &Option<&str>, method: Method,
+        &mut self, path: &str, scope: Option<&str>, method: Method,
         accept: &Option<RegistryAccept>, body: Option<&T>,
     ) -> Result<Response> {
         let url = self.registry_addr.clone() + path;
@@ -91,7 +91,7 @@ impl RegistryHttpClient {
     }
 
     fn do_request<T: Serialize + ?Sized>(
-        &mut self, path: &str, scope: &Option<&str>, method: Method,
+        &mut self, path: &str, scope: Option<&str>, method: Method,
         accept: &Option<RegistryAccept>, body: Option<&T>,
     ) -> Result<FullRegistryResponse> {
         let http_response = self.do_request_raw(path, scope, method, accept, body)?;
@@ -108,14 +108,15 @@ impl RegistryHttpClient {
         };
     }
 
-    pub fn download(&mut self, path: &str, blob_down_config: BlobConfig, scope: &str) -> Result<RegDownloader> {
+    pub fn download(&mut self, path: &str, blob_down_config: BlobConfig, scope: &str, layer_size: Option<u64>) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
-        let token = self.reg_token_handler.token(&Some(scope))?;
+        let token = self.reg_token_handler.token(Some(scope))?;
         let downloader = RegDownloader::new_reg_downloader(
             url,
             Some(HttpAuth::BearerToken { token }),
             self.client.clone(),
             blob_down_config,
+            layer_size
         )?;
         Ok(downloader)
     }
@@ -178,8 +179,8 @@ impl FullRegistryResponse {
         self.docker_content_digest.clone()
     }
 
-    pub fn location_header(&self) -> &Option<String> {
-        &self.location_header
+    pub fn location_header(&self) -> Option<&String> {
+        self.location_header.as_ref()
     }
 }
 

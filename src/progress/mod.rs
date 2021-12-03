@@ -18,11 +18,15 @@ pub trait ProcessorAsync<R> {
 
 pub struct CoreStatus {
     pub blob_config: Arc<BlobConfig>,
-    pub full_size: usize,
-    pub now_size: usize,
+    pub full_size: u64,
+    pub now_size: u64,
     pub is_done: bool,
 }
 
 pub trait ProgressStatus {
     fn status(&self) -> CoreStatus;
+}
+
+pub trait ProcessResult {
+    fn finished_info(&self) -> &str;
 }

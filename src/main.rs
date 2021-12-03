@@ -11,6 +11,7 @@ use serde::Deserialize;
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
 use crate::reg::{BlobType, Reference};
+use crate::reg::docker::http::download::DownloadResult;
 use crate::reg::docker::http::RegistryAuth;
 use crate::reg::docker::registry::Registry;
 
@@ -50,9 +51,9 @@ fn main() -> Result<()> {
     let config_digest = &manifest.config.digest;
 
 
-    let mut reg_downloader_vec = Vec::<Box<dyn Processor<String>>>::new();
+    let mut reg_downloader_vec = Vec::<Box<dyn Processor<DownloadResult>>>::new();
     for layer in &manifest.layers {
-        let downloader = from_registry.image_manager.layer_blob_download(&frome_image_reference.image_name, &layer.digest)?;
+        let downloader = from_registry.image_manager.layer_blob_download(&frome_image_reference.image_name, &layer.digest, Some(layer.size))?;
         reg_downloader_vec.push(Box::new(downloader))
     }
     info!("创建manager");

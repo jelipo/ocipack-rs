@@ -3,7 +3,7 @@ use std::fs::File;
 use std::rc::Rc;
 
 use anyhow::{Error, Result};
-use log::{info};
+use log::info;
 use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
@@ -46,7 +46,7 @@ impl ImageManager {
         let scope = Some(refe.image_name);
         let mut reg_rc = self.reg_client.borrow_mut();
         let accept_opt = Some(RegistryAccept::APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_V2JSON);
-        reg_rc.request_registry_body::<u8, Manifest2>(&path, &scope, Method::GET, &accept_opt, None)
+        reg_rc.request_registry_body::<u8, Manifest2>(&path, scope, Method::GET, &accept_opt, None)
     }
 
     // /// 获取Image的Manifest
@@ -62,7 +62,7 @@ impl ImageManager {
     pub fn manifests_exited(&mut self, refe: &Reference) -> Result<bool> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
-        let response = self.reg_client.borrow_mut().head_request_registry(&path, &scope)?;
+        let response = self.reg_client.borrow_mut().head_request_registry(&path, scope)?;
         exited(&response)
     }
 
@@ -70,7 +70,7 @@ impl ImageManager {
     pub fn blobs_exited(&mut self, name: &str, blob_digest: &str) -> Result<bool> {
         let path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let scope = Some(name);
-        let response = self.reg_client.borrow_mut().head_request_registry(&path, &scope)?;
+        let response = self.reg_client.borrow_mut().head_request_registry(&path, scope)?;
         exited(&response)
     }
 
@@ -78,26 +78,20 @@ impl ImageManager {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let scope = Some(name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        reg_rc.request_registry_body::<u8, ConfigBlob>(&url_path, &scope, Method::GET, &None, None)
+        reg_rc.request_registry_body::<u8, ConfigBlob>(&url_path, scope, Method::GET, &None, None)
     }
 
-    pub fn layer_blob_download(&mut self, name: &str, blob_digest: &str) -> Result<RegDownloader> {
+    pub fn layer_blob_download(&mut self, name: &str, blob_digest: &str, layer_size: Option<u64>) -> Result<RegDownloader> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let (file_path, file_name) = self.home_dir.cache.blobs.digest_path(blob_digest, &BlobType::Layers);
-        let down_config = BlobConfig {
-            file_path,
-            file_name,
-            digest: blob_digest.to_string(),
-            short_hash: blob_digest.replace("sha256:", "")[..12].to_string(),
-        };
-        let file_sha256 = blob_digest.replace("sha256:", "");
-        if !self.home_dir.cache.blobs.download_pre_processing(&down_config.file_path, file_sha256)? {
-            let file = File::open(&down_config.file_path)?;
+        let blob_config = BlobConfig::new(file_path, file_name, blob_digest.to_string());
+        if !self.home_dir.cache.blobs.download_pre_processing(&blob_config.file_path, &blob_config.sha256)? {
+            let file = File::open(&blob_config.file_path)?;
             let finished_downloader = RegDownloader::new_finished_downloader(
-                down_config, file.metadata()?.len() as usize)?;
+                blob_config, file.metadata()?.len())?;
             return Ok(finished_downloader);
         }
-        let downloader = self.reg_client.borrow_mut().download(&url_path, down_config, name)?;
+        let downloader = self.reg_client.borrow_mut().download(&url_path, blob_config, name, layer_size)?;
         Ok(downloader)
     }
 
@@ -111,7 +105,6 @@ impl ImageManager {
         location_url.query_pairs_mut().append_pair("digest", blob_digest);
         let blob_upload_url = location_url.as_str();
         info!("blob_upload_url is {}",blob_upload_url);
-
         Ok(())
     }
 
@@ -120,8 +113,8 @@ impl ImageManager {
         let url_path = format!("/v2/{}/blobs/uploads/", name);
         let scope = Some(name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        let success_resp = reg_rc.request_registry::<u8>(&url_path, &scope, Method::POST, &None, None)?;
-        let location = success_resp.location_header().as_ref().expect("location header not found");
+        let success_resp = reg_rc.request_registry::<u8>(&url_path, scope, Method::POST, &None, None)?;
+        let location = success_resp.location_header().expect("location header not found");
         let url = Url::parse(location)?;
         Ok(url)
     }
@@ -159,7 +152,7 @@ pub struct ManifestConfig {
 #[serde(rename_all = "camelCase")]
 pub struct ManifestLayer {
     pub media_type: String,
-    pub size: usize,
+    pub size: u64,
     pub digest: String,
     pub urls: Option<Vec<String>>,
 }

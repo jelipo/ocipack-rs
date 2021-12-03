@@ -40,7 +40,7 @@ struct RegUploaderCore {
 }
 
 enum RegUploaderEnum {
-    Finished { file_size: usize },
+    Finished { file_size: u64 },
     Run(RegUploaderCore),
 }
 
@@ -51,14 +51,14 @@ pub struct RegUploaderStatus {
 
 struct RegUploaderStatusCore {
     blob_config: Arc<BlobConfig>,
-    file_size: usize,
-    pub curr_size: usize,
+    file_size: u64,
+    pub curr_size: u64,
     pub done: bool,
 }
 
 impl RegUploader {
     /// 创建一个已经完成状态的Uploader
-    pub fn new_finished_uploader(blob_config: BlobConfig, file_size: usize) -> RegUploader {
+    pub fn new_finished_uploader(blob_config: BlobConfig, file_size: u64) -> RegUploader {
         let blob_config_arc = Arc::new(blob_config);
         let temp = RegUploaderStatus {
             status_core: Arc::new(Mutex::new(RegUploaderStatusCore {
@@ -77,7 +77,7 @@ impl RegUploader {
         }
     }
 
-    pub fn new_uploader(url: String, auth: HttpAuth, client: Client, blob_config: BlobConfig, file_size: usize) -> RegUploader {
+    pub fn new_uploader(url: String, auth: HttpAuth, client: Client, blob_config: BlobConfig, file_size: u64) -> RegUploader {
         let blob_config_arc = Arc::new(blob_config);
         let temp = RegUploaderStatus {
             status_core: Arc::new(Mutex::new(RegUploaderStatusCore {
@@ -165,7 +165,7 @@ impl Read for RegUploaderReader {
         let size = self.file.read(buf)?;
         let mut guard = self.status.status_core.lock().unwrap();
         let core = guard.borrow_mut();
-        core.curr_size = core.curr_size + size;
+        core.curr_size = core.curr_size + size as u64;
         Ok(size)
     }
 }

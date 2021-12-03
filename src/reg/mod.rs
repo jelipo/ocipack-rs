@@ -21,4 +21,18 @@ pub struct BlobConfig {
     pub file_name: String,
     pub digest: String,
     pub short_hash: String,
+    pub sha256: String,
+}
+
+impl BlobConfig {
+    pub fn new(file_path: Box<Path>, file_name: String, digest: String) -> BlobConfig {
+        let sha256 = digest.replace("sha256:", "");
+        BlobConfig {
+            file_path,
+            file_name,
+            digest: digest.to_string(),
+            short_hash: sha256[..12].to_string(),
+            sha256,
+        }
+    }
 }

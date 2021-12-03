@@ -48,7 +48,7 @@ impl BlobsDir {
 
     /// 下载之前的前置检查
     /// 返回值bool代表是否需要下载
-    pub fn download_pre_processing(&self, file_path: &Path, file_expect_sha256: String) -> Result<bool> {
+    pub fn download_pre_processing(&self, file_path: &Path, file_expect_sha256: &str) -> Result<bool> {
         if !file_path.exists() {
             return Ok(true);
         }

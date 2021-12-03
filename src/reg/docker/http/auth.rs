@@ -31,7 +31,7 @@ impl RegTokenHandler {
         }
     }
 
-    pub fn token(&mut self, scope_opt: &Option<&str>) -> Result<String> {
+    pub fn token(&mut self, scope_opt: Option<&str>) -> Result<String> {
         let scope = if let Some(scope) = scope_opt {
             scope
         } else {
@@ -56,7 +56,7 @@ impl RegTokenHandler {
         return Ok(None);
     }
 
-    fn update_token_to_cache(&mut self, scope_opt: &Option<&str>) -> Result<String> {
+    fn update_token_to_cache(&mut self, scope_opt: Option<&str>) -> Result<String> {
         let adapter = match &self.authenticate_adapter {
             None => {
                 let new_adapter = AuthenticateAdapter::new_authenticate_adapter(
@@ -117,7 +117,7 @@ impl AuthenticateAdapter {
     }
 
     pub fn new_token(
-        &self, scope: &Option<&str>, basic_auth: Option<&HttpAuth>, client: &Client,
+        &self, scope: Option<&str>, basic_auth: Option<&HttpAuth>, client: &Client,
     ) -> Result<TokenResponse> {
         let mut url = format!("{}?service={}", &self.realm, &self.service);
         if let Some(scope_raw) = scope {

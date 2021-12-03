@@ -6,7 +6,7 @@ pub struct Bar {
 }
 
 impl Bar {
-    pub fn add_size(&mut self, size: usize) {
+    pub fn add_size(&mut self, size: u64) {
         let mut bar_core_mut = self.bar_core.borrow_mut();
         bar_core_mut.curr_file_size = bar_core_mut.curr_file_size + size;
     }
@@ -18,14 +18,13 @@ impl Bar {
 }
 
 struct BarCore {
-    curr_file_size: usize,
+    curr_file_size: u64,
     finished: bool,
 }
 
-
 pub struct MultiBar {
     /// name,total,core
-    bar_vec: Vec<(String, usize, Rc<RefCell<BarCore>>)>,
+    bar_vec: Vec<(String, u64, Rc<RefCell<BarCore>>)>,
 }
 
 impl MultiBar {
@@ -35,7 +34,7 @@ impl MultiBar {
         }
     }
 
-    pub fn add_new_bar(&mut self, short_digest: String, file_count: usize) -> Bar {
+    pub fn add_new_bar(&mut self, short_digest: String, file_count: u64) -> Bar {
         let bar_core = Rc::new(RefCell::new(BarCore {
             curr_file_size: 0,
             finished: false,

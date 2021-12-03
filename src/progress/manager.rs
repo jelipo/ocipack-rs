@@ -4,14 +4,14 @@ use std::time::Duration;
 use anyhow::Result;
 
 use crate::bar::{Bar, MultiBar};
-use crate::progress::{Processor, ProcessorAsync, ProgressStatus};
+use crate::progress::{Processor, ProcessorAsync, ProcessResult, ProgressStatus};
 
-pub struct ProcessorManager<R> {
+pub struct ProcessorManager<R: ProcessResult> {
     statuses: Vec<(Box<dyn ProcessorAsync<R>>, Box<dyn ProgressStatus>, Bar)>,
     multi_progress: MultiBar,
 }
 
-impl<R> ProcessorManager<R> {
+impl<R: ProcessResult> ProcessorManager<R> {
     pub fn new_processor_manager(processors: Vec<Box<dyn Processor<R>>>) -> Result<ProcessorManager<R>> {
         let mut mb = MultiBar::new_multi_bar();
         let status = processors.iter().map(|processor| {
@@ -34,7 +34,7 @@ impl<R> ProcessorManager<R> {
         loop {
             let mut done_vec = vec![false; statuses.len()];
             for index in 0..statuses.len() {
-                let (_, progress_status, bar) = &mut statuses[index];
+                let (processor, progress_status, bar) = &mut statuses[index];
                 let status = progress_status.status();
                 done_vec[index] = status.is_done;
                 bar.add_size(status.now_size);
