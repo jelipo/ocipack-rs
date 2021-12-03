@@ -32,19 +32,19 @@ impl<R: ProcessResult> ProcessorManager<R> {
         println!("开始等待");
         let mut statuses = self.statuses;
         loop {
-            let mut done_vec = vec![false; statuses.len()];
-            for index in 0..statuses.len() {
-                let (processor, progress_status, bar) = &mut statuses[index];
-                let status = progress_status.status();
-                done_vec[index] = status.is_done;
-                bar.add_size(status.now_size);
+            let mut new_status: Vec<(Box<dyn ProcessorAsync<R>>, Box<dyn ProgressStatus>, Bar)> = Vec::new();
+            for (processor, progress_status, mut bar) in statuses {
+                let status = &progress_status.status();
+                &bar.add_size(status.now_size);
                 if status.is_done {
-                    bar.finish(true);
+                    let process_result = processor.wait_result()?;
+                    let finished_info = process_result.finished_info();
+                    &bar.finish(true);
+                } else {
+                    new_status.push((processor, progress_status, bar))
                 }
             }
-            if processors_all_done(&done_vec[..]) {
-                break;
-            }
+            statuses = new_status;
             sleep(Duration::from_secs(1));
             self.multi_progress.update();
         }
