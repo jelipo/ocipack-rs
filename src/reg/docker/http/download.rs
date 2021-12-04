@@ -73,13 +73,15 @@ impl RegDownloader {
 
 impl Processor<DownloadResult> for RegDownloader {
     fn start(&self) -> Box<dyn ProcessorAsync<DownloadResult>> {
-        let file_path = self.blob_down_config.file_path.clone();
+        let blob_config = self.blob_down_config.clone();
+        let file_path = blob_config.file_path.clone();
         let status = self.temp.clone();
         if self.finished {
             return Box::new(RegFinishedDownloader {
                 result: DownloadResult {
                     file_path: Some(file_path.clone()),
                     file_size: (&file_path).metadata().unwrap().len(),
+                    blob_config: blob_config.clone(),
                     local_existed: false,
                     result_str: "exists".to_string(),
                 }
@@ -101,6 +103,7 @@ impl Processor<DownloadResult> for RegDownloader {
             Ok(DownloadResult {
                 file_path: Some(file_path),
                 file_size: status_core.file_size,
+                blob_config: blob_config.clone(),
                 local_existed: false,
                 result_str: "complete".to_string(),
             })
@@ -261,6 +264,7 @@ pub struct CustomDownloadFileName {
 pub struct DownloadResult {
     pub file_path: Option<Box<Path>>,
     pub file_size: u64,
+    pub blob_config: Arc<BlobConfig>,
     pub local_existed: bool,
     pub result_str: String,
 }
@@ -270,5 +274,3 @@ impl ProcessResult for DownloadResult {
         &self.result_str
     }
 }
-
-
