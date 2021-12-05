@@ -1,5 +1,6 @@
 #![feature(exclusive_range_pattern)]
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
 
@@ -13,6 +14,7 @@ use crate::progress::Processor;
 use crate::reg::{BlobType, Reference};
 use crate::reg::docker::http::download::DownloadResult;
 use crate::reg::docker::http::RegistryAuth;
+use crate::reg::docker::ManifestLayer;
 use crate::reg::docker::registry::Registry;
 
 mod progress;
@@ -56,11 +58,21 @@ fn main() -> Result<()> {
     }
     info!("创建manager");
     let manager = ProcessorManager::new_processor_manager(reg_downloader_vec)?;
-    let donwload_results = manager.wait_all_done()?;
+    let download_results = manager.wait_all_done()?;
+
+    for download_result in download_results {}
 
     let _config_blob = from_registry.image_manager.config_blob(&temp_config.from.image_name, &config_digest)?;
     info!("全部下载完成");
     Ok(())
+}
+
+fn layer_to_map(layers: &Vec<ManifestLayer>) -> HashMap<&str, &ManifestLayer> {
+    let mut map = HashMap::<&str, &ManifestLayer>::with_capacity(layers.len());
+    for layer in layers {
+        let option = map.insert(&layer.digest, layer);
+    }
+    map
 }
 
 #[derive(Deserialize)]
