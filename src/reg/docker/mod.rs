@@ -83,9 +83,9 @@ impl ImageManager {
 
     pub fn layer_blob_download(&mut self, name: &str, blob_digest: &str, layer_size: Option<u64>) -> Result<RegDownloader> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
-        let (file_path, file_name) = self.home_dir.cache.blobs.digest_path(blob_digest, &BlobType::Layers);
+        let (file_path, file_name) = self.home_dir.cache.blobs.download_ready(blob_digest);
         let blob_config = BlobConfig::new(file_path, file_name, blob_digest.to_string());
-        if !self.home_dir.cache.blobs.download_pre_processing(&blob_config.file_path, &blob_config.sha256)? {
+        if let Some(_) = self.home_dir.cache.blobs.ungizip_file_path(blob_digest) {
             let file = File::open(&blob_config.file_path)?;
             let finished_downloader = RegDownloader::new_finished_downloader(
                 blob_config, file.metadata()?.len())?;

@@ -25,12 +25,14 @@ struct BarCore {
 pub struct MultiBar {
     /// name,total,core
     bar_vec: Vec<(String, u64, Rc<RefCell<BarCore>>)>,
+    first: bool,
 }
 
 impl MultiBar {
     pub fn new_multi_bar() -> MultiBar {
         MultiBar {
-            bar_vec: Vec::with_capacity(8)
+            bar_vec: Vec::with_capacity(8),
+            first: true,
         }
     }
 
@@ -46,11 +48,17 @@ impl MultiBar {
         }
     }
 
-    pub fn update(&self) {
+    pub fn update(&mut self) {
+        if self.first {
+            for i in 0..self.bar_vec.len() {
+                println!();
+            }
+            self.first = false;
+        }
         print!("\x1b[{}A", self.bar_vec.len());
         for (name, _ds, bar_core) in &self.bar_vec {
             let bar_core = bar_core.borrow();
-            println!("{} {}\r", name, bar_core.curr_file_size);
+            println!("{} {}", name, bar_core.curr_file_size);
         }
     }
 }

@@ -28,7 +28,7 @@ impl<R: ProcessResult> ProcessorManager<R> {
         })
     }
 
-    pub fn wait_all_done(self) -> Result<Vec<R>> {
+    pub fn wait_all_done(mut self) -> Result<Vec<R>> {
         println!("开始等待");
         let mut statuses = self.statuses;
         let mut result_infos = Vec::<R>::new();

@@ -127,10 +127,7 @@ impl AuthenticateAdapter {
             do_request_raw::<u8>(client, url.as_str(), Method::GET, basic_auth, &None, None)?;
         let status = http_response.status();
         if !status.is_success() {
-            return Err(Error::msg(format!(
-                "get token failed,code:{}",
-                status.as_str()
-            )));
+            return Err(Error::msg(format!("get token failed,code:{}", status.as_str())));
         }
         Ok(http_response.json::<TokenResponse>()?)
     }

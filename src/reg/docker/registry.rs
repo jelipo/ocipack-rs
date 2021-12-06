@@ -17,13 +17,11 @@ impl Registry {
     pub fn open(
         registry_addr: String,
         auth: Option<RegistryAuth>,
-        home_dir: &Path,
+        home_dir: Rc<HomeDir>,
     ) -> Result<Registry> {
         let client = RegistryHttpClient::new(registry_addr.clone(), auth)?;
         let client_rc = Rc::new(RefCell::new(client));
-        let home_dir = HomeDir::new_home_dir(home_dir);
-        let home_dir_rc = Rc::new(home_dir);
-        let image = ImageManager::new(registry_addr.clone(), client_rc.clone(), home_dir_rc);
+        let image = ImageManager::new(registry_addr.clone(), client_rc.clone(), home_dir);
         Ok(Registry {
             image_manager: image,
         })
