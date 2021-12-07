@@ -50,12 +50,10 @@ impl MultiBar {
 
     pub fn update(&mut self) {
         if self.first {
-            for i in 0..self.bar_vec.len() {
-                println!();
-            }
             self.first = false;
+        } else {
+            print!("\x1b[{}A", self.bar_vec.len());
         }
-        print!("\x1b[{}A", self.bar_vec.len());
         for (name, _ds, bar_core) in &self.bar_vec {
             let bar_core = bar_core.borrow();
             println!("{} {}", name, bar_core.curr_file_size);

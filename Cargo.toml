@@ -17,7 +17,7 @@ sha2 = "0.9.8"
 hex-literal = "0.3"
 hex = "0.4"
 regex = "1.5"
-
+tar = "0.4"
 flate2 = "1.0"
 
 url = "2.2"

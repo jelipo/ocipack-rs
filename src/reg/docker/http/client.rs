@@ -116,7 +116,7 @@ impl RegistryHttpClient {
             Some(HttpAuth::BearerToken { token }),
             self.client.clone(),
             blob_down_config,
-            layer_size
+            layer_size,
         )?;
         Ok(downloader)
     }

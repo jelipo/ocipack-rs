@@ -48,9 +48,7 @@ impl RegDownloader {
         })
     }
 
-    pub fn new_finished_downloader(
-        blob_down_config: BlobConfig, file_size: u64,
-    ) -> Result<RegDownloader> {
+    pub fn new_finished_downloader(blob_down_config: BlobConfig, file_size: u64) -> Result<RegDownloader> {
         let blob_down_config_arc = Arc::new(blob_down_config);
         let temp = RegDownloaderStatus {
             status_core: Arc::new(Mutex::new(RegDownloaderStatusCore {
@@ -82,7 +80,7 @@ impl Processor<DownloadResult> for RegDownloader {
                     file_path: Some(file_path.clone()),
                     file_size: (&file_path).metadata().unwrap().len(),
                     blob_config: blob_config.clone(),
-                    local_existed: false,
+                    local_existed: true,
                     result_str: "exists".to_string(),
                 }
             });

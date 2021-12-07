@@ -1,4 +1,4 @@
-use std::fs::{create_dir, File};
+use std::fs::{create_dir, create_dir_all, File};
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -16,7 +16,7 @@ pub struct HomeDir {
 }
 
 impl HomeDir {
-    pub fn new_home_dir(cache_dir_path: &Path) -> HomeDir {
+    pub fn new_home_dir(cache_dir_path: &Path) -> Result<HomeDir> {
         let blob_cache_dir_path = &cache_dir_path.join("blobs");
         let home_dir = HomeDir {
             cache: CacheDir {
@@ -24,16 +24,23 @@ impl HomeDir {
                     blob_path: blob_cache_dir_path.clone().into_boxed_path(),
                     config_path: blob_cache_dir_path.join("config").into_boxed_path(),
                     layers_path: blob_cache_dir_path.join("layers").into_boxed_path(),
-                    download_path: blob_cache_dir_path.join("download").into_boxed_path(),
+                    download_path: cache_dir_path.join("download").into_boxed_path(),
                 },
+                temp_dir: cache_dir_path.join("temp").into_boxed_path(),
             },
         };
-        home_dir
+        create_dir_all(&home_dir.cache.temp_dir)?;
+        create_dir_all(&home_dir.cache.blobs.config_path)?;
+        create_dir_all(&home_dir.cache.blobs.layers_path)?;
+        create_dir_all(&home_dir.cache.blobs.layers_path)?;
+        create_dir_all(&home_dir.cache.blobs.download_path)?;
+        Ok(home_dir)
     }
 }
 
 pub struct CacheDir {
     pub blobs: BlobsDir,
+    pub temp_dir: Box<Path>,
 }
 
 pub struct BlobsDir {
@@ -60,10 +67,10 @@ impl BlobsDir {
         drop(download_file);
         let sha256 = &sha256_encode.finalize()[..];
         let ungzip_sha256 = hex::encode(sha256);
-        let layer_dir = self.blob_path.join(download_file_sha256);
+        let layer_dir = self.layers_path.join(download_file_sha256);
         let ungzip_file_path = layer_dir.join(&ungzip_sha256);
         ungzip_file_path.remove()?;
-        create_dir(&layer_dir)?;
+        create_dir_all(&layer_dir)?;
         std::fs::rename(download_file_path, &ungzip_file_path)?;
         let ungizip_sha_file_path = self.ungizip_sha_file_path(&layer_dir);
         ungizip_sha_file_path.remove()?;
@@ -82,9 +89,9 @@ impl BlobsDir {
         let layer_dir = self.layers_path.join(gzip_file_sha256);
         let ungzip_sha_file = self.ungizip_sha_file_path(layer_dir.as_path());
         if let Ok(mut file) = File::open(ungzip_sha_file) {
-            let mut string = String::new();
-            file.read_to_string(&mut string);
-            return Some(layer_dir.join(string).into_boxed_path());
+            let mut ungzip_file_sha256 = String::new();
+            file.read_to_string(&mut ungzip_file_sha256);
+            return Some(layer_dir.join(ungzip_file_sha256).into_boxed_path());
         }
         return None;
     }

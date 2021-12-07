@@ -10,6 +10,7 @@ use env_logger::Env;
 use flate2::read::GzDecoder;
 use log::{error, info};
 use serde::Deserialize;
+use tar::Builder;
 
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
@@ -44,7 +45,7 @@ fn main() -> Result<()> {
         }),
     };
     let home_dir_path = Path::new(&temp_config.home_dir);
-    let home_dir = Rc::new(HomeDir::new_home_dir(home_dir_path));
+    let home_dir = Rc::new(HomeDir::new_home_dir(home_dir_path)?);
     let mut from_registry = Registry::open(temp_config.from.registry, from_auth_opt, home_dir.clone())?;
 
     let from_image_reference = Reference {
@@ -77,7 +78,10 @@ fn main() -> Result<()> {
         let unzip_file = home_dir.cache.blobs.ungzip_download_file(&layer.digest)?;
     }
 
-    let _config_blob = from_registry.image_manager.config_blob(&temp_config.from.image_name, &config_digest)?;
+    let config_blob = from_registry.image_manager.config_blob(&temp_config.from.image_name, &config_digest)?;
+
+    File::create("");
+
     info!("全部下载完成");
     Ok(())
 }
