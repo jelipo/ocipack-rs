@@ -1,4 +1,5 @@
-use std::fs::File;
+use std::fs::{File, read};
+use std::io::{Read, Write};
 use std::path::Path;
 
 use anyhow::Result;
@@ -22,14 +23,61 @@ pub fn file_sha256(file_path: &Path) -> Result<String> {
     Ok(hex::encode(sha256))
 }
 
-#[derive(Clone)]
-pub struct Sha {
-    pub sha_type: ShaType,
-    pub sha_str: String,
+pub struct Sha256Reader<R: Read> {
+    read: R,
+    hasher: Sha256,
 }
 
-#[derive(Clone)]
-pub enum ShaType {
-    Sha256,
-    Sha128,
+impl<R: Read> Sha256Reader<R> {
+    pub fn new(read: R) -> Sha256Reader<R> {
+        Sha256Reader {
+            read,
+            hasher: Sha256::new(),
+        }
+    }
+
+    pub fn sha256(self) -> Result<String> {
+        let sha256_bytes = &self.hasher.finalize()[..];
+        Ok(hex::encode(sha256_bytes))
+    }
+}
+
+impl<R: Read> Read for Sha256Reader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let read_size = self.read.read(buf)?;
+        let _write_size = self.hasher.write(&buf[..read_size])?;
+        Ok(read_size)
+    }
+}
+
+
+pub struct Sha256Writer<W: Write> {
+    write: W,
+    hasher: Sha256,
+}
+
+impl<W: Write> Write for Sha256Writer<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let _hasher_write_size = self.hasher.write(buf)?;
+        self.write.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.hasher.flush()?;
+        self.write.flush()
+    }
+}
+
+impl<W: Write> Sha256Writer<W> {
+    pub fn new(write: W) -> Sha256Writer<W> {
+        Sha256Writer {
+            write,
+            hasher: Sha256::new(),
+        }
+    }
+
+    pub fn sha256(self) -> Result<String> {
+        let sha256_bytes = &self.hasher.finalize()[..];
+        Ok(hex::encode(sha256_bytes))
+    }
 }

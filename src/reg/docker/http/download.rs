@@ -14,7 +14,6 @@ use reqwest::Method;
 use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
 use crate::reg::BlobConfig;
 use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth};
-use crate::util::sha::Sha;
 
 pub struct RegDownloader {
     finished: bool,
@@ -256,7 +255,6 @@ pub struct AutoDownloadFileName {
 pub struct CustomDownloadFileName {
     pub dir_path: Box<Path>,
     pub file_name: String,
-    pub sha: Option<Sha>,
 }
 
 pub struct DownloadResult {

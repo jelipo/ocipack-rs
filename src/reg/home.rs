@@ -6,10 +6,10 @@ use anyhow::Result;
 use sha2::{Digest, Sha256};
 use sha2::digest::DynDigest;
 
-use crate::BlobType;
-use crate::util::compress::ungzip_file;
+use crate::{BlobType, compress, random};
+use crate::util::compress::ungz_file;
 use crate::util::file::PathExt;
-use crate::util::sha::{file_sha256, sha256};
+use crate::util::sha::{file_sha256, sha256, Sha256Reader, Sha256Writer};
 
 pub struct HomeDir {
     pub cache: CacheDir,
@@ -43,6 +43,26 @@ pub struct CacheDir {
     pub temp_dir: Box<Path>,
 }
 
+impl CacheDir {
+    pub fn gz_layer_file(&self, tar_file_path: &Path) -> Result<LayerResult> {
+        let tar_file = File::open(tar_file_path)?;
+        let mut sha256_reader = Sha256Reader::new(tar_file);
+        let tgz_file_name = random::random_str(10) + ".tgz";
+        let tgz_file_path = self.temp_dir.join(tgz_file_name);
+        let tgz_file = File::create(&tgz_file_path)?;
+        let mut sha256_writer = Sha256Writer::new(tgz_file);
+        compress::gz_file(&mut sha256_reader, &mut sha256_writer)?;
+        let tar_sha256 = sha256_reader.sha256()?;
+        let tgz_sha256 = sha256_writer.sha256()?;
+        Ok(LayerResult {
+            gz_sha256: tgz_sha256,
+            tar_sha256,
+            gz_file_path: tgz_file_path.into_boxed_path(),
+        })
+    }
+}
+
+
 pub struct BlobsDir {
     blob_path: Box<Path>,
     pub config_path: Box<Path>,
@@ -59,29 +79,29 @@ impl BlobsDir {
         (file_path, download_file_sha256)
     }
 
-    pub fn ungzip_download_file(&self, digest: &str) -> Result<Box<Path>> {
+    pub fn ungz_download_file(&self, digest: &str) -> Result<Box<Path>> {
         let (download_file_path, download_file_sha256) = self.download_ready(digest);
         let download_file = File::open(&download_file_path)?;
         let mut sha256_encode = Sha256::new();
-        ungzip_file(&download_file, &mut sha256_encode)?;
+        ungz_file(&download_file, &mut sha256_encode)?;
         drop(download_file);
         let sha256 = &sha256_encode.finalize()[..];
-        let ungzip_sha256 = hex::encode(sha256);
+        let tar_sha256 = hex::encode(sha256);
         let layer_dir = self.layers_path.join(download_file_sha256);
-        let ungzip_file_path = layer_dir.join(&ungzip_sha256);
-        ungzip_file_path.remove()?;
+        let tar_file_path = layer_dir.join(&tar_sha256);
+        tar_file_path.remove()?;
         create_dir_all(&layer_dir)?;
-        std::fs::rename(download_file_path, &ungzip_file_path)?;
+        std::fs::rename(download_file_path, &tar_file_path)?;
         let ungizip_sha_file_path = self.ungizip_sha_file_path(&layer_dir);
         ungizip_sha_file_path.remove()?;
-        let mut ungizip_sha_file = File::create(ungizip_sha_file_path)?;
-        ungizip_sha_file.write(ungzip_sha256.as_bytes())?;
-        ungizip_sha_file.flush()?;
-        Ok(ungzip_file_path.into_boxed_path())
+        let mut tar_sha_file = File::create(ungizip_sha_file_path)?;
+        tar_sha_file.write(tar_sha256.as_bytes())?;
+        tar_sha_file.flush()?;
+        Ok(tar_file_path.into_boxed_path())
     }
 
     pub fn ungizip_sha_file_path(&self, layer_dir: &Path) -> Box<Path> {
-        layer_dir.join("ungzip_sha256").into_boxed_path()
+        layer_dir.join("tar_sha256").into_boxed_path()
     }
 
     pub fn ungizip_file_path(&self, digest: &str) -> Option<Box<Path>> {
@@ -101,24 +121,10 @@ impl BlobsDir {
     }
 
     pub fn layer_exists(&self, digest: &str) {}
+}
 
-    // /// 下载之前的前置检查
-    // /// 返回值bool代表是否需要下载
-    // pub fn download_pre_processing(&self, file_path: &Path, file_expect_sha256: &str) -> Result<bool> {
-    //     if !file_path.exists() {
-    //         return Ok(true);
-    //     }
-    //     return if file_path.is_file() {
-    //         let file_sha256 = file_sha256(file_path)?;
-    //         if file_sha256 == file_expect_sha256 {
-    //             Ok(false)
-    //         } else {
-    //             std::fs::remove_file(file_path)?;
-    //             Ok(true)
-    //         }
-    //     } else {
-    //         std::fs::remove_file(file_path)?;
-    //         Ok(true)
-    //     };
-    // }
+pub struct LayerResult {
+    gz_sha256: String,
+    tar_sha256: String,
+    gz_file_path: Box<Path>,
 }

@@ -2,13 +2,17 @@
 
 use std::collections::HashMap;
 use std::fs::File;
+use std::iter;
 use std::path::Path;
 use std::rc::Rc;
 
 use anyhow::{Error, Result};
 use env_logger::Env;
-use flate2::read::GzDecoder;
+use flate2::Compression;
+use flate2::read::{GzDecoder, GzEncoder};
 use log::{error, info};
+use rand::{Rng, thread_rng};
+use rand::distributions::Alphanumeric;
 use serde::Deserialize;
 use tar::Builder;
 
@@ -20,6 +24,7 @@ use crate::reg::docker::http::RegistryAuth;
 use crate::reg::docker::ManifestLayer;
 use crate::reg::docker::registry::Registry;
 use crate::reg::home::HomeDir;
+use crate::util::{compress, random};
 
 mod progress;
 mod reg;
@@ -75,12 +80,19 @@ fn main() -> Result<()> {
         if !layer_types.contains(&layer.media_type.as_str()) {
             return Err(Error::msg(format!("unknown layer media type:{}", layer.media_type)));
         }
-        let unzip_file = home_dir.cache.blobs.ungzip_download_file(&layer.digest)?;
+        let unzip_file = home_dir.cache.blobs.ungz_download_file(&layer.digest)?;
     }
 
     let config_blob = from_registry.image_manager.config_blob(&temp_config.from.image_name, &config_digest)?;
 
-    File::create("");
+    let tar_temp_file_path = home_dir.cache.temp_dir.join(random::random_str(10) + ".tar");
+    let tar_temp_file = File::create(tar_temp_file_path)?;
+    let mut tar_builder = Builder::new(tar_temp_file);
+    tar_builder.append_file("root/a.txt", &mut File::open("C:/Users/me/Desktop/a.txt")?)?;
+    let mut tar_file = tar_builder.into_inner()?;
+    let tgz_temp_file_path = home_dir.cache.temp_dir.join(random::random_str(10) + ".tgz");
+    let mut tgz_temp_file = File::create(tgz_temp_file_path)?;
+    compress::gz_file(&mut tar_file, &mut tgz_temp_file)?;
 
     info!("全部下载完成");
     Ok(())
@@ -93,6 +105,7 @@ fn layer_to_map(layers: &Vec<ManifestLayer>) -> HashMap<&str, &ManifestLayer> {
     }
     map
 }
+
 
 #[derive(Deserialize)]
 struct TempConfig {
