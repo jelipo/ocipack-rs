@@ -122,15 +122,12 @@ impl RegistryHttpClient {
         Ok(downloader)
     }
 
-    pub fn upload(&mut self, url: String, blob_down_config: BlobConfig, file_local_path: &Path) -> Result<RegUploader> {
+    pub fn upload(&mut self, url: String, blob_config: BlobConfig, scope: &str, file_local_path: &Path) -> Result<RegUploader> {
         let token = self.reg_token_handler.token(Some(scope), TokenType::PushAndPull)?;
         Ok(RegUploader::new_uploader(
-            url,
-            HttpAuth::BearerToken { token },
-            self.client.clone(),
-            blob_down_config,
-            file_local_path.metadata()?.len(),
-        )?)
+            url, HttpAuth::BearerToken { token }, self.client.clone(),
+            blob_config, file_local_path.metadata()?.len(),
+        ))
     }
 }
 

@@ -15,6 +15,7 @@ use crate::reg::docker::http::auth::TokenType;
 use crate::reg::docker::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
 use crate::reg::docker::http::download::RegDownloader;
 use crate::reg::docker::http::RegistryAccept;
+use crate::reg::docker::http::upload::RegUploader;
 use crate::reg::docker::image::ConfigBlob;
 use crate::reg::home::HomeDir;
 
@@ -99,24 +100,25 @@ impl ImageManager {
     }
 
     /// 上传layer类型的blob文件
-    pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &str, file_local_path: &str) -> Result<()> {
+    pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &str, file_local_path: &str) -> Result<RegUploader> {
+        let file_path = PathBuf::from(file_local_path).into_boxed_path();
+        let file_name = file_path.file_name()
+            .expect("file name error").to_str().unwrap().to_string();
+        let blob_config = BlobConfig::new(file_path.clone(), file_name, blob_digest.to_string());
         if self.blobs_exited(name, blob_digest)? {
-            // TODO 返回一个已经完成的结果
-            return Ok(());
+            return Ok(RegUploader::new_finished_uploader(
+                blob_config, file_path.metadata()?.len(),
+            ));
         }
         let mut location_url = self.layer_blob_upload_ready(name)?;
         location_url.query_pairs_mut().append_pair("digest", blob_digest);
         let blob_upload_url = location_url.as_str();
         info!("blob_upload_url is {}",blob_upload_url);
-        let file_path = PathBuf::from(file_local_path).into_boxed_path();
-        let file_name = file_path.file_name()
-            .expect("file name error").to_str().unwrap().to_string();
-        let x = self.reg_client.borrow_mut().upload(
-            location_url.to_string(),
-            BlobConfig::new(file_path, file_name, blob_digest.to_string()),
-            &file_path,
+
+        let reg_uploader = self.reg_client.borrow_mut().upload(
+            location_url.to_string(), blob_config, name, &file_path,
         )?;
-        Ok(())
+        Ok(reg_uploader)
     }
 
     /// 向仓库获取上传blob的URL

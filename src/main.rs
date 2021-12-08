@@ -16,6 +16,7 @@ use crate::progress::Processor;
 use crate::reg::docker::{Manifest2, ManifestLayer};
 use crate::reg::docker::http::download::DownloadResult;
 use crate::reg::docker::http::RegistryAuth;
+use crate::reg::docker::http::upload::UploadResult;
 use crate::reg::docker::image::ConfigBlob;
 use crate::reg::docker::registry::Registry;
 use crate::reg::home::HomeDir;
@@ -64,7 +65,7 @@ fn main() -> Result<()> {
         reg_downloader_vec.push(Box::new(downloader))
     }
     info!("创建manager");
-    let manager = ProcessorManager::new_processor_manager(reg_downloader_vec)?;
+    let manager = ProcessorManager::new_processor_manager_two(reg_downloader_vec)?;
     let download_results = manager.wait_all_done()?;
     let layer_digest_map = layer_to_map(&manifest.layers);
     let layer_types = vec!["application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
@@ -100,15 +101,24 @@ fn upload(
     info!("tar sha256:{}", layer_result.tar_sha256);
     info!("tgz file path:{:?}", layer_result.gz_temp_file_path);
 
-    let to_auth_opt = match temp_config.to.username.as_str() {
+    let to_config = &temp_config.to;
+    let to_auth_opt = match to_config.username.as_str() {
         "" => None,
         _username => Some(RegistryAuth {
-            username: temp_config.to.username.clone(),
-            password: temp_config.to.password.clone(),
+            username: to_config.username.clone(),
+            password: to_config.password.clone(),
         }),
     };
-    let mut to_registry = Registry::open(temp_config.from.registry.clone(), to_auth_opt, home_dir.clone())?;
-    to_registry.image_manager.layer_blob_upload()
+    let mut to_registry = Registry::open(to_config.registry.clone(), to_auth_opt, home_dir.clone())?;
+    let mut reg_uploader_vec = Vec::<Box<dyn Processor<UploadResult>>>::new();
+    for layer in manifest.layers.iter() {
+        let layer_digest = &layer.digest;
+        let (file_path, _) = home_dir.cache.blobs.download_ready(layer_digest);
+        let file_path_str = file_path.as_os_str().to_string_lossy().to_string();
+        let reg_uploader = to_registry.image_manager.layer_blob_upload(&to_config.image_name, layer_digest, &file_path_str)?;
+        reg_uploader_vec.push(Box::new(reg_uploader))
+    }
+
 
     Ok(())
 }

@@ -12,6 +12,23 @@ pub struct ProcessorManager<R: ProcessResult> {
 }
 
 impl<R: ProcessResult> ProcessorManager<R> {
+    pub fn new_processor_manager_two(processors: Vec<Box<dyn Processor<R>>>) -> Result<ProcessorManager<R>> {
+        let mut mb = MultiBar::new_multi_bar();
+        let status = processors.iter().map(|processor| {
+            let async_processor = processor.start();
+            let status = processor.process_status();
+            let status_core = status.status();
+            let name = status_core.blob_config.short_hash.clone();
+            let bar = mb.add_new_bar(name, status_core.full_size);
+            (async_processor, status, bar)
+        }).collect::<Vec<(Box<dyn ProcessorAsync<R>>, Box<dyn ProgressStatus>, Bar)>>();
+        Ok(ProcessorManager {
+            statuses: status,
+            multi_progress: mb,
+        })
+    }
+
+
     pub fn new_processor_manager(processors: Vec<Box<dyn Processor<R>>>) -> Result<ProcessorManager<R>> {
         let mut mb = MultiBar::new_multi_bar();
         let status = processors.iter().map(|processor| {

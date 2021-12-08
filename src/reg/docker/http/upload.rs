@@ -7,8 +7,7 @@ use std::thread;
 use std::thread::JoinHandle;
 
 use anyhow::{Error, Result};
-
-use reqwest::blocking::{Client};
+use reqwest::blocking::Client;
 use reqwest::Method;
 
 use crate::Processor;
@@ -23,12 +22,12 @@ pub struct RegUploader {
 }
 
 pub struct RegFinishedUploader {
-    result: String,
+    upload_result: UploadResult,
 }
 
-impl ProcessorAsync<String> for RegFinishedUploader {
-    fn wait_result(self: Box<Self>) -> Result<String> {
-        Ok(self.result)
+impl ProcessorAsync<UploadResult> for RegFinishedUploader {
+    fn wait_result(self: Box<Self>) -> Result<UploadResult> {
+        Ok(self.upload_result)
     }
 }
 
@@ -102,11 +101,13 @@ impl RegUploader {
     }
 }
 
-impl Processor<String> for RegUploader {
-    fn start(&self) -> Box<dyn ProcessorAsync<String>> {
+impl Processor<UploadResult> for RegUploader {
+    fn start(&self) -> Box<dyn ProcessorAsync<UploadResult>> {
         return match &self.reg_uploader_enum {
             RegUploaderEnum::Finished { file_size: _ } => Box::new(RegFinishedUploader {
-                result: "already exists".to_string()
+                upload_result: UploadResult {
+                    result_str: "exists".to_string()
+                }
             }),
             RegUploaderEnum::Run(info) => {
                 let status = self.temp.clone();
@@ -116,7 +117,7 @@ impl Processor<String> for RegUploader {
                     client: info.client.clone(),
                 };
                 let file_path_clone = self.blob_config.file_path.to_str().unwrap().to_string();
-                let handle = thread::spawn::<_, Result<String>>(move || {
+                let handle = thread::spawn::<_, Result<UploadResult>>(move || {
                     let uploader = reg_http_uploader;
                     let result = uploading(status.clone(), file_path_clone.clone().as_str(), uploader);
                     let status_core = &mut status.status_core.lock().unwrap();
@@ -124,7 +125,9 @@ impl Processor<String> for RegUploader {
                     if let Err(err) = &result {
                         println!("{}\n{}", err, err.backtrace());
                     }
-                    Ok(file_path_clone)
+                    Ok(UploadResult {
+                        result_str: "succuss".to_string()
+                    })
                 });
                 Box::new(RegUploadHandler {
                     join: handle
@@ -177,11 +180,11 @@ impl Read for RegUploaderReader {
 }
 
 pub struct RegUploadHandler {
-    join: JoinHandle<Result<String>>,
+    join: JoinHandle<Result<UploadResult>>,
 }
 
-impl ProcessorAsync<String> for RegUploadHandler {
-    fn wait_result(self: Box<Self>) -> Result<String> {
+impl ProcessorAsync<UploadResult> for RegUploadHandler {
+    fn wait_result(self: Box<Self>) -> Result<UploadResult> {
         let result = self.join.join();
         result.unwrap()
     }
@@ -203,4 +206,8 @@ struct RegHttpUploader {
     url: String,
     auth: HttpAuth,
     client: Client,
+}
+
+pub struct UploadResult {
+    pub result_str: String,
 }
