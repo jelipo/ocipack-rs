@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 
-use anyhow::Result;
+use anyhow::{Error, Result};
 
 use reqwest::blocking::{Client};
 use reqwest::Method;
@@ -149,10 +149,16 @@ fn uploading(
         status,
         file: local_file,
     };
-    let _response = do_request_raw_read::<RegUploaderReader>(
+    let response = do_request_raw_read::<RegUploaderReader>(
         &reg_http_uploader.client, &reg_http_uploader.url.as_str(), Method::PUT,
         Some(&reg_http_uploader.auth), &None, Some(reader), file_size)?;
-    Ok(())
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        let status_code = response.status().as_str();
+        // TODO 补充错误信息
+        Err(Error::msg(format!("upload request failed.")))
+    }
 }
 
 pub struct RegUploaderReader {

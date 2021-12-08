@@ -36,11 +36,11 @@ impl<R: ProcessResult> ProcessorManager<R> {
             let mut new_status: Vec<(Box<dyn ProcessorAsync<R>>, Box<dyn ProgressStatus>, Bar)> = Vec::new();
             for (processor, progress_status, mut bar) in statuses {
                 let status = &progress_status.status();
-                &bar.add_size(status.now_size);
+                let _ = &bar.add_size(status.now_size);
                 if status.is_done {
                     let process_result = processor.wait_result()?;
                     let finished_info = process_result.finished_info();
-                    &bar.finish(true, finished_info);
+                    let _ = &bar.finish(true, finished_info);
                     result_infos.push(process_result);
                 } else {
                     new_status.push((processor, progress_status, bar))

@@ -1,15 +1,14 @@
-use std::fs::{create_dir, create_dir_all, File};
+use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
 use std::path::Path;
 
 use anyhow::Result;
 use sha2::{Digest, Sha256};
-use sha2::digest::DynDigest;
 
-use crate::{BlobType, compress, random};
+use crate::{compress, random};
 use crate::util::compress::ungz_file;
 use crate::util::file::PathExt;
-use crate::util::sha::{file_sha256, sha256, Sha256Reader, Sha256Writer};
+use crate::util::sha::{Sha256Reader, Sha256Writer};
 
 pub struct HomeDir {
     pub cache: CacheDir,
@@ -57,7 +56,7 @@ impl CacheDir {
         Ok(LayerResult {
             gz_sha256: tgz_sha256,
             tar_sha256,
-            gz_file_path: tgz_file_path.into_boxed_path(),
+            gz_temp_file_path: tgz_file_path.into_boxed_path(),
         })
     }
 }
@@ -120,11 +119,11 @@ impl BlobsDir {
         digest.replace("sha256:", "")
     }
 
-    pub fn layer_exists(&self, digest: &str) {}
+    pub fn layer_exists(&self, _digest: &str) {}
 }
 
 pub struct LayerResult {
-    gz_sha256: String,
-    tar_sha256: String,
-    gz_file_path: Box<Path>,
+    pub gz_sha256: String,
+    pub tar_sha256: String,
+    pub gz_temp_file_path: Box<Path>,
 }

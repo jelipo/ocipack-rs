@@ -11,7 +11,7 @@ impl Bar {
         bar_core_mut.curr_file_size = bar_core_mut.curr_file_size + size;
     }
 
-    pub fn finish(&mut self, _success: bool, finished_info: &str) {
+    pub fn finish(&mut self, _success: bool, _finished_info: &str) {
         let mut bar_core_mut = self.bar_core.borrow_mut();
         bar_core_mut.finished = true;
     }

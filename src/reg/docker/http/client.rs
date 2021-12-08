@@ -1,5 +1,5 @@
-use std::io::Read;
 use std::option::Option::Some;
+use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{Error, Result};
@@ -12,8 +12,9 @@ use serde::Serialize;
 
 use crate::reg::BlobConfig;
 use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth, RegistryAccept, RegistryAuth};
-use crate::reg::docker::http::auth::RegTokenHandler;
+use crate::reg::docker::http::auth::{RegTokenHandler, TokenType};
 use crate::reg::docker::http::download::RegDownloader;
+use crate::reg::docker::http::upload::RegUploader;
 use crate::util::sha;
 
 pub struct RegistryHttpClient {
@@ -51,9 +52,9 @@ impl RegistryHttpClient {
 
     pub fn request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(
         &mut self, path: &str, scope: Option<&str>, method: Method,
-        accept: &Option<RegistryAccept>, body: Option<&T>,
+        accept: &Option<RegistryAccept>, body: Option<&T>, token_type: TokenType,
     ) -> Result<R> {
-        let success_response = self.do_request(path, scope, method, accept, body)?;
+        let success_response = self.do_request(path, scope, method, accept, body, token_type)?;
         // let _header_docker_content_digest = success_response
         //     .header_docker_content_digest()
         //     .expect("No Docker-Content-Digest header");
@@ -67,13 +68,13 @@ impl RegistryHttpClient {
 
     pub fn request_registry<T: Serialize + ?Sized>(
         &mut self, path: &str, scope: Option<&str>, method: Method,
-        accept: &Option<RegistryAccept>, body: Option<&T>,
+        accept: &Option<RegistryAccept>, body: Option<&T>, token_type: TokenType,
     ) -> Result<FullRegistryResponse> {
-        self.do_request(path, scope, method, accept, body)
+        self.do_request(path, scope, method, accept, body, token_type)
     }
 
     pub fn head_request_registry(&mut self, path: &str, scope: Option<&str>) -> Result<SimpleRegistryResponse> {
-        let http_response = self.do_request_raw::<u8>(path, scope, Method::HEAD, &None, None)?;
+        let http_response = self.do_request_raw::<u8>(path, scope, Method::HEAD, &None, None, TokenType::Pull)?;
         Ok(SimpleRegistryResponse {
             status_code: http_response.status(),
         })
@@ -81,10 +82,10 @@ impl RegistryHttpClient {
 
     fn do_request_raw<T: Serialize + ?Sized>(
         &mut self, path: &str, scope: Option<&str>, method: Method,
-        accept: &Option<RegistryAccept>, body: Option<&T>,
+        accept: &Option<RegistryAccept>, body: Option<&T>, token_type: TokenType,
     ) -> Result<Response> {
         let url = self.registry_addr.clone() + path;
-        let token = self.reg_token_handler.token(scope)?;
+        let token = self.reg_token_handler.token(scope, token_type)?;
         let auth = Some(HttpAuth::BearerToken { token });
         let http_response = do_request_raw(&self.client, url.as_str(), method, auth.as_ref(), accept, body)?;
         Ok(http_response)
@@ -92,9 +93,9 @@ impl RegistryHttpClient {
 
     fn do_request<T: Serialize + ?Sized>(
         &mut self, path: &str, scope: Option<&str>, method: Method,
-        accept: &Option<RegistryAccept>, body: Option<&T>,
+        accept: &Option<RegistryAccept>, body: Option<&T>, token_type: TokenType,
     ) -> Result<FullRegistryResponse> {
-        let http_response = self.do_request_raw(path, scope, method, accept, body)?;
+        let http_response = self.do_request_raw(path, scope, method, accept, body, token_type)?;
         let response = FullRegistryResponse::new_registry_response(http_response)?;
         return if response.is_success() {
             Ok(response)
@@ -110,7 +111,7 @@ impl RegistryHttpClient {
 
     pub fn download(&mut self, path: &str, blob_down_config: BlobConfig, scope: &str, layer_size: Option<u64>) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
-        let token = self.reg_token_handler.token(Some(scope))?;
+        let token = self.reg_token_handler.token(Some(scope), TokenType::Pull)?;
         let downloader = RegDownloader::new_reg_downloader(
             url,
             Some(HttpAuth::BearerToken { token }),
@@ -121,7 +122,16 @@ impl RegistryHttpClient {
         Ok(downloader)
     }
 
-    pub fn upload(&mut self, _file_local_path: &str) {}
+    pub fn upload(&mut self, url: String, blob_down_config: BlobConfig, file_local_path: &Path) -> Result<RegUploader> {
+        let token = self.reg_token_handler.token(Some(scope), TokenType::PushAndPull)?;
+        Ok(RegUploader::new_uploader(
+            url,
+            HttpAuth::BearerToken { token },
+            self.client.clone(),
+            blob_down_config,
+            file_local_path.metadata()?.len(),
+        )?)
+    }
 }
 
 pub struct FullRegistryResponse {

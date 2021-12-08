@@ -2,28 +2,24 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::iter;
 use std::path::Path;
 use std::rc::Rc;
 
 use anyhow::{Error, Result};
 use env_logger::Env;
-use flate2::Compression;
-use flate2::read::{GzDecoder, GzEncoder};
-use log::{error, info};
-use rand::{Rng, thread_rng};
-use rand::distributions::Alphanumeric;
+use log::info;
 use serde::Deserialize;
 use tar::Builder;
 
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
-use crate::reg::{BlobType, Reference};
+use crate::reg::docker::{Manifest2, ManifestLayer};
 use crate::reg::docker::http::download::DownloadResult;
 use crate::reg::docker::http::RegistryAuth;
-use crate::reg::docker::ManifestLayer;
+use crate::reg::docker::image::ConfigBlob;
 use crate::reg::docker::registry::Registry;
 use crate::reg::home::HomeDir;
+use crate::reg::Reference;
 use crate::util::{compress, random};
 
 mod progress;
@@ -52,6 +48,7 @@ fn main() -> Result<()> {
     let home_dir_path = Path::new(&temp_config.home_dir);
     let home_dir = Rc::new(HomeDir::new_home_dir(home_dir_path)?);
     let mut from_registry = Registry::open(temp_config.from.registry, from_auth_opt, home_dir.clone())?;
+
 
     let from_image_reference = Reference {
         image_name: temp_config.from.image_name.as_str(),
@@ -83,18 +80,36 @@ fn main() -> Result<()> {
         let unzip_file = home_dir.cache.blobs.ungz_download_file(&layer.digest)?;
     }
 
-    let config_blob = from_registry.image_manager.config_blob(&temp_config.from.image_name, &config_digest)?;
+    let _config_blob = from_registry.image_manager.config_blob(&temp_config.from.image_name, &config_digest)?;
 
+
+    Ok(())
+}
+
+fn upload(
+    home_dir: Rc<HomeDir>, temp_config: &TempConfig, config_blob: &ConfigBlob, manifest: Manifest2,
+    layer_digest_map: &HashMap<&str, &ManifestLayer>,
+) -> Result<()> {
     let tar_temp_file_path = home_dir.cache.temp_dir.join(random::random_str(10) + ".tar");
-    let tar_temp_file = File::create(tar_temp_file_path)?;
+    let tar_temp_file = File::create(tar_temp_file_path.as_path())?;
     let mut tar_builder = Builder::new(tar_temp_file);
-    tar_builder.append_file("root/a.txt", &mut File::open("C:/Users/me/Desktop/a.txt")?)?;
-    let mut tar_file = tar_builder.into_inner()?;
-    let tgz_temp_file_path = home_dir.cache.temp_dir.join(random::random_str(10) + ".tgz");
-    let mut tgz_temp_file = File::create(tgz_temp_file_path)?;
-    compress::gz_file(&mut tar_file, &mut tgz_temp_file)?;
+    tar_builder.append_file("root/a.txt", &mut File::open("C:/Users/cao/Desktop/a.txt")?)?;
+    let _tar_file = tar_builder.into_inner()?;
+    let layer_result = home_dir.cache.gz_layer_file(tar_temp_file_path.as_path())?;
+    info!("tgz sha256:{}", layer_result.gz_sha256);
+    info!("tar sha256:{}", layer_result.tar_sha256);
+    info!("tgz file path:{:?}", layer_result.gz_temp_file_path);
 
-    info!("全部下载完成");
+    let to_auth_opt = match temp_config.to.username.as_str() {
+        "" => None,
+        _username => Some(RegistryAuth {
+            username: temp_config.to.username.clone(),
+            password: temp_config.to.password.clone(),
+        }),
+    };
+    let mut to_registry = Registry::open(temp_config.from.registry.clone(), to_auth_opt, home_dir.clone())?;
+    to_registry.image_manager.layer_blob_upload()
+
     Ok(())
 }
 

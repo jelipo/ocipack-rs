@@ -1,8 +1,8 @@
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
 
-use anyhow::{Error, Result};
+
+use anyhow::{Result};
 use flate2::Compression;
 use flate2::read::{GzDecoder};
 use flate2::write::GzEncoder;
