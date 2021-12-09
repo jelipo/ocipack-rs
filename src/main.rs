@@ -1,6 +1,7 @@
 #![feature(exclusive_range_pattern)]
 
 use std::collections::HashMap;
+use std::fmt::format;
 use std::fs::File;
 use std::path::Path;
 use std::rc::Rc;
@@ -95,7 +96,7 @@ fn upload(
     let tar_temp_file_path = home_dir.cache.temp_dir.join(random::random_str(10) + ".tar");
     let tar_temp_file = File::create(tar_temp_file_path.as_path())?;
     let mut tar_builder = Builder::new(tar_temp_file);
-    tar_builder.append_file("root/a.txt", &mut File::open("C:/Users/cao/Desktop/a.txt")?)?;
+    tar_builder.append_file("root/a.txt", &mut File::open(&temp_config.test_file)?)?;
     let _tar_file = tar_builder.into_inner()?;
     let layer_result = home_dir.cache.gz_layer_file(tar_temp_file_path.as_path())?;
     info!("tgz sha256:{}", &layer_result.gz_sha256);
@@ -112,27 +113,35 @@ fn upload(
     };
     let mut to_registry = Registry::open(to_config.registry.clone(), to_auth_opt, home_dir.clone())?;
     let mut reg_uploader_vec = Vec::<Box<dyn Processor<UploadResult>>>::new();
-    let location_url = to_registry.image_manager.layer_blob_upload_ready(&to_config.image_name)?;
     for layer in manifest.layers.iter() {
         let layer_digest = &layer.digest;
         let tgz_file_path = home_dir.cache.blobs.tgz_file_path(layer_digest)
             .expect("local download file not found");
         let file_path_str = tgz_file_path.as_os_str().to_string_lossy().to_string();
         let reg_uploader = to_registry.image_manager.layer_blob_upload(
-            &to_config.image_name, layer_digest, &file_path_str, location_url.clone(),
+            &to_config.image_name, layer_digest, &file_path_str,
         )?;
         reg_uploader_vec.push(Box::new(reg_uploader))
     }
+    //
+    let custom_layer_uploader = to_registry.image_manager.layer_blob_upload(
+        &to_config.image_name, &format!("sha256:{}", &layer_result.gz_sha256),
+        &layer_result.gz_temp_file_path.as_os_str().to_string_lossy().to_string(),
+    )?;
+    reg_uploader_vec.push(Box::new(custom_layer_uploader));
+
+    // config blob 上传
     let mut to_config_blob = from_config_blob.clone();
-    to_config_blob.rootfs.diff_ids.insert(0, layer_result.tar_sha256);
+    to_config_blob.rootfs.diff_ids.insert(0, format!("sha256:{}", layer_result.tar_sha256));
     let config_blob_str = serde_json::to_string(&to_config_blob)?;
     let config_blob_path = home_dir.cache.write_temp_file(config_blob_str)?;
     let config_blob_path_str = config_blob_path.as_os_str().to_string_lossy().to_string();
     let config_blob_digest = format!("sha256:{}", file_sha256(&config_blob_path)?);
     let config_blob_uploader = to_registry.image_manager.layer_blob_upload(
-        &to_config.image_name, &config_blob_digest, &config_blob_path_str, location_url.clone(),
+        &to_config.image_name, &config_blob_digest, &config_blob_path_str,
     )?;
     reg_uploader_vec.push(Box::new(config_blob_uploader));
+    //
     let manager = ProcessorManager::new_processor_manager(reg_uploader_vec)?;
     let upload_results = manager.wait_all_done()?;
     for upload_result in upload_results {
@@ -170,6 +179,7 @@ struct TempConfig {
     from: FromConfig,
     to: ToConfig,
     home_dir: String,
+    test_file: String,
 }
 
 #[derive(Deserialize)]

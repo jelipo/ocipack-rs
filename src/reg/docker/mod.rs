@@ -92,17 +92,19 @@ impl ImageManager {
     }
 
     /// 上传layer类型的blob文件
-    pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &str, file_local_path: &str, mut location_url: Url) -> Result<RegUploader> {
+    pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &str, file_local_path: &str) -> Result<RegUploader> {
         let file_path = PathBuf::from(file_local_path).into_boxed_path();
         let file_name = file_path.file_name()
             .expect("file name error").to_str().unwrap().to_string();
         let blob_config = BlobConfig::new(file_path.clone(), file_name, blob_digest.to_string());
+        let short_hash = blob_config.short_hash.clone();
         if self.blobs_exited(name, blob_digest)? {
             return Ok(RegUploader::new_finished_uploader(
                 blob_config, file_path.metadata()?.len(),
-                "blob exists in registry".to_string(),
+                format!("{} blob exists in registry", short_hash),
             ));
         }
+        let mut location_url = self.layer_blob_upload_ready(name)?;
         location_url.query_pairs_mut().append_pair("digest", blob_digest);
         let blob_upload_url = location_url.as_str();
         info!("blob_upload_url is {}",blob_upload_url);
