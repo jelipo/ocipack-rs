@@ -7,11 +7,12 @@ use std::thread;
 use std::thread::JoinHandle;
 
 use anyhow::{Error, Result};
+use log::info;
 use reqwest::blocking::Client;
 use reqwest::Method;
 
-use crate::Processor;
-use crate::progress::{CoreStatus, ProcessorAsync, ProgressStatus};
+use crate::{ConfigBlob, Processor};
+use crate::progress::{CoreStatus, ProcessorAsync, ProcessResult, ProgressStatus};
 use crate::reg::BlobConfig;
 use crate::reg::docker::http::{do_request_raw_read, HttpAuth};
 
@@ -39,7 +40,7 @@ struct RegUploaderCore {
 }
 
 enum RegUploaderEnum {
-    Finished { file_size: u64 },
+    Finished { file_size: u64, finished_reason: String },
     Run(RegUploaderCore),
 }
 
@@ -57,7 +58,7 @@ struct RegUploaderStatusCore {
 
 impl RegUploader {
     /// 创建一个已经完成状态的Uploader
-    pub fn new_finished_uploader(blob_config: BlobConfig, file_size: u64) -> RegUploader {
+    pub fn new_finished_uploader(blob_config: BlobConfig, file_size: u64, finished_reason: String) -> RegUploader {
         let blob_config_arc = Arc::new(blob_config);
         let temp = RegUploaderStatus {
             status_core: Arc::new(Mutex::new(RegUploaderStatusCore {
@@ -70,6 +71,7 @@ impl RegUploader {
         RegUploader {
             reg_uploader_enum: RegUploaderEnum::Finished {
                 file_size,
+                finished_reason,
             },
             blob_config: blob_config_arc,
             temp,
@@ -104,9 +106,9 @@ impl RegUploader {
 impl Processor<UploadResult> for RegUploader {
     fn start(&self) -> Box<dyn ProcessorAsync<UploadResult>> {
         return match &self.reg_uploader_enum {
-            RegUploaderEnum::Finished { file_size: _ } => Box::new(RegFinishedUploader {
+            RegUploaderEnum::Finished { file_size: _, finished_reason } => Box::new(RegFinishedUploader {
                 upload_result: UploadResult {
-                    result_str: "exists".to_string()
+                    result_str: finished_reason.to_string()
                 }
             }),
             RegUploaderEnum::Run(info) => {
@@ -117,9 +119,10 @@ impl Processor<UploadResult> for RegUploader {
                     client: info.client.clone(),
                 };
                 let file_path_clone = self.blob_config.file_path.to_str().unwrap().to_string();
+                let blob_config_arc = self.blob_config.clone();
                 let handle = thread::spawn::<_, Result<UploadResult>>(move || {
                     let uploader = reg_http_uploader;
-                    let result = uploading(status.clone(), file_path_clone.clone().as_str(), uploader);
+                    let result = uploading(status.clone(), file_path_clone.clone().as_str(), uploader, blob_config_arc);
                     let status_core = &mut status.status_core.lock().unwrap();
                     status_core.done = true;
                     if let Err(err) = &result {
@@ -142,7 +145,7 @@ impl Processor<UploadResult> for RegUploader {
 }
 
 fn uploading(
-    status: RegUploaderStatus, file_path: &str, reg_http_uploader: RegHttpUploader,
+    status: RegUploaderStatus, file_path: &str, reg_http_uploader: RegHttpUploader, blob_config: Arc<BlobConfig>,
 ) -> Result<()> {
     //检查本地是否存在已有
     let file_path = Path::new(file_path);
@@ -152,15 +155,20 @@ fn uploading(
         status,
         file: local_file,
     };
-    let response = do_request_raw_read::<RegUploaderReader>(
+    let mut response = do_request_raw_read::<RegUploaderReader>(
         &reg_http_uploader.client, &reg_http_uploader.url.as_str(), Method::PUT,
-        Some(&reg_http_uploader.auth), &None, Some(reader), file_size)?;
+        Some(&reg_http_uploader.auth), None, Some(reader), file_size)?;
+    let short_hash = &blob_config.short_hash;
     if response.status().is_success() {
+        let mut response_string = String::new();
+        let read_size = response.read_to_string(&mut response_string)?;
+        info!("{} upload response :{}",short_hash,response_string);
         Ok(())
     } else {
         let status_code = response.status().as_str();
-        // TODO 补充错误信息
-        Err(Error::msg(format!("upload request failed.")))
+        let mut response_string = String::new();
+        let read_size = response.read_to_string(&mut response_string)?;
+        Err(Error::msg(format!("{} upload request failed. {}", short_hash, response_string)))
     }
 }
 
@@ -210,4 +218,10 @@ struct RegHttpUploader {
 
 pub struct UploadResult {
     pub result_str: String,
+}
+
+impl ProcessResult for UploadResult {
+    fn finished_info(&self) -> &str {
+        &self.result_str
+    }
 }

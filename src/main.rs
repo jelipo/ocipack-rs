@@ -11,8 +11,8 @@ use log::info;
 use serde::Deserialize;
 use tar::Builder;
 
+use crate::progress::{Processor, ProcessResult};
 use crate::progress::manager::ProcessorManager;
-use crate::progress::Processor;
 use crate::reg::docker::{Manifest2, ManifestLayer};
 use crate::reg::docker::http::download::DownloadResult;
 use crate::reg::docker::http::RegistryAuth;
@@ -22,6 +22,7 @@ use crate::reg::docker::registry::Registry;
 use crate::reg::home::HomeDir;
 use crate::reg::Reference;
 use crate::util::{compress, random};
+use crate::util::sha::file_sha256;
 
 mod progress;
 mod reg;
@@ -42,13 +43,13 @@ fn main() -> Result<()> {
     let from_auth_opt = match temp_config.from.username.as_str() {
         "" => None,
         _username => Some(RegistryAuth {
-            username: temp_config.from.username,
-            password: temp_config.from.password,
+            username: temp_config.from.username.clone(),
+            password: temp_config.from.password.clone(),
         }),
     };
     let home_dir_path = Path::new(&temp_config.home_dir);
     let home_dir = Rc::new(HomeDir::new_home_dir(home_dir_path)?);
-    let mut from_registry = Registry::open(temp_config.from.registry, from_auth_opt, home_dir.clone())?;
+    let mut from_registry = Registry::open(temp_config.from.registry.clone(), from_auth_opt, home_dir.clone())?;
 
 
     let from_image_reference = Reference {
@@ -65,7 +66,7 @@ fn main() -> Result<()> {
         reg_downloader_vec.push(Box::new(downloader))
     }
     info!("创建manager");
-    let manager = ProcessorManager::new_processor_manager_two(reg_downloader_vec)?;
+    let manager = ProcessorManager::new_processor_manager(reg_downloader_vec)?;
     let download_results = manager.wait_all_done()?;
     let layer_digest_map = layer_to_map(&manifest.layers);
     let layer_types = vec!["application/vnd.docker.image.rootfs.foreign.diff.tar.gzip",
@@ -81,14 +82,14 @@ fn main() -> Result<()> {
         let unzip_file = home_dir.cache.blobs.ungz_download_file(&layer.digest)?;
     }
 
-    let _config_blob = from_registry.image_manager.config_blob(&temp_config.from.image_name, &config_digest)?;
+    let config_blob = from_registry.image_manager.config_blob(&temp_config.from.image_name, &config_digest)?;
 
-
+    upload(home_dir.clone(), &temp_config, &config_blob, &manifest, &layer_digest_map)?;
     Ok(())
 }
 
 fn upload(
-    home_dir: Rc<HomeDir>, temp_config: &TempConfig, config_blob: &ConfigBlob, manifest: Manifest2,
+    home_dir: Rc<HomeDir>, temp_config: &TempConfig, from_config_blob: &ConfigBlob, manifest: &Manifest2,
     layer_digest_map: &HashMap<&str, &ManifestLayer>,
 ) -> Result<()> {
     let tar_temp_file_path = home_dir.cache.temp_dir.join(random::random_str(10) + ".tar");
@@ -97,9 +98,9 @@ fn upload(
     tar_builder.append_file("root/a.txt", &mut File::open("C:/Users/cao/Desktop/a.txt")?)?;
     let _tar_file = tar_builder.into_inner()?;
     let layer_result = home_dir.cache.gz_layer_file(tar_temp_file_path.as_path())?;
-    info!("tgz sha256:{}", layer_result.gz_sha256);
-    info!("tar sha256:{}", layer_result.tar_sha256);
-    info!("tgz file path:{:?}", layer_result.gz_temp_file_path);
+    info!("tgz sha256:{}", &layer_result.gz_sha256);
+    info!("tar sha256:{}", &layer_result.tar_sha256);
+    info!("tgz file path:{:?}", &layer_result.gz_temp_file_path);
 
     let to_config = &temp_config.to;
     let to_auth_opt = match to_config.username.as_str() {
@@ -111,15 +112,48 @@ fn upload(
     };
     let mut to_registry = Registry::open(to_config.registry.clone(), to_auth_opt, home_dir.clone())?;
     let mut reg_uploader_vec = Vec::<Box<dyn Processor<UploadResult>>>::new();
+    let location_url = to_registry.image_manager.layer_blob_upload_ready(&to_config.image_name)?;
     for layer in manifest.layers.iter() {
         let layer_digest = &layer.digest;
-        let (file_path, _) = home_dir.cache.blobs.download_ready(layer_digest);
-        let file_path_str = file_path.as_os_str().to_string_lossy().to_string();
-        let reg_uploader = to_registry.image_manager.layer_blob_upload(&to_config.image_name, layer_digest, &file_path_str)?;
+        let tgz_file_path = home_dir.cache.blobs.tgz_file_path(layer_digest)
+            .expect("local download file not found");
+        let file_path_str = tgz_file_path.as_os_str().to_string_lossy().to_string();
+        let reg_uploader = to_registry.image_manager.layer_blob_upload(
+            &to_config.image_name, layer_digest, &file_path_str, location_url.clone(),
+        )?;
         reg_uploader_vec.push(Box::new(reg_uploader))
     }
-
-
+    let mut to_config_blob = from_config_blob.clone();
+    to_config_blob.rootfs.diff_ids.insert(0, layer_result.tar_sha256);
+    let config_blob_str = serde_json::to_string(&to_config_blob)?;
+    let config_blob_path = home_dir.cache.write_temp_file(config_blob_str)?;
+    let config_blob_path_str = config_blob_path.as_os_str().to_string_lossy().to_string();
+    let config_blob_digest = format!("sha256:{}", file_sha256(&config_blob_path)?);
+    let config_blob_uploader = to_registry.image_manager.layer_blob_upload(
+        &to_config.image_name, &config_blob_digest, &config_blob_path_str, location_url.clone(),
+    )?;
+    reg_uploader_vec.push(Box::new(config_blob_uploader));
+    let manager = ProcessorManager::new_processor_manager(reg_uploader_vec)?;
+    let upload_results = manager.wait_all_done()?;
+    for upload_result in upload_results {
+        info!("{}", &upload_result.finished_info());
+    }
+    // layers上传完成，开始组装manifest
+    let mut to_manifest = (*manifest).clone();
+    to_manifest.config.digest = config_blob_digest;
+    to_manifest.config.media_type = "application/vnd.docker.container.image.v1+json".to_string();
+    to_manifest.config.size = config_blob_path.metadata()?.len();
+    // 插入一个layer
+    to_manifest.layers.insert(0, ManifestLayer {
+        media_type: "application/vnd.docker.image.rootfs.diff.tar.gzip".to_string(),
+        size: layer_result.gz_temp_file_path.metadata()?.len(),
+        digest: format!("sha256:{}", layer_result.gz_sha256),
+    });
+    let put_result = to_registry.image_manager.put_manifest(&Reference {
+        image_name: to_config.image_name.as_str(),
+        reference: to_config.reference.as_str(),
+    }, to_manifest)?;
+    info!("put result: {}",put_result);
     Ok(())
 }
 
@@ -130,7 +164,6 @@ fn layer_to_map(layers: &Vec<ManifestLayer>) -> HashMap<&str, &ManifestLayer> {
     }
     map
 }
-
 
 #[derive(Deserialize)]
 struct TempConfig {

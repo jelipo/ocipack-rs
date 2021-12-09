@@ -2,7 +2,6 @@ use std::io::Read;
 use std::str::FromStr;
 
 use anyhow::Result;
-
 use reqwest::{Method, Url};
 use reqwest::blocking::{Body, Client, Request, Response};
 use reqwest::header::HeaderMap;
@@ -25,14 +24,14 @@ pub enum HttpAuth {
     BearerToken { token: String },
 }
 
-pub struct RegistryAccept(&'static str);
+pub struct RegistryContentType(&'static str);
 
 pub enum RequestBody<'a, T: Serialize + ?Sized> {
     JSON(&'a T),
     Read(Body),
 }
 
-impl RegistryAccept {
+impl RegistryContentType {
     pub const APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_V2JSON: Self = Self("application/vnd.docker.distribution.manifest.v2+json");
     pub const APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_LIST_V2JSON: Self = Self("application/vnd.docker.distribution.manifest.list.v2+json");
     pub const ALL: Self = Self("*/*");
@@ -44,27 +43,27 @@ impl RegistryAccept {
 
 fn do_request_raw<T: Serialize + ?Sized>(
     client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
-    accept: &Option<RegistryAccept>, body: Option<&T>,
+    accept: Option<&RegistryContentType>, body: Option<&T>, content_type: Option<&RegistryContentType>,
 ) -> Result<Response> {
     let request_body = body.map(|json| RequestBody::JSON(json));
-    let request = build_request::<T>(client, url, method, http_auth_opt, accept, request_body)?;
+    let request = build_request::<T>(client, url, method, http_auth_opt, accept, request_body, content_type)?;
     let http_response = client.execute(request)?;
     Ok(http_response)
 }
 
 fn do_request_raw_read<R: Read + Send + 'static>(
     client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
-    accept: &Option<RegistryAccept>, body: Option<R>, size: u64,
+    accept: Option<&RegistryContentType>, body: Option<R>, size: u64,
 ) -> Result<Response> {
     let request_body = body.map(|read| RequestBody::Read(Body::sized(read, size)));
-    let request = build_request::<String>(client, url, method, http_auth_opt, accept, request_body)?;
+    let request = build_request::<String>(client, url, method, http_auth_opt, accept, request_body, None)?;
     let http_response = client.execute(request)?;
     Ok(http_response)
 }
 
 fn build_request<T: Serialize + ?Sized>(
     client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
-    accept: &Option<RegistryAccept>, body: Option<RequestBody<T>>,
+    accept: Option<&RegistryContentType>, body: Option<RequestBody<T>>, content_type: Option<&RegistryContentType>,
 ) -> Result<Request> {
     let url = Url::from_str(url)?;
     let mut builder = client.request(method, url);
@@ -77,6 +76,9 @@ fn build_request<T: Serialize + ?Sized>(
     }
     if let Some(reg_accept) = accept {
         builder = builder.header("Accept", reg_accept.get_value());
+    }
+    if let Some(content_type) = content_type {
+        builder = builder.header("Content-Type", content_type.get_value());
     }
     match body {
         None => {}

@@ -12,9 +12,9 @@ use url::Url;
 
 use crate::reg::{BlobConfig, Reference};
 use crate::reg::docker::http::auth::TokenType;
-use crate::reg::docker::http::client::{RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
+use crate::reg::docker::http::client::{ClientRequest, RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
 use crate::reg::docker::http::download::RegDownloader;
-use crate::reg::docker::http::RegistryAccept;
+use crate::reg::docker::http::RegistryContentType;
 use crate::reg::docker::http::upload::RegUploader;
 use crate::reg::docker::image::ConfigBlob;
 use crate::reg::home::HomeDir;
@@ -48,18 +48,10 @@ impl ImageManager {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        let accept_opt = Some(RegistryAccept::APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_V2JSON);
-        reg_rc.request_registry_body::<u8, Manifest2>(&path, scope, Method::GET, &accept_opt, None, TokenType::Pull)
+        let accept_opt = Some(RegistryContentType::APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_V2JSON);
+        let request = ClientRequest::new_get_request(&path, scope, accept_opt.as_ref());
+        reg_rc.request_registry_body::<u8, Manifest2>(request)
     }
-
-    // /// 获取Image的Manifest
-    // pub fn manifests_list(&mut self, refe: &Reference) -> Result<Manifest2> {
-    //     let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
-    //     let scope = Some(refe.image_name);
-    //     let mut reg_rc = self.reg_client.borrow_mut();
-    //     let accept_opt = Some(RegistryAccept::APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_LIST_V2JSON);
-    //     let string = reg_rc.request_registry::<u8, String>(&path, &scope, Method::GET, &accept_opt, None)?;
-    // }
 
     /// Image manifests是否存在
     pub fn manifests_exited(&mut self, refe: &Reference) -> Result<bool> {
@@ -79,16 +71,16 @@ impl ImageManager {
 
     pub fn config_blob(&mut self, name: &str, blob_digest: &str) -> Result<ConfigBlob> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
-        let scope = Some(name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        reg_rc.request_registry_body::<u8, ConfigBlob>(&url_path, scope, Method::GET, &None, None, TokenType::Pull)
+        let request = ClientRequest::new_get_request(&url_path, Some(name), None);
+        reg_rc.request_registry_body::<u8, ConfigBlob>(request)
     }
 
     pub fn layer_blob_download(&mut self, name: &str, blob_digest: &str, layer_size: Option<u64>) -> Result<RegDownloader> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let (file_path, file_name) = self.home_dir.cache.blobs.download_ready(blob_digest);
         let mut blob_config = BlobConfig::new(file_path, file_name, blob_digest.to_string());
-        if let Some(exists_file) = self.home_dir.cache.blobs.ungizip_file_path(blob_digest) {
+        if let Some(exists_file) = self.home_dir.cache.blobs.tgz_file_path(blob_digest) {
             let file = File::open(&exists_file)?;
             blob_config.file_path = exists_file;
             let finished_downloader = RegDownloader::new_finished_downloader(
@@ -100,7 +92,7 @@ impl ImageManager {
     }
 
     /// 上传layer类型的blob文件
-    pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &str, file_local_path: &str) -> Result<RegUploader> {
+    pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &str, file_local_path: &str, mut location_url: Url) -> Result<RegUploader> {
         let file_path = PathBuf::from(file_local_path).into_boxed_path();
         let file_name = file_path.file_name()
             .expect("file name error").to_str().unwrap().to_string();
@@ -108,13 +100,12 @@ impl ImageManager {
         if self.blobs_exited(name, blob_digest)? {
             return Ok(RegUploader::new_finished_uploader(
                 blob_config, file_path.metadata()?.len(),
+                "blob exists in registry".to_string(),
             ));
         }
-        let mut location_url = self.layer_blob_upload_ready(name)?;
         location_url.query_pairs_mut().append_pair("digest", blob_digest);
         let blob_upload_url = location_url.as_str();
         info!("blob_upload_url is {}",blob_upload_url);
-
         let reg_uploader = self.reg_client.borrow_mut().upload(
             location_url.to_string(), blob_config, name, &file_path,
         )?;
@@ -122,14 +113,27 @@ impl ImageManager {
     }
 
     /// 向仓库获取上传blob的URL
-    fn layer_blob_upload_ready(&mut self, name: &str) -> Result<Url> {
+    pub fn layer_blob_upload_ready(&mut self, name: &str) -> Result<Url> {
         let url_path = format!("/v2/{}/blobs/uploads/", name);
         let scope = Some(name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        let success_resp = reg_rc.request_registry::<u8>(&url_path, scope, Method::POST, &None, None, TokenType::PushAndPull)?;
+        let success_resp = reg_rc.request_full_response::<u8>(&url_path, scope, Method::POST, None, None, TokenType::PushAndPull)?;
         let location = success_resp.location_header().expect("location header not found");
         let url = Url::parse(location)?;
         Ok(url)
+    }
+
+    pub fn put_manifest(&mut self, refe: &Reference, manifest: Manifest2) -> Result<String> {
+        let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
+        let scope = Some(refe.image_name);
+        let mut reg_rc = self.reg_client.borrow_mut();
+        let request = ClientRequest::new_with_content_type(
+            &path, scope, Method::PUT, None, Some(&manifest),
+            &RegistryContentType::APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_V2JSON,
+            TokenType::PushAndPull,
+        );
+        let response_str = reg_rc.request_registry_body::<Manifest2, String>(request)?;
+        Ok(response_str)
     }
 }
 
@@ -144,7 +148,7 @@ fn exited(simple_response: &SimpleRegistryResponse) -> Result<bool> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest2 {
     pub schema_version: usize,
@@ -153,19 +157,18 @@ pub struct Manifest2 {
     pub layers: Vec<ManifestLayer>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ManifestConfig {
     pub media_type: String,
-    pub size: usize,
+    pub size: u64,
     pub digest: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ManifestLayer {
     pub media_type: String,
     pub size: u64,
     pub digest: String,
-    pub urls: Option<Vec<String>>,
 }

@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::reg::BlobConfig;
-use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth, RegistryAccept, RegistryAuth};
+use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth, RegistryContentType, RegistryAuth};
 use crate::reg::docker::http::auth::{RegTokenHandler, TokenType};
 use crate::reg::docker::http::download::RegDownloader;
 use crate::reg::docker::http::upload::RegUploader;
@@ -51,51 +51,43 @@ impl RegistryHttpClient {
     }
 
     pub fn request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(
-        &mut self, path: &str, scope: Option<&str>, method: Method,
-        accept: &Option<RegistryAccept>, body: Option<&T>, token_type: TokenType,
+        &mut self, request: ClientRequest<T>,
     ) -> Result<R> {
-        let success_response = self.do_request(path, scope, method, accept, body, token_type)?;
-        // let _header_docker_content_digest = success_response
-        //     .header_docker_content_digest()
-        //     .expect("No Docker-Content-Digest header");
+        let success_response = self.do_request(request)?;
         let body_bytes = success_response.bytes_body();
         let _body_sha256 = format!("sha256:{}", sha::sha256(body_bytes));
-        // if body_bytes.len() != 0 && body_sha256 != header_docker_content_digest {
-        //     return Err(Error::msg("docker_content_digest verification failed"));
-        // }
         success_response.json_body::<R>()
     }
 
-    pub fn request_registry<T: Serialize + ?Sized>(
+    pub fn request_full_response<T: Serialize + ?Sized>(
         &mut self, path: &str, scope: Option<&str>, method: Method,
-        accept: &Option<RegistryAccept>, body: Option<&T>, token_type: TokenType,
+        accept: Option<&RegistryContentType>, body: Option<&T>, token_type: TokenType,
     ) -> Result<FullRegistryResponse> {
-        self.do_request(path, scope, method, accept, body, token_type)
+        let request = ClientRequest::new(path, scope, method, accept, body, token_type);
+        self.do_request(request)
     }
 
     pub fn head_request_registry(&mut self, path: &str, scope: Option<&str>) -> Result<SimpleRegistryResponse> {
-        let http_response = self.do_request_raw::<u8>(path, scope, Method::HEAD, &None, None, TokenType::Pull)?;
+        let request = ClientRequest::new_head_request(path, scope, TokenType::Pull);
+        let http_response = self.do_request_raw::<u8>(request)?;
         Ok(SimpleRegistryResponse {
             status_code: http_response.status(),
         })
     }
 
-    fn do_request_raw<T: Serialize + ?Sized>(
-        &mut self, path: &str, scope: Option<&str>, method: Method,
-        accept: &Option<RegistryAccept>, body: Option<&T>, token_type: TokenType,
-    ) -> Result<Response> {
-        let url = self.registry_addr.clone() + path;
-        let token = self.reg_token_handler.token(scope, token_type)?;
+    fn do_request_raw<B: Serialize + ?Sized>(&mut self, request: ClientRequest<B>) -> Result<Response> {
+        let url = self.registry_addr.clone() + request.path;
+        let token = self.reg_token_handler.token(request.scope, request.token_type)?;
         let auth = Some(HttpAuth::BearerToken { token });
-        let http_response = do_request_raw(&self.client, url.as_str(), method, auth.as_ref(), accept, body)?;
+        let http_response = do_request_raw(
+            &self.client, url.as_str(), request.method, auth.as_ref(),
+            request.accept, request.body, request.request_content_type,
+        )?;
         Ok(http_response)
     }
 
-    fn do_request<T: Serialize + ?Sized>(
-        &mut self, path: &str, scope: Option<&str>, method: Method,
-        accept: &Option<RegistryAccept>, body: Option<&T>, token_type: TokenType,
-    ) -> Result<FullRegistryResponse> {
-        let http_response = self.do_request_raw(path, scope, method, accept, body, token_type)?;
+    fn do_request<T: Serialize + ?Sized>(&mut self, request: ClientRequest<T>) -> Result<FullRegistryResponse> {
+        let http_response = self.do_request_raw(request)?;
         let response = FullRegistryResponse::new_registry_response(http_response)?;
         return if response.is_success() {
             Ok(response)
@@ -113,11 +105,8 @@ impl RegistryHttpClient {
         let url = format!("{}{}", &self.registry_addr, path);
         let token = self.reg_token_handler.token(Some(scope), TokenType::Pull)?;
         let downloader = RegDownloader::new_reg_downloader(
-            url,
-            Some(HttpAuth::BearerToken { token }),
-            self.client.clone(),
-            blob_down_config,
-            layer_size,
+            url, Some(HttpAuth::BearerToken { token }), self.client.clone(),
+            blob_down_config, layer_size,
         )?;
         Ok(downloader)
     }
@@ -209,5 +198,73 @@ impl RegistryResponse for SimpleRegistryResponse {
 
     fn status_code(&self) -> u16 {
         self.status_code.as_u16()
+    }
+}
+
+pub struct ClientRequest<'a, B: Serialize + ?Sized> {
+    path: &'a str,
+    scope: Option<&'a str>,
+    method: Method,
+    accept: Option<&'a RegistryContentType>,
+    body: Option<&'a B>,
+    request_content_type: Option<&'a RegistryContentType>,
+    token_type: TokenType,
+}
+
+impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
+    pub fn new(
+        path: &'a str, scope: Option<&'a str>, method: Method, accept: Option<&'a RegistryContentType>,
+        body: Option<&'a B>, token_type: TokenType,
+    ) -> ClientRequest<'a, B> {
+        ClientRequest {
+            path,
+            scope,
+            method,
+            accept,
+            body,
+            request_content_type: None,
+            token_type,
+        }
+    }
+
+    pub fn new_head_request(path: &'a str, scope: Option<&'a str>, token_type: TokenType) -> ClientRequest<'a, B> {
+        ClientRequest {
+            path,
+            scope,
+            method: Method::HEAD,
+            accept: None,
+            body: None,
+            request_content_type: None,
+            token_type,
+        }
+    }
+
+    pub fn new_get_request(
+        path: &'a str, scope: Option<&'a str>, accept: Option<&'a RegistryContentType>,
+    ) -> ClientRequest<'a, B> {
+        ClientRequest {
+            path,
+            scope,
+            method: Method::GET,
+            accept,
+            body: None,
+            request_content_type: None,
+            token_type: TokenType::Pull,
+        }
+    }
+
+    pub fn new_with_content_type(
+        path: &'a str, scope: Option<&'a str>, method: Method, accept: Option<&'a RegistryContentType>,
+        body: Option<&'a B>, content_type: &'a RegistryContentType, token_type: TokenType,
+    ) -> ClientRequest<'a, B> {
+        ClientRequest {
+            path,
+            scope,
+            method,
+            accept,
+            body,
+            request_content_type: Some(content_type),
+            token_type,
+        }
     }
 }

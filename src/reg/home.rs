@@ -59,6 +59,15 @@ impl CacheDir {
             gz_temp_file_path: tgz_file_path.into_boxed_path(),
         })
     }
+
+    pub fn write_temp_file(&self, file_str: String) -> Result<Box<Path>> {
+        let temp_file_name = random::random_str(10) + ".tmp";
+        let temp_file_path = self.temp_dir.join(temp_file_name);
+        let mut temp_file = File::create(&temp_file_path)?;
+        temp_file.write_all(file_str.as_bytes())?;
+        temp_file.flush()?;
+        Ok(temp_file_path.into_boxed_path())
+    }
 }
 
 
@@ -91,7 +100,7 @@ impl BlobsDir {
         tar_file_path.remove()?;
         create_dir_all(&layer_dir)?;
         std::fs::rename(download_file_path, &tar_file_path)?;
-        let ungizip_sha_file_path = self.ungizip_sha_file_path(&layer_dir);
+        let ungizip_sha_file_path = self.ungzip_sha_file_path(&layer_dir);
         ungizip_sha_file_path.remove()?;
         let mut tar_sha_file = File::create(ungizip_sha_file_path)?;
         tar_sha_file.write(tar_sha256.as_bytes())?;
@@ -99,18 +108,19 @@ impl BlobsDir {
         Ok(tar_file_path.into_boxed_path())
     }
 
-    pub fn ungizip_sha_file_path(&self, layer_dir: &Path) -> Box<Path> {
+    pub fn ungzip_sha_file_path(&self, layer_dir: &Path) -> Box<Path> {
         layer_dir.join("tar_sha256").into_boxed_path()
     }
 
-    pub fn ungizip_file_path(&self, digest: &str) -> Option<Box<Path>> {
-        let gzip_file_sha256 = self.digest_to_sha(digest);
-        let layer_dir = self.layers_path.join(gzip_file_sha256);
-        let ungzip_sha_file = self.ungizip_sha_file_path(layer_dir.as_path());
+
+    pub fn tgz_file_path(&self, digest: &str) -> Option<Box<Path>> {
+        let tgz_file_sha256 = self.digest_to_sha(digest);
+        let layer_file_parent = self.layers_path.join(tgz_file_sha256);
+        let ungzip_sha_file = self.ungzip_sha_file_path(layer_file_parent.as_path());
         if let Ok(mut file) = File::open(ungzip_sha_file) {
-            let mut ungzip_file_sha256 = String::new();
-            file.read_to_string(&mut ungzip_file_sha256);
-            return Some(layer_dir.join(ungzip_file_sha256).into_boxed_path());
+            let mut tgz_file_name = String::new();
+            file.read_to_string(&mut tgz_file_name);
+            return Some(layer_file_parent.join(tgz_file_name).into_boxed_path());
         }
         return None;
     }
@@ -118,8 +128,6 @@ impl BlobsDir {
     fn digest_to_sha(&self, digest: &str) -> String {
         digest.replace("sha256:", "")
     }
-
-    pub fn layer_exists(&self, _digest: &str) {}
 }
 
 pub struct LayerResult {

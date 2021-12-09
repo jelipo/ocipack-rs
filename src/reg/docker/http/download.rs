@@ -174,7 +174,7 @@ struct RegHttpDownloader {
 impl RegHttpDownloader {
     fn do_request_raw(&self) -> Result<Response> {
         let url = self.url.as_str();
-        do_request_raw::<u8>(&self.client, url, Method::GET, self.auth.as_ref(), &None, None)
+        do_request_raw::<u8>(&self.client, url, Method::GET, self.auth.as_ref(), None, None, None)
     }
 }
 
