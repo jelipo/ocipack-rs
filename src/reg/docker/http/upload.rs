@@ -11,7 +11,7 @@ use log::info;
 use reqwest::blocking::Client;
 use reqwest::Method;
 
-use crate::{ConfigBlob, Processor};
+use crate::Processor;
 use crate::progress::{CoreStatus, ProcessorAsync, ProcessResult, ProgressStatus};
 use crate::reg::BlobConfig;
 use crate::reg::docker::http::{do_request_raw_read, HttpAuth};
@@ -161,13 +161,12 @@ fn uploading(
     let short_hash = &blob_config.short_hash;
     if response.status().is_success() {
         let mut response_string = String::new();
-        let read_size = response.read_to_string(&mut response_string)?;
-        info!("{} upload response :{}",short_hash,response_string);
+        let _read_size = response.read_to_string(&mut response_string)?;
         Ok(())
     } else {
-        let status_code = response.status().as_str();
+        let _status_code = response.status().as_str();
         let mut response_string = String::new();
-        let read_size = response.read_to_string(&mut response_string)?;
+        let _read_size = response.read_to_string(&mut response_string)?;
         Err(Error::msg(format!("{} upload request failed. {}", short_hash, response_string)))
     }
 }

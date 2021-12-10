@@ -84,7 +84,6 @@ fn build_request<T: Serialize + ?Sized>(
         None => {}
         Some(RequestBody::JSON(json_body)) => {
             let json_str = serde_json::to_string(json_body)?;
-            println!("request json {}", json_str);
             builder = builder.body(json_str)
         }
         Some(RequestBody::Read(read)) => builder = builder.body(read)

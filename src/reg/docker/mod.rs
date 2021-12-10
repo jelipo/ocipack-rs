@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use anyhow::{Error, Result};
@@ -10,9 +10,9 @@ use serde::Deserialize;
 use serde::Serialize;
 use url::Url;
 
-use crate::reg::{BlobConfig, Reference};
+use crate::reg::{BlobConfig, Reference, RegDigest};
 use crate::reg::docker::http::auth::TokenType;
-use crate::reg::docker::http::client::{ClientRequest, RegistryHttpClient, RegistryResponse, SimpleRegistryResponse};
+use crate::reg::docker::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::docker::http::download::RegDownloader;
 use crate::reg::docker::http::RegistryContentType;
 use crate::reg::docker::http::upload::RegUploader;
@@ -57,15 +57,17 @@ impl ImageManager {
     pub fn manifests_exited(&mut self, refe: &Reference) -> Result<bool> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
-        let response = self.reg_client.borrow_mut().head_request_registry(&path, scope)?;
+        let request = ClientRequest::new_head_request(&path, scope, TokenType::Pull);
+        let response = self.reg_client.borrow_mut().simple_request::<u8>(request)?;
         exited(&response)
     }
 
     /// Image blobs是否存在
-    pub fn blobs_exited(&mut self, name: &str, blob_digest: &str) -> Result<bool> {
-        let path = format!("/v2/{}/blobs/{}", name, blob_digest);
+    pub fn blobs_exited(&mut self, name: &str, blob_digest: &RegDigest) -> Result<bool> {
+        let path = format!("/v2/{}/blobs/{}", name, blob_digest.digest);
         let scope = Some(name);
-        let response = self.reg_client.borrow_mut().head_request_registry(&path, scope)?;
+        let request = ClientRequest::new_head_request(&path, scope, TokenType::Pull);
+        let response = self.reg_client.borrow_mut().simple_request::<u8>(request)?;
         exited(&response)
     }
 
@@ -76,10 +78,11 @@ impl ImageManager {
         reg_rc.request_registry_body::<u8, ConfigBlob>(request)
     }
 
-    pub fn layer_blob_download(&mut self, name: &str, blob_digest: &str, layer_size: Option<u64>) -> Result<RegDownloader> {
-        let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
-        let (file_path, file_name) = self.home_dir.cache.blobs.download_ready(blob_digest);
-        let mut blob_config = BlobConfig::new(file_path, file_name, blob_digest.to_string());
+    pub fn layer_blob_download(&mut self, name: &str, blob_digest: &RegDigest, layer_size: Option<u64>) -> Result<RegDownloader> {
+        let url_path = format!("/v2/{}/blobs/{}", name, blob_digest.digest);
+        let file_path = self.home_dir.cache.blobs.download_ready(blob_digest);
+        let file_name = blob_digest.sha256.clone();
+        let mut blob_config = BlobConfig::new(file_path, file_name, blob_digest.clone());
         if let Some(exists_file) = self.home_dir.cache.blobs.tgz_file_path(blob_digest) {
             let file = File::open(&exists_file)?;
             blob_config.file_path = exists_file;
@@ -92,20 +95,20 @@ impl ImageManager {
     }
 
     /// 上传layer类型的blob文件
-    pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &str, file_local_path: &str) -> Result<RegUploader> {
+    pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &RegDigest, file_local_path: &str) -> Result<RegUploader> {
         let file_path = PathBuf::from(file_local_path).into_boxed_path();
         let file_name = file_path.file_name()
             .expect("file name error").to_str().unwrap().to_string();
-        let blob_config = BlobConfig::new(file_path.clone(), file_name, blob_digest.to_string());
+        let blob_config = BlobConfig::new(file_path.clone(), file_name, blob_digest.clone());
         let short_hash = blob_config.short_hash.clone();
-        if self.blobs_exited(name, blob_digest)? {
+        if self.blobs_exited(name, &blob_digest)? {
             return Ok(RegUploader::new_finished_uploader(
                 blob_config, file_path.metadata()?.len(),
                 format!("{} blob exists in registry", short_hash),
             ));
         }
         let mut location_url = self.layer_blob_upload_ready(name)?;
-        location_url.query_pairs_mut().append_pair("digest", blob_digest);
+        location_url.query_pairs_mut().append_pair("digest", &blob_digest.digest);
         let blob_upload_url = location_url.as_str();
         info!("blob_upload_url is {}",blob_upload_url);
         let reg_uploader = self.reg_client.borrow_mut().upload(
@@ -119,7 +122,8 @@ impl ImageManager {
         let url_path = format!("/v2/{}/blobs/uploads/", name);
         let scope = Some(name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        let success_resp = reg_rc.request_full_response::<u8>(&url_path, scope, Method::POST, None, None, TokenType::PushAndPull)?;
+        let request = ClientRequest::new(&url_path, scope, Method::POST, None, None, TokenType::PushAndPull);
+        let success_resp = reg_rc.request_full_response::<u8>(request)?;
         let location = success_resp.location_header().expect("location header not found");
         let url = Url::parse(location)?;
         Ok(url)
@@ -134,12 +138,12 @@ impl ImageManager {
             &RegistryContentType::APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_V2JSON,
             TokenType::PushAndPull,
         );
-        let response_str = reg_rc.request_registry_body::<Manifest2, String>(request)?;
-        Ok(response_str)
+        let raw_response = reg_rc.simple_request::<Manifest2>(request)?;
+        Ok(raw_response.body_to_string())
     }
 }
 
-fn exited(simple_response: &SimpleRegistryResponse) -> Result<bool> {
+fn exited(simple_response: &RawRegistryResponse) -> Result<bool> {
     match simple_response.status_code() {
         200..300 => Ok(true),
         404 => Ok(false),

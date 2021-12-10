@@ -1,3 +1,4 @@
+use std::detect::__is_feature_detected::sha;
 use std::path::Path;
 
 pub mod home;
@@ -19,20 +20,39 @@ pub enum BlobType {
 pub struct BlobConfig {
     pub file_path: Box<Path>,
     pub file_name: String,
-    pub digest: String,
+    pub reg_digest: RegDigest,
     pub short_hash: String,
-    pub sha256: String,
 }
 
 impl BlobConfig {
-    pub fn new(file_path: Box<Path>, file_name: String, digest: String) -> BlobConfig {
-        let sha256 = digest.replace("sha256:", "");
+    pub fn new(file_path: Box<Path>, file_name: String, digest: RegDigest) -> BlobConfig {
         BlobConfig {
             file_path,
             file_name,
-            digest: digest.to_string(),
-            short_hash: sha256[..12].to_string(),
+            short_hash: digest.sha256[..12].to_string(),
+            reg_digest: digest,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct RegDigest {
+    pub sha256: String,
+    pub digest: String,
+}
+
+impl RegDigest {
+    pub fn new_with_sha256(sha256: String) -> RegDigest {
+        RegDigest {
+            digest: format!("sha256:{}", &sha256),
             sha256,
+        }
+    }
+
+    pub fn new_with_digest(digest: String) -> RegDigest {
+        RegDigest {
+            sha256: digest.as_str()[7..].to_string(),
+            digest,
         }
     }
 }

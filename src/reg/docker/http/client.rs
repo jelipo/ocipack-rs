@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::option::Option::Some;
 use std::path::Path;
 use std::time::Duration;
@@ -11,7 +12,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::reg::BlobConfig;
-use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth, RegistryContentType, RegistryAuth};
+use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth, RegistryAuth, RegistryContentType};
 use crate::reg::docker::http::auth::{RegTokenHandler, TokenType};
 use crate::reg::docker::http::download::RegDownloader;
 use crate::reg::docker::http::upload::RegUploader;
@@ -53,25 +54,20 @@ impl RegistryHttpClient {
     pub fn request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(
         &mut self, request: ClientRequest<T>,
     ) -> Result<R> {
-        let success_response = self.do_request(request)?;
+        let success_response = self.request_full_response(request)?;
         let body_bytes = success_response.bytes_body();
         let _body_sha256 = format!("sha256:{}", sha::sha256(body_bytes));
         success_response.json_body::<R>()
     }
 
-    pub fn request_full_response<T: Serialize + ?Sized>(
-        &mut self, path: &str, scope: Option<&str>, method: Method,
-        accept: Option<&RegistryContentType>, body: Option<&T>, token_type: TokenType,
-    ) -> Result<FullRegistryResponse> {
-        let request = ClientRequest::new(path, scope, method, accept, body, token_type);
+    pub fn request_full_response<T: Serialize + ?Sized>(&mut self, request: ClientRequest<T>) -> Result<FullRegistryResponse> {
         self.do_request(request)
     }
 
-    pub fn head_request_registry(&mut self, path: &str, scope: Option<&str>) -> Result<SimpleRegistryResponse> {
-        let request = ClientRequest::new_head_request(path, scope, TokenType::Pull);
-        let http_response = self.do_request_raw::<u8>(request)?;
-        Ok(SimpleRegistryResponse {
-            status_code: http_response.status(),
+    pub fn simple_request<T: Serialize + ?Sized>(&mut self, request: ClientRequest<T>) -> Result<RawRegistryResponse> {
+        let http_response = self.do_request_raw(request)?;
+        Ok(RawRegistryResponse {
+            response: http_response,
         })
     }
 
@@ -184,20 +180,41 @@ pub trait RegistryResponse {
     fn success(&self) -> bool;
 
     fn status_code(&self) -> u16;
+
+    fn body_to_string(self) -> String;
 }
 
 /// 一个简单的Registry的Response，只包含状态码
-pub struct SimpleRegistryResponse {
-    status_code: StatusCode,
+pub struct RawRegistryResponse {
+    response: Response,
 }
 
-impl RegistryResponse for SimpleRegistryResponse {
+impl RegistryResponse for RawRegistryResponse {
     fn success(&self) -> bool {
-        self.status_code.is_success()
+        self.response.status().is_success()
     }
 
     fn status_code(&self) -> u16 {
-        self.status_code.as_u16()
+        self.response.status().as_u16()
+    }
+
+    fn body_to_string(mut self) -> String {
+        match self.response.content_length() {
+            None => {
+                let mut string = String::new();
+                self.response.read_to_string(&mut string);
+                string
+            }
+            Some(len) => {
+                if len == 0 {
+                    String::default()
+                } else {
+                    let mut string = String::with_capacity(len as usize);
+                    self.response.read_to_string(&mut string);
+                    string
+                }
+            }
+        }
     }
 }
 
