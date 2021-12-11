@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 
+use serde::Deserialize;
+use serde::Serialize;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UserDockerConfig {
-    auths: HashMap<String, UserDockerConfigAuth>,
+    pub auths: HashMap<String, UserDockerConfigAuth>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UserDockerConfigAuth {
-    auth: String,
+    pub auth: Option<String>,
 }

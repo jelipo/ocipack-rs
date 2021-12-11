@@ -2,17 +2,20 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use anyhow::{Error, Result};
 use env_logger::Env;
+use home::home_dir;
 use log::info;
+use log::Level::Info;
 use serde::Deserialize;
 use tar::Builder;
 
 use crate::progress::{Processor, ProcessResult};
 use crate::progress::manager::ProcessorManager;
+use crate::reg::{Reference, RegDigest};
 use crate::reg::docker::{Manifest2, ManifestLayer};
 use crate::reg::docker::http::download::DownloadResult;
 use crate::reg::docker::http::RegistryAuth;
@@ -20,7 +23,6 @@ use crate::reg::docker::http::upload::UploadResult;
 use crate::reg::docker::image::ConfigBlob;
 use crate::reg::docker::registry::Registry;
 use crate::reg::home::HomeDir;
-use crate::reg::{Reference, RegDigest};
 use crate::util::{compress, random};
 use crate::util::sha::file_sha256;
 
@@ -33,7 +35,7 @@ mod config;
 
 fn main() -> Result<()> {
     let env = Env::default()
-        .default_filter_or("info");
+        .default_filter_or(Info.as_str());
     env_logger::init_from_env(env);
 
     let config_path = Path::new("config.json");
