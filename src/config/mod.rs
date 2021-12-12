@@ -35,7 +35,7 @@ impl RegAuthType {
             RegAuthType::LocalDockerAuth { reg_host } => {
                 Ok(match home_dir() {
                     None => None,
-                    Some(dir) => read_docker_config(dir.join(".docker/config.json"), &reg_host)
+                    Some(dir) => read_docker_config(dir.join(".docker/config.json"), &reg_host)?
                 })
             }
             RegAuthType::CustomPassword { username, password } => Ok(Some(RegistryAuth {
