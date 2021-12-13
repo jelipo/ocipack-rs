@@ -7,7 +7,7 @@ use serde_json::Value;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ConfigBlob {
+pub struct OciConfigBlob {
     pub created: Option<String>,
     pub author: Option<String>,
     pub architecture: String,

@@ -1,29 +1,28 @@
 use std::cell::RefCell;
-
 use std::rc::Rc;
 
 use anyhow::Result;
 
+use crate::reg::docker::DockerImageManager;
+use crate::reg::home::HomeDir;
 use crate::reg::http::client::RegistryHttpClient;
 use crate::reg::http::RegistryAuth;
-use crate::reg::docker::ImageManager;
-use crate::reg::home::HomeDir;
 
-pub struct Registry {
-    pub image_manager: ImageManager,
+pub struct DockerRegistry {
+    pub docker_image_manager: DockerImageManager,
 }
 
-impl Registry {
+impl DockerRegistry {
     pub fn open(
         registry_addr: String,
         auth: Option<RegistryAuth>,
         home_dir: Rc<HomeDir>,
-    ) -> Result<Registry> {
+    ) -> Result<DockerRegistry> {
         let client = RegistryHttpClient::new(registry_addr.clone(), auth)?;
         let client_rc = Rc::new(RefCell::new(client));
-        let image = ImageManager::new(registry_addr.clone(), client_rc.clone(), home_dir);
-        Ok(Registry {
-            image_manager: image,
+        let image = DockerImageManager::new(registry_addr.clone(), client_rc.clone(), home_dir);
+        Ok(DockerRegistry {
+            docker_image_manager: image,
         })
     }
 }

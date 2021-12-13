@@ -11,6 +11,7 @@ mod bar;
 mod config;
 mod docker;
 mod tempconfig;
+mod oci;
 
 fn main() -> Result<()> {
     let env = Env::default()

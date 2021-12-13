@@ -1,11 +1,12 @@
+use std::collections::HashMap;
+
 use serde::Deserialize;
 use serde::Serialize;
-
-
+use serde_json::Value;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ConfigBlob {
+pub struct DockerConfigBlob {
     pub created: Option<String>,
     pub author: Option<String>,
     pub architecture: String,
@@ -27,7 +28,7 @@ pub struct Config {
     #[serde(rename = "CpuShares")]
     pub cpu_shares: Option<u64>,
     #[serde(rename = "ExposedPorts")]
-    pub exposed_ports: Option<ExposedPorts>,
+    pub exposed_ports: Option<HashMap<String, Value>>,
     #[serde(rename = "Env")]
     pub env: Option<Vec<String>>,
     #[serde(rename = "Entrypoint")]
@@ -35,29 +36,9 @@ pub struct Config {
     #[serde(rename = "Cmd")]
     pub cmd: Option<Vec<String>>,
     #[serde(rename = "Volumes")]
-    pub volumes: Option<Volumes>,
+    pub volumes: Option<HashMap<String, Value>>,
     #[serde(rename = "WorkingDir")]
     pub working_dir: Option<String>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExposedPorts {
-    #[serde(rename = "8080/tcp")]
-    pub n8080_tcp: Option<N8080tcp>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct N8080tcp {}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Volumes {
-    #[serde(rename = "/var/job-result-data")]
-    pub var_job_result_data: Option<VarJobResultData>,
-    #[serde(rename = "/var/log/my-app-logs")]
-    pub var_log_my_app_logs: Option<VarLogMyAppLogs>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

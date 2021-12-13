@@ -11,8 +11,8 @@ use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::reg::BlobConfig;
-use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth, RegistryContentType};
+use crate::reg::{BlobConfig, RegContentType};
+use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::reg::http::auth::{RegTokenHandler, TokenType};
 use crate::reg::http::download::RegDownloader;
 use crate::reg::http::upload::RegUploader;
@@ -222,15 +222,15 @@ pub struct ClientRequest<'a, B: Serialize + ?Sized> {
     path: &'a str,
     scope: Option<&'a str>,
     method: Method,
-    accept: Option<&'a RegistryContentType>,
+    accept: Option<&'a RegContentType>,
     body: Option<&'a B>,
-    request_content_type: Option<&'a RegistryContentType>,
+    request_content_type: Option<&'a RegContentType>,
     token_type: TokenType,
 }
 
 impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
     pub fn new(
-        path: &'a str, scope: Option<&'a str>, method: Method, accept: Option<&'a RegistryContentType>,
+        path: &'a str, scope: Option<&'a str>, method: Method, accept: Option<&'a RegContentType>,
         body: Option<&'a B>, token_type: TokenType,
     ) -> ClientRequest<'a, B> {
         ClientRequest {
@@ -257,7 +257,7 @@ impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
     }
 
     pub fn new_get_request(
-        path: &'a str, scope: Option<&'a str>, accept: Option<&'a RegistryContentType>,
+        path: &'a str, scope: Option<&'a str>, accept: Option<&'a RegContentType>,
     ) -> ClientRequest<'a, B> {
         ClientRequest {
             path,
@@ -271,8 +271,8 @@ impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
     }
 
     pub fn new_with_content_type(
-        path: &'a str, scope: Option<&'a str>, method: Method, accept: Option<&'a RegistryContentType>,
-        body: Option<&'a B>, content_type: &'a RegistryContentType, token_type: TokenType,
+        path: &'a str, scope: Option<&'a str>, method: Method, accept: Option<&'a RegContentType>,
+        body: Option<&'a B>, content_type: &'a RegContentType, token_type: TokenType,
     ) -> ClientRequest<'a, B> {
         ClientRequest {
             path,

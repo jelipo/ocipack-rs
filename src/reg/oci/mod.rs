@@ -10,32 +10,36 @@ use serde::Deserialize;
 use serde::Serialize;
 use url::Url;
 
-use crate::reg::{BlobConfig, Reference, RegDigest};
+use crate::reg::{BlobConfig, ImageManager, Reference, RegDigest};
 use crate::reg::home::HomeDir;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::http::RegistryContentType;
+use crate::reg::RegContentType;
 use crate::reg::http::upload::RegUploader;
-use crate::reg::oci::image::ConfigBlob;
+use crate::reg::oci::image::OciConfigBlob;
 
 pub mod registry;
 pub mod image;
 
 
-pub struct ImageManager {
+pub struct OciImageManager {
     registry_addr: String,
     reg_client: Rc<RefCell<RegistryHttpClient>>,
     home_dir: Rc<HomeDir>,
 }
 
-impl ImageManager {
+impl ImageManager for OciImageManager {
+
+}
+
+impl OciImageManager {
     pub fn new(
         registry_addr: String,
         client: Rc<RefCell<RegistryHttpClient>>,
         home_dir: Rc<HomeDir>,
-    ) -> ImageManager {
-        ImageManager {
+    ) -> OciImageManager {
+        OciImageManager {
             registry_addr,
             reg_client: client,
             home_dir,
@@ -43,13 +47,13 @@ impl ImageManager {
     }
 
     /// 获取Image的Manifest
-    pub fn manifests(&mut self, refe: &Reference) -> Result<Manifest2> {
+    pub fn manifests(&mut self, refe: &Reference) -> Result<OciManifest> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        let accept_opt = Some(RegistryContentType::DOCKER_MANIFEST);
+        let accept_opt = Some(RegContentType::OCI_MANIFEST);
         let request = ClientRequest::new_get_request(&path, scope, accept_opt.as_ref());
-        reg_rc.request_registry_body::<u8, Manifest2>(request)
+        reg_rc.request_registry_body::<u8, OciManifest>(request)
     }
 
     /// Image manifests是否存在
@@ -70,11 +74,11 @@ impl ImageManager {
         exited(&response)
     }
 
-    pub fn config_blob(&mut self, name: &str, blob_digest: &str) -> Result<ConfigBlob> {
+    pub fn config_blob(&mut self, name: &str, blob_digest: &str) -> Result<OciConfigBlob> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let mut reg_rc = self.reg_client.borrow_mut();
         let request = ClientRequest::new_get_request(&url_path, Some(name), None);
-        reg_rc.request_registry_body::<u8, ConfigBlob>(request)
+        reg_rc.request_registry_body::<u8, OciConfigBlob>(request)
     }
 
     pub fn layer_blob_download(&mut self, name: &str, blob_digest: &RegDigest, layer_size: Option<u64>) -> Result<RegDownloader> {
@@ -128,16 +132,16 @@ impl ImageManager {
         Ok(url)
     }
 
-    pub fn put_manifest(&mut self, refe: &Reference, manifest: Manifest2) -> Result<String> {
+    pub fn put_manifest(&mut self, refe: &Reference, manifest: OciManifest) -> Result<String> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
         let mut reg_rc = self.reg_client.borrow_mut();
         let request = ClientRequest::new_with_content_type(
             &path, scope, Method::PUT, None, Some(&manifest),
-            &RegistryContentType::OCI_MANIFEST,
+            &RegContentType::OCI_MANIFEST,
             TokenType::PushAndPull,
         );
-        let raw_response = reg_rc.simple_request::<Manifest2>(request)?;
+        let raw_response = reg_rc.simple_request::<OciManifest>(request)?;
         Ok(raw_response.body_to_string())
     }
 }
@@ -155,16 +159,16 @@ fn exited(simple_response: &RawRegistryResponse) -> Result<bool> {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Manifest2 {
+pub struct OciManifest {
     pub schema_version: usize,
     pub media_type: String,
-    pub config: ManifestConfig,
-    pub layers: Vec<ManifestLayer>,
+    pub config: OciManifestConfig,
+    pub layers: Vec<OciManifestLayer>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ManifestConfig {
+pub struct OciManifestConfig {
     pub media_type: String,
     pub size: u64,
     pub digest: String,
@@ -172,7 +176,7 @@ pub struct ManifestConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ManifestLayer {
+pub struct OciManifestLayer {
     pub media_type: String,
     pub size: u64,
     pub digest: String,
