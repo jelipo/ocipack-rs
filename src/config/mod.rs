@@ -7,7 +7,8 @@ use anyhow::Result;
 use home::home_dir;
 
 use crate::config::userconfig::{UserDockerConfig, UserDockerConfigAuth};
-use crate::RegistryAuth;
+use crate::reg::http::RegistryAuth;
+
 
 pub mod dockerfile;
 pub mod ocifile;

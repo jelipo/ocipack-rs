@@ -13,7 +13,7 @@ use reqwest::Method;
 
 use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
 use crate::reg::BlobConfig;
-use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth};
+use crate::reg::http::{do_request_raw, get_header, HttpAuth};
 
 pub struct RegDownloader {
     finished: bool,

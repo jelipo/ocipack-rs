@@ -12,10 +12,10 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::reg::BlobConfig;
-use crate::reg::docker::http::{do_request_raw, get_header, HttpAuth, RegistryAuth, RegistryContentType};
-use crate::reg::docker::http::auth::{RegTokenHandler, TokenType};
-use crate::reg::docker::http::download::RegDownloader;
-use crate::reg::docker::http::upload::RegUploader;
+use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth, RegistryContentType};
+use crate::reg::http::auth::{RegTokenHandler, TokenType};
+use crate::reg::http::download::RegDownloader;
+use crate::reg::http::upload::RegUploader;
 use crate::util::sha;
 
 pub struct RegistryHttpClient {

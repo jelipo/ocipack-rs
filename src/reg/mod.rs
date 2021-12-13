@@ -3,6 +3,8 @@ use std::path::Path;
 
 pub mod home;
 pub mod docker;
+pub mod oci;
+pub mod http;
 
 
 pub struct Reference<'a> {

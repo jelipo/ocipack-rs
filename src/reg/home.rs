@@ -5,8 +5,8 @@ use std::path::Path;
 use anyhow::Result;
 use sha2::{Digest, Sha256};
 
-use crate::{compress, random};
 use crate::reg::RegDigest;
+use crate::util::{compress, random};
 use crate::util::compress::ungz_file;
 use crate::util::file::PathExt;
 use crate::util::sha::{Sha256Reader, Sha256Writer};

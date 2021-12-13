@@ -11,10 +11,10 @@ use log::info;
 use reqwest::blocking::Client;
 use reqwest::Method;
 
-use crate::Processor;
-use crate::progress::{CoreStatus, ProcessorAsync, ProcessResult, ProgressStatus};
+
+use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
 use crate::reg::BlobConfig;
-use crate::reg::docker::http::{do_request_raw_read, HttpAuth};
+use crate::reg::http::{do_request_raw_read, HttpAuth};
 
 pub struct RegUploader {
     reg_uploader_enum: RegUploaderEnum,

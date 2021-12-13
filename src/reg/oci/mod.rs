@@ -11,13 +11,13 @@ use serde::Serialize;
 use url::Url;
 
 use crate::reg::{BlobConfig, Reference, RegDigest};
+use crate::reg::home::HomeDir;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
 use crate::reg::http::RegistryContentType;
 use crate::reg::http::upload::RegUploader;
-use crate::reg::docker::image::ConfigBlob;
-use crate::reg::home::HomeDir;
+use crate::reg::oci::image::ConfigBlob;
 
 pub mod registry;
 pub mod image;
@@ -134,7 +134,7 @@ impl ImageManager {
         let mut reg_rc = self.reg_client.borrow_mut();
         let request = ClientRequest::new_with_content_type(
             &path, scope, Method::PUT, None, Some(&manifest),
-            &RegistryContentType::DOCKER_MANIFEST,
+            &RegistryContentType::OCI_MANIFEST,
             TokenType::PushAndPull,
         );
         let raw_response = reg_rc.simple_request::<Manifest2>(request)?;

@@ -32,9 +32,13 @@ pub enum RequestBody<'a, T: Serialize + ?Sized> {
 }
 
 impl RegistryContentType {
-    pub const APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_V2JSON: Self = Self("application/vnd.docker.distribution.manifest.v2+json");
-    pub const APPLICATION_VND_DOCKER_DISTRIBUTION_MANIFEST_LIST_V2JSON: Self = Self("application/vnd.docker.distribution.manifest.list.v2+json");
-    pub const ALL: Self = Self("*/*");
+    /// Docker content-type
+    pub const DOCKER_MANIFEST: Self = Self("application/vnd.docker.distribution.manifest.v2+json");
+    pub const DOCKER_MANIFEST_LIST: Self = Self("application/vnd.docker.distribution.manifest.list.v2+json");
+
+    /// OCI content-type
+    pub const OCI_MANIFEST: Self = Self("application/vnd.oci.image.manifest.v1+json");
+    pub const ALL: Self = Self(" */*");
 
     fn get_value(&self) -> &'static str {
         self.0
