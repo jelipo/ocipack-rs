@@ -139,7 +139,7 @@ impl DockerImageManager {
             TokenType::PushAndPull,
         );
         let raw_response = reg_rc.simple_request::<DockerManifest>(request)?;
-        Ok(raw_response.body_to_string())
+        Ok(raw_response.string_body())
     }
 }
 

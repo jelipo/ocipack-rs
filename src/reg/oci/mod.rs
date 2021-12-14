@@ -142,7 +142,7 @@ impl OciImageManager {
             TokenType::PushAndPull,
         );
         let raw_response = reg_rc.simple_request::<OciManifest>(request)?;
-        Ok(raw_response.body_to_string())
+        Ok(raw_response.string_body())
     }
 }
 

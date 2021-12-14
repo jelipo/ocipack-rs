@@ -32,10 +32,10 @@ pub enum RequestBody<'a, T: Serialize + ?Sized> {
 
 fn do_request_raw<T: Serialize + ?Sized>(
     client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
-    accept: Option<&RegContentType>, body: Option<&T>, content_type: Option<&RegContentType>,
+    accepts: &[RegContentType], body: Option<&T>, content_type: Option<&RegContentType>,
 ) -> Result<Response> {
     let request_body = body.map(|json| RequestBody::JSON(json));
-    let request = build_request::<T>(client, url, method, http_auth_opt, accept, request_body, content_type)?;
+    let request = build_request::<T>(client, url, method, http_auth_opt, accepts, request_body, content_type)?;
     let http_response = client.execute(request)?;
     Ok(http_response)
 }
@@ -52,7 +52,7 @@ fn do_request_raw_read<R: Read + Send + 'static>(
 
 fn build_request<T: Serialize + ?Sized>(
     client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
-    accept: Option<&RegContentType>, body: Option<RequestBody<T>>, content_type: Option<&RegContentType>,
+    accepts: &[RegContentType], body: Option<RequestBody<T>>, content_type: Option<&RegContentType>,
 ) -> Result<Request> {
     let url = Url::from_str(url)?;
     let mut builder = client.request(method, url);
@@ -63,8 +63,13 @@ fn build_request<T: Serialize + ?Sized>(
         }
         Some(HttpAuth::BearerToken { token }) => builder = builder.bearer_auth(token)
     }
-    if let Some(reg_accept) = accept {
-        builder = builder.header("Accept", reg_accept.val());
+    // Set accept header
+    let mut accepts_str = Vec::with_capacity(accepts.len());
+    for accept in accepts {
+        accepts_str.push(accept.val())
+    }
+    if accepts.len() > 0 {
+        builder = builder.header("Accept", accepts_str.join(";"));
     }
     if let Some(content_type) = content_type {
         builder = builder.header("Content-Type", content_type.val());

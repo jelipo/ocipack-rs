@@ -5,6 +5,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::reg::ConfigBlob;
+
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OciConfigBlob {
@@ -16,6 +18,8 @@ pub struct OciConfigBlob {
     pub rootfs: Rootfs,
     pub history: Vec<History>,
 }
+
+impl ConfigBlob for OciConfigBlob {}
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

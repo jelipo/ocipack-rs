@@ -7,6 +7,7 @@ use anyhow::{Error, Result};
 use bytes::Bytes;
 use reqwest::{Method, StatusCode};
 use reqwest::blocking::{Client, Response};
+use reqwest::header::{HeaderValue, ToStrError};
 use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -179,9 +180,11 @@ impl FullRegistryResponse {
 pub trait RegistryResponse {
     fn success(&self) -> bool;
 
+    fn content_type(&self) -> Option<&str>;
+
     fn status_code(&self) -> u16;
 
-    fn body_to_string(self) -> String;
+    fn string_body(self) -> String;
 }
 
 /// 一个简单的Registry的Response，只包含状态码
@@ -194,11 +197,20 @@ impl RegistryResponse for RawRegistryResponse {
         self.response.status().is_success()
     }
 
+    fn content_type(&self) -> Option<&str> {
+        let header_map = self.response.headers();
+        header_map.get("content-type")
+            .map(|value| value.to_str()).and_then(|x| match x {
+            Ok(str) => Some(str),
+            Err(_) => None
+        })
+    }
+
     fn status_code(&self) -> u16 {
         self.response.status().as_u16()
     }
 
-    fn body_to_string(mut self) -> String {
+    fn string_body(mut self) -> String {
         match self.response.content_length() {
             None => {
                 let mut string = String::new();
@@ -222,7 +234,7 @@ pub struct ClientRequest<'a, B: Serialize + ?Sized> {
     path: &'a str,
     scope: Option<&'a str>,
     method: Method,
-    accept: Option<&'a RegContentType>,
+    accept: &'a [RegContentType],
     body: Option<&'a B>,
     request_content_type: Option<&'a RegContentType>,
     token_type: TokenType,
@@ -230,7 +242,7 @@ pub struct ClientRequest<'a, B: Serialize + ?Sized> {
 
 impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
     pub fn new(
-        path: &'a str, scope: Option<&'a str>, method: Method, accept: Option<&'a RegContentType>,
+        path: &'a str, scope: Option<&'a str>, method: Method, accept: &'a [RegContentType],
         body: Option<&'a B>, token_type: TokenType,
     ) -> ClientRequest<'a, B> {
         ClientRequest {
@@ -249,7 +261,7 @@ impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
             path,
             scope,
             method: Method::HEAD,
-            accept: None,
+            accept: &[],
             body: None,
             request_content_type: None,
             token_type,
@@ -257,7 +269,7 @@ impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
     }
 
     pub fn new_get_request(
-        path: &'a str, scope: Option<&'a str>, accept: Option<&'a RegContentType>,
+        path: &'a str, scope: Option<&'a str>, accept: &'a [RegContentType],
     ) -> ClientRequest<'a, B> {
         ClientRequest {
             path,
@@ -271,7 +283,7 @@ impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
     }
 
     pub fn new_with_content_type(
-        path: &'a str, scope: Option<&'a str>, method: Method, accept: Option<&'a RegContentType>,
+        path: &'a str, scope: Option<&'a str>, method: Method, accept: &'a [RegContentType],
         body: Option<&'a B>, content_type: &'a RegContentType, token_type: TokenType,
     ) -> ClientRequest<'a, B> {
         ClientRequest {

@@ -18,5 +18,13 @@ fn main() -> Result<()> {
         .default_filter_or(Info.as_str());
     env_logger::init_from_env(env);
 
+
     docker::run()
 }
+
+fn test() -> Result<Struct>{
+    let string = "{}".to_string();
+    let x = serde_json::from_str::<Struct>(&string)?;
+    Ok(x)
+}
+
