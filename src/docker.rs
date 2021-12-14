@@ -73,7 +73,8 @@ pub fn run() -> Result<()> {
             return Err(Error::msg(format!("unknown layer media type:{}", layer.media_type)));
         }
         let digest = RegDigest::new_with_digest(layer.digest.clone());
-        let _unzip_file = home_dir.cache.blobs.ungz_download_file(&digest)?;
+        let (tar_sha256, tar_path) = home_dir.cache.blobs.ungz_download_file(&digest)?;
+        home_dir.cache.blobs.create_tar_shafile(&tar_sha256, &tar_path)?;
     }
 
     let config_blob = from_registry.docker_image_manager.config_blob(&temp_config.from.image_name, &config_digest)?;

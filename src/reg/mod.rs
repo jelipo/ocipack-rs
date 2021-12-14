@@ -73,7 +73,7 @@ pub trait ImageManager {
     // fn blobs_exited(&mut self, name: &str, blob_digest: &RegDigest) -> Result<bool>;
     //
     // fn config_blob(&mut self, name: &str, blob_digest: &str) -> Result<ConfigBlob>;
-    //
+    //-
     // fn layer_blob_download(&mut self, name: &str, blob_digest: &RegDigest, layer_size: Option<u64>) -> Result<RegDownloader>;
     //
     // /// 上传layer类型的blob文件

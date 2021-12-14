@@ -2,14 +2,14 @@ use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Error, Result};
 use sha2::{Digest, Sha256};
 
 use crate::reg::RegDigest;
 use crate::util::{compress, random};
 use crate::util::compress::ungz_file;
 use crate::util::file::PathExt;
-use crate::util::sha::{Sha256Reader, Sha256Writer};
+use crate::util::sha::{file_sha256, Sha256Reader, Sha256Writer};
 
 pub struct HomeDir {
     pub cache: CacheDir,
@@ -87,9 +87,9 @@ impl BlobsDir {
         file_path
     }
 
-    pub fn ungz_download_file(&self, digest: &RegDigest) -> Result<Box<Path>> {
-        let download_file_path = self.download_ready(digest);
-        let download_file = File::open(&download_file_path)?;
+    pub fn ungz_download_file(&self, digest: &RegDigest) -> Result<(String, Box<Path>)> {
+        let tgz_download_file_path = self.download_ready(digest);
+        let download_file = File::open(&tgz_download_file_path)?;
         let mut sha256_encode = Sha256::new();
         ungz_file(&download_file, &mut sha256_encode)?;
         drop(download_file);
@@ -99,23 +99,40 @@ impl BlobsDir {
         let tar_file_path = layer_dir.join(&tar_sha256);
         tar_file_path.remove()?;
         create_dir_all(&layer_dir)?;
-        std::fs::rename(download_file_path, &tar_file_path)?;
-        let ungizip_sha_file_path = self.ungzip_sha_file_path(&layer_dir);
-        ungizip_sha_file_path.remove()?;
-        let mut tar_sha_file = File::create(ungizip_sha_file_path)?;
-        tar_sha_file.write(tar_sha256.as_bytes())?;
-        tar_sha_file.flush()?;
+        std::fs::rename(tgz_download_file_path, &tar_file_path)?;
+        Ok((tar_sha256, tar_file_path.into_boxed_path()))
+    }
+
+    pub fn move_tar_download_file(&self, digest: &RegDigest) -> Result<Box<Path>> {
+        let tar_download_file_path = self.download_ready(digest);
+        let tar_sha256 = &digest.sha256;
+        let layer_dir = self.layers_path.join(&digest.sha256);
+        let tar_file_path = layer_dir.join(&tar_sha256);
+        tar_file_path.remove()?;
+        create_dir_all(&layer_dir)?;
+        std::fs::rename(tar_download_file_path, &tar_file_path)?;
         Ok(tar_file_path.into_boxed_path())
     }
 
-    pub fn ungzip_sha_file_path(&self, layer_dir: &Path) -> Box<Path> {
+
+    pub fn create_tar_shafile(&self, sha256: &str, tar_file_path: &Path) -> Result<()> {
+        let tar_file_parent = tar_file_path.parent().ok_or(Error::msg("illegal tar file path"))?;
+        let tar_sha_file_path = self.tar_sha_file_path(tar_file_parent);
+        tar_sha_file_path.remove()?;
+        let mut tar_sha_file = File::create(tar_sha_file_path)?;
+        tar_sha_file.write(sha256.as_bytes())?;
+        tar_sha_file.flush()?;
+        Ok(())
+    }
+
+    pub fn tar_sha_file_path(&self, layer_dir: &Path) -> Box<Path> {
         layer_dir.join("tar_sha256").into_boxed_path()
     }
 
 
     pub fn tgz_file_path(&self, digest: &RegDigest) -> Option<Box<Path>> {
         let layer_file_parent = self.layers_path.join(&digest.sha256);
-        let ungzip_sha_file = self.ungzip_sha_file_path(layer_file_parent.as_path());
+        let ungzip_sha_file = self.tar_sha_file_path(layer_file_parent.as_path());
         if let Ok(mut file) = File::open(ungzip_sha_file) {
             let mut tgz_file_name = String::new();
             file.read_to_string(&mut tgz_file_name);

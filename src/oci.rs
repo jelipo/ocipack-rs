@@ -7,7 +7,7 @@ use anyhow::{Error, Result};
 use env_logger::Env;
 use home::home_dir;
 use log::info;
-use log::Level::Info;
+use log::Level::{Info};
 use serde::Deserialize;
 use tar::Builder;
 
@@ -62,7 +62,6 @@ pub fn run() -> Result<()> {
     let download_results = manager.wait_all_done()?;
     let layer_digest_map = layer_to_map(&manifest.layers);
     let layer_types = vec![RegContentType::OCI_LAYER_TGZ.val(),
-
                            RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.val()];
     for download_result in &download_results {
         if download_result.local_existed {
@@ -70,11 +69,22 @@ pub fn run() -> Result<()> {
         }
         let layer = layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str())
             .expect("internal error");
-        if !layer_types.contains(&layer.media_type.as_str()) {
-            return Err(Error::msg(format!("unknown layer media type:{}", layer.media_type)));
+        let media_type = &layer.media_type;
+        if !layer_types.contains(&media_type.as_str()) {
+            return Err(Error::msg(format!("unknown layer media type:{}", media_type)));
         }
         let digest = RegDigest::new_with_digest(layer.digest.clone());
-        let _unzip_file = home_dir.cache.blobs.ungz_download_file(&digest)?;
+        if media_type == RegContentType::OCI_LAYER_TGZ.val()
+            || media_type == RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.val() {
+            let (tar_sha256, tar_path) = home_dir.cache.blobs.ungz_download_file(&digest)?;
+            home_dir.cache.blobs.create_tar_shafile(&tar_sha256, &tar_path)?;
+        } else if media_type == RegContentType::OCI_LAYER_TAR.val()
+            || media_type == RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.val() {
+            let tar_path = home_dir.cache.blobs.move_tar_download_file(&digest)?;
+            home_dir.cache.blobs.create_tar_shafile(&digest.sha256, &tar_path)?;
+        } else {
+            return Err(Error::msg(format!("unknown media type:{}", media_type)));
+        }
     }
 
     let config_blob = from_registry.oci_image_manager.config_blob(&temp_config.from.image_name, &config_digest)?;
@@ -84,8 +94,8 @@ pub fn run() -> Result<()> {
 }
 
 fn upload(
-    home_dir: Rc<HomeDir>, temp_config: &TempConfig, from_config_blob: &OciConfigBlob, manifest: &OciManifest,
-    _layer_digest_map: &HashMap<&str, &OciManifestLayer>,
+    home_dir: Rc<HomeDir>, temp_config: &TempConfig, from_config_blob: &OciConfigBlob,
+    manifest: &OciManifest, _layer_digest_map: &HashMap<&str, &OciManifestLayer>,
 ) -> Result<()> {
     let tar_temp_file_path = home_dir.cache.temp_dir.join(random::random_str(10) + ".tar");
     let tar_temp_file = File::create(tar_temp_file_path.as_path())?;
