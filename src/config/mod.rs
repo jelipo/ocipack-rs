@@ -1,12 +1,12 @@
-use std::collections::HashMap;
+
 use std::fs::File;
-use std::hash::Hash;
-use std::path::{Path, PathBuf};
+
+use std::path::{PathBuf};
 
 use anyhow::Result;
 use home::home_dir;
 
-use crate::config::userconfig::{UserDockerConfig, UserDockerConfigAuth};
+use crate::config::userconfig::{UserDockerConfig};
 use crate::reg::http::RegistryAuth;
 
 

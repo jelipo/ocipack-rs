@@ -9,7 +9,7 @@ use crate::reg::RegDigest;
 use crate::util::{compress, random};
 use crate::util::compress::ungz_file;
 use crate::util::file::PathExt;
-use crate::util::sha::{file_sha256, Sha256Reader, Sha256Writer};
+use crate::util::sha::{Sha256Reader, Sha256Writer};
 
 pub struct HomeDir {
     pub cache: CacheDir,

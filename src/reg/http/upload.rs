@@ -7,10 +7,8 @@ use std::thread;
 use std::thread::JoinHandle;
 
 use anyhow::{Error, Result};
-use log::info;
 use reqwest::blocking::Client;
 use reqwest::Method;
-
 
 use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
 use crate::reg::BlobConfig;

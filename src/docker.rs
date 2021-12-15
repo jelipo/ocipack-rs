@@ -1,28 +1,24 @@
 use std::collections::HashMap;
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::rc::Rc;
 
 use anyhow::{Error, Result};
-use env_logger::Env;
-use home::home_dir;
 use log::info;
-use log::Level::Info;
-use serde::Deserialize;
 use tar::Builder;
 
 use crate::progress::{Processor, ProcessResult};
 use crate::progress::manager::ProcessorManager;
-use crate::reg::{Reference, RegContentType, RegDigest};
+use crate::reg::{ConfigBlob, ConfigBlobEnum, Layer, LayerConvert, Manifest, Reference, RegContentType, RegDigest, Registry};
 use crate::reg::docker::{DockerManifest, DockerManifestLayer};
 use crate::reg::docker::image::DockerConfigBlob;
-use crate::reg::docker::registry::DockerRegistry;
 use crate::reg::home::HomeDir;
 use crate::reg::http::download::DownloadResult;
 use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::UploadResult;
+use crate::reg::oci::image::OciConfigBlob;
 use crate::tempconfig::TempConfig;
-use crate::util::{compress, random};
+use crate::util::random;
 use crate::util::sha::file_sha256;
 
 pub fn run() -> Result<()> {
@@ -41,28 +37,29 @@ pub fn run() -> Result<()> {
     let home_dir_path = Path::new(&temp_config.home_dir);
     let home_dir = Rc::new(HomeDir::new_home_dir(home_dir_path)?);
 
-
-    let mut from_registry = DockerRegistry::open(temp_config.from.registry.clone(), from_auth_opt, home_dir.clone())?;
+    let mut from_registry = Registry::open(temp_config.from.registry.clone(), from_auth_opt, home_dir.clone())?;
 
 
     let from_image_reference = Reference {
         image_name: temp_config.from.image_name.as_str(),
         reference: temp_config.from.reference.as_str(),
     };
-    let manifest = from_registry.docker_image_manager.manifests(&from_image_reference)?;
-    let config_digest = &manifest.config.digest;
-
+    let manifest = from_registry.image_manager.manifests(&from_image_reference)?;
+    let (config_digest, layers) = match &manifest {
+        Manifest::OciV1(oci) => (&oci.config.digest, oci.to_layers()),
+        Manifest::DockerV2S2(docker) => (&docker.config.digest, docker.to_layers()),
+    };
 
     let mut reg_downloader_vec = Vec::<Box<dyn Processor<DownloadResult>>>::new();
-    for layer in &manifest.layers {
-        let digest = RegDigest::new_with_digest(layer.digest.clone());
-        let downloader = from_registry.docker_image_manager.layer_blob_download(&from_image_reference.image_name, &digest, Some(layer.size))?;
+    for layer in &layers {
+        let digest = RegDigest::new_with_digest(layer.digest.to_string());
+        let downloader = from_registry.image_manager.layer_blob_download(&from_image_reference.image_name, &digest, Some(layer.size))?;
         reg_downloader_vec.push(Box::new(downloader))
     }
     info!("创建manager");
     let manager = ProcessorManager::new_processor_manager(reg_downloader_vec)?;
     let download_results = manager.wait_all_done()?;
-    let layer_digest_map = layer_to_map(&manifest.layers);
+    let layer_digest_map = layer_to_map(&layers);
     let layer_types = vec![RegContentType::DOCKER_FOREIGN_LAYER_TGZ.val(),
                            RegContentType::DOCKER_LAYER_TGZ.val()];
     for download_result in &download_results {
@@ -71,23 +68,27 @@ pub fn run() -> Result<()> {
         }
         let layer = layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str())
             .expect("internal error");
-        if !layer_types.contains(&layer.media_type.as_str()) {
+        if !layer_types.contains(&layer.media_type) {
             return Err(Error::msg(format!("unknown layer media type:{}", layer.media_type)));
         }
-        let digest = RegDigest::new_with_digest(layer.digest.clone());
+        let digest = RegDigest::new_with_digest(layer.digest.to_string());
         let (tar_sha256, tar_path) = home_dir.cache.blobs.ungz_download_file(&digest)?;
         home_dir.cache.blobs.create_tar_shafile(&tar_sha256, &tar_path)?;
     }
 
-    let config_blob = from_registry.docker_image_manager.config_blob(&temp_config.from.image_name, &config_digest)?;
+    let config_blob_enum = match &manifest {
+        Manifest::OciV1(_) => ConfigBlobEnum::OciV1(from_registry.image_manager
+            .config_blob::<OciConfigBlob>(&temp_config.from.image_name, config_digest)?),
+        Manifest::DockerV2S2(_) => ConfigBlobEnum::DockerV2S2(from_registry.image_manager
+            .config_blob::<DockerConfigBlob>(&temp_config.from.image_name, config_digest)?)
+    };
 
-    upload(home_dir.clone(), &temp_config, &config_blob, &manifest, &layer_digest_map)?;
+    upload(home_dir.clone(), &temp_config, &config_blob_enum, &manifest)?;
     Ok(())
 }
 
 fn upload(
-    home_dir: Rc<HomeDir>, temp_config: &TempConfig, from_config_blob: &DockerConfigBlob, manifest: &DockerManifest,
-    _layer_digest_map: &HashMap<&str, &DockerManifestLayer>,
+    home_dir: Rc<HomeDir>, temp_config: &TempConfig, from_config_blob_enum: &ConfigBlobEnum, from_manifest: &Manifest,
 ) -> Result<()> {
     let tar_temp_file_path = home_dir.cache.temp_dir.join(random::random_str(10) + ".tar");
     let tar_temp_file = File::create(tar_temp_file_path.as_path())?;
@@ -107,33 +108,48 @@ fn upload(
             password: to_config.password.clone(),
         }),
     };
-    let mut to_registry = DockerRegistry::open(to_config.registry.clone(), to_auth_opt, home_dir.clone())?;
+
+    let mut to_registry = Registry::open(to_config.registry.clone(), to_auth_opt, home_dir.clone())?;
     let mut reg_uploader_vec = Vec::<Box<dyn Processor<UploadResult>>>::new();
-    for layer in manifest.layers.iter() {
-        let layer_digest = RegDigest::new_with_digest(layer.digest.clone());
+
+    let from_layers = match &from_manifest {
+        Manifest::OciV1(oci) => oci.to_layers(),
+        Manifest::DockerV2S2(docker) => docker.to_layers(),
+    };
+    for layer in from_layers.iter() {
+        let layer_digest = RegDigest::new_with_digest(layer.digest.to_string());
         let tgz_file_path = home_dir.cache.blobs.tgz_file_path(&layer_digest)
             .expect("local download file not found");
         let file_path_str = tgz_file_path.as_os_str().to_string_lossy().to_string();
-        let reg_uploader = to_registry.docker_image_manager.layer_blob_upload(
+        let reg_uploader = to_registry.image_manager.layer_blob_upload(
             &to_config.image_name, &layer_digest, &file_path_str,
         )?;
         reg_uploader_vec.push(Box::new(reg_uploader))
     }
     //
-    let custom_layer_uploader = to_registry.docker_image_manager.layer_blob_upload(
+    let custom_layer_uploader = to_registry.image_manager.layer_blob_upload(
         &to_config.image_name, &RegDigest::new_with_sha256(layer_info.gz_sha256.clone()),
         &layer_info.gz_temp_file_path.as_os_str().to_string_lossy().to_string(),
     )?;
     reg_uploader_vec.push(Box::new(custom_layer_uploader));
 
     // config blob 上传
-    let mut to_config_blob = from_config_blob.clone();
-    to_config_blob.rootfs.diff_ids.insert(0, format!("sha256:{}", layer_info.tar_sha256));
-    let config_blob_str = serde_json::to_string(&to_config_blob)?;
+    let mut to_config_blob_enum = from_config_blob_enum.clone();
+    let config_blob_digest = format!("sha256:{}", layer_info.tar_sha256);
+    let config_blob_str = match to_config_blob_enum {
+        ConfigBlobEnum::OciV1(mut oci_config_blob) => {
+            oci_config_blob.rootfs.diff_ids.insert(0, config_blob_digest);
+            serde_json::to_string(&oci_config_blob)?
+        }
+        ConfigBlobEnum::DockerV2S2(mut docker_config_blob) => {
+            docker_config_blob.rootfs.diff_ids.insert(0, config_blob_digest);
+            serde_json::to_string(&docker_config_blob)?
+        }
+    };
     let config_blob_path = home_dir.cache.write_temp_file(config_blob_str)?;
     let config_blob_path_str = config_blob_path.as_os_str().to_string_lossy().to_string();
     let config_blob_digest = RegDigest::new_with_sha256(file_sha256(&config_blob_path)?);
-    let config_blob_uploader = to_registry.docker_image_manager.layer_blob_upload(
+    let config_blob_uploader = to_registry.image_manager.layer_blob_upload(
         &to_config.image_name, &config_blob_digest, &config_blob_path_str,
     )?;
     reg_uploader_vec.push(Box::new(config_blob_uploader));
@@ -144,7 +160,8 @@ fn upload(
         info!("{}", &upload_result.finished_info());
     }
     // layers上传完成，开始组装manifest
-    let mut to_manifest = (*manifest).clone();
+    let mut to_manifest = from_manifest.clone();
+
     to_manifest.config.digest = config_blob_digest.digest;
     to_manifest.config.media_type = RegContentType::DOCKER_CONTAINER_IMAGE.val().to_string();
     to_manifest.config.size = config_blob_path.metadata()?.len();
@@ -154,7 +171,7 @@ fn upload(
         size: layer_info.gz_temp_file_path.metadata()?.len(),
         digest: format!("sha256:{}", &layer_info.gz_sha256),
     });
-    let put_result = to_registry.docker_image_manager.put_manifest(&Reference {
+    let put_result = to_registry.image_manager.put_manifest(&Reference {
         image_name: to_config.image_name.as_str(),
         reference: to_config.reference.as_str(),
     }, to_manifest)?;
@@ -162,8 +179,8 @@ fn upload(
     Ok(())
 }
 
-fn layer_to_map(layers: &Vec<DockerManifestLayer>) -> HashMap<&str, &DockerManifestLayer> {
-    let mut map = HashMap::<&str, &DockerManifestLayer>::with_capacity(layers.len());
+fn layer_to_map<'a>(layers: &'a Vec<Layer>) -> HashMap<&'a str, &'a Layer<'a>> {
+    let mut map = HashMap::<&str, &Layer>::with_capacity(layers.len());
     for layer in layers {
         map.insert(&layer.digest, layer);
     }

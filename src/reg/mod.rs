@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::detect::__is_feature_detected::sha;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -7,22 +5,19 @@ use std::rc::Rc;
 use anyhow::{Error, Result};
 use log::info;
 use reqwest::Method;
-use serde::de;
 use serde::de::DeserializeOwned;
 use url::Url;
 
-use crate::reg::docker::DockerManifest;
+use crate::reg::docker::{DockerManifest, DockerManifestConfig, DockerManifestLayer};
 use crate::reg::docker::image::DockerConfigBlob;
-use crate::reg::docker::registry::DockerRegistry;
 use crate::reg::home::HomeDir;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
 use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::RegUploader;
+use crate::reg::oci::{OciManifest, OciManifestConfig, OciManifestLayer};
 use crate::reg::oci::image::OciConfigBlob;
-use crate::reg::oci::OciManifest;
-use crate::reg::oci::registry::OciRegistry;
 
 pub mod home;
 pub mod docker;
@@ -245,9 +240,62 @@ fn exited(simple_response: &RawRegistryResponse) -> Result<bool> {
     }
 }
 
+#[derive(Clone)]
 pub enum Manifest {
     OciV1(OciManifest),
     DockerV2S2(DockerManifest),
+}
+
+impl Manifest {
+    pub fn to_oci_v1(self) -> Result<OciManifest> {
+        Ok(match self {
+            Manifest::OciV1(oci) => oci,
+            Manifest::DockerV2S2(docker) => {
+                // TODO 适配media_type
+                OciManifest {
+                    schema_version: 2,
+                    media_type: Some(RegContentType::OCI_MANIFEST.val().to_string()),
+                    config: OciManifestConfig {
+                        media_type: RegContentType::OCI_IMAGE_CONFIG.val().to_string(),
+                        size: docker.config.size,
+                        digest: docker.config.digest,
+                    },
+                    layers: docker.layers.into_iter().map(|docker_layer| {
+                        OciManifestLayer {
+                            media_type: "TODO".to_string(),
+                            size: docker_layer.size,
+                            digest: docker_layer.digest,
+                        }
+                    }).collect::<Vec<OciManifestLayer>>(),
+                }
+            }
+        })
+    }
+
+    pub fn to_docker_v2_s2(self) -> Result<DockerManifest> {
+        // TODO 适配media_type
+        Ok(match self {
+            Manifest::OciV1(oci) => {
+                DockerManifest {
+                    schema_version: 2,
+                    media_type: RegContentType::DOCKER_MANIFEST.val().to_string(),
+                    config: DockerManifestConfig {
+                        media_type: RegContentType::DOCKER_CONTAINER_IMAGE.val().to_string(),
+                        size: oci.config.size,
+                        digest: oci.config.digest,
+                    },
+                    layers: oci.layers.into_iter().map(|docker_layer| {
+                        DockerManifestLayer {
+                            media_type: "TODO".to_string(),
+                            size: docker_layer.size,
+                            digest: docker_layer.digest,
+                        }
+                    }).collect::<Vec<DockerManifestLayer>>(),
+                }
+            }
+            Manifest::DockerV2S2(docker) => docker,
+        })
+    }
 }
 
 pub trait LayerConvert {
@@ -261,6 +309,12 @@ pub struct Layer<'a> {
 }
 
 pub trait ConfigBlob {}
+
+#[derive(Clone)]
+pub enum ConfigBlobEnum {
+    OciV1(OciConfigBlob),
+    DockerV2S2(DockerConfigBlob),
+}
 
 pub struct RegContentType(&'static str);
 
@@ -286,3 +340,15 @@ impl RegContentType {
         self.0
     }
 }
+
+pub const DOCKER_LAYER_TYPE: Vec<&str> = vec![
+    RegContentType::DOCKER_FOREIGN_LAYER_TGZ.val(),
+    RegContentType::DOCKER_LAYER_TGZ.val(),
+];
+
+pub const OCI_LAYER_TYPE: Vec<&str> = vec![
+    RegContentType::OCI_LAYER_TAR.val(),
+    RegContentType::OCI_LAYER_TGZ.val(),
+    RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.val(),
+    RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.val(),
+];

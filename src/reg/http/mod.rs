@@ -43,7 +43,7 @@ fn do_request_raw<T: Serialize + ?Sized>(
 
 fn do_request_raw_read<R: Read + Send + 'static>(
     client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
-    accept: Option<&RegContentType>, body: Option<R>, size: u64,
+    _accept: Option<&RegContentType>, body: Option<R>, size: u64,
 ) -> Result<Response> {
     let request_body = body.map(|read| RequestBody::Read(Body::sized(read, size)));
     let request = build_request::<String>(client, url, method, http_auth_opt, &[], request_body, None)?;

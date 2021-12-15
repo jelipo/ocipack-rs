@@ -7,7 +7,7 @@ use anyhow::{Error, Result};
 use bytes::Bytes;
 use reqwest::{Method, StatusCode};
 use reqwest::blocking::{Client, Response};
-use reqwest::header::{HeaderValue, ToStrError};
+
 use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -190,14 +190,6 @@ pub trait RegistryResponse {
 /// 一个简单的Registry的Response，只包含状态码
 pub struct RawRegistryResponse {
     response: Response,
-}
-
-impl TryInto<T> for RawRegistryResponse {
-    type Error = ();
-
-    fn try_into(self) -> std::result::Result<T, Self::Error> {
-        todo!()
-    }
 }
 
 impl RegistryResponse for RawRegistryResponse {
