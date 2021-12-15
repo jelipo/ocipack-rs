@@ -52,14 +52,6 @@ pub struct Config {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct VarJobResultData {}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct VarLogMyAppLogs {}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Rootfs {
     #[serde(rename = "diff_ids")]
     pub diff_ids: Vec<String>,

@@ -21,10 +21,3 @@ fn main() -> Result<()> {
 
     docker::run()
 }
-
-fn test() -> Result<Struct>{
-    let string = "{}".to_string();
-    let x = serde_json::from_str::<Struct>(&string)?;
-    Ok(x)
-}
-

@@ -10,14 +10,14 @@ use serde::Deserialize;
 use serde::Serialize;
 use url::Url;
 
-use crate::reg::{BlobConfig, ImageManager, Reference, RegDigest};
+use crate::reg::{BlobConfig, Layer, LayerConvert, Reference, RegDigest};
 use crate::reg::home::HomeDir;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::RegContentType;
 use crate::reg::http::upload::RegUploader;
 use crate::reg::oci::image::OciConfigBlob;
+use crate::reg::RegContentType;
 
 pub mod registry;
 pub mod image;
@@ -27,10 +27,6 @@ pub struct OciImageManager {
     registry_addr: String,
     reg_client: Rc<RefCell<RegistryHttpClient>>,
     home_dir: Rc<HomeDir>,
-}
-
-impl ImageManager for OciImageManager {
-
 }
 
 impl OciImageManager {
@@ -51,8 +47,8 @@ impl OciImageManager {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        let accept_opt = Some(RegContentType::OCI_MANIFEST);
-        let request = ClientRequest::new_get_request(&path, scope, accept_opt.as_ref());
+        let accepts = &[RegContentType::OCI_MANIFEST];
+        let request = ClientRequest::new_get_request(&path, scope, accepts);
         reg_rc.request_registry_body::<u8, OciManifest>(request)
     }
 
@@ -77,7 +73,7 @@ impl OciImageManager {
     pub fn config_blob(&mut self, name: &str, blob_digest: &str) -> Result<OciConfigBlob> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let mut reg_rc = self.reg_client.borrow_mut();
-        let request = ClientRequest::new_get_request(&url_path, Some(name), None);
+        let request = ClientRequest::new_get_request(&url_path, Some(name), &[]);
         reg_rc.request_registry_body::<u8, OciConfigBlob>(request)
     }
 
@@ -125,7 +121,7 @@ impl OciImageManager {
         let url_path = format!("/v2/{}/blobs/uploads/", name);
         let scope = Some(name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        let request = ClientRequest::new(&url_path, scope, Method::POST, None, None, TokenType::PushAndPull);
+        let request = ClientRequest::new(&url_path, scope, Method::POST, &[], None, TokenType::PushAndPull);
         let success_resp = reg_rc.request_full_response::<u8>(request)?;
         let location = success_resp.location_header().expect("location header not found");
         let url = Url::parse(location)?;
@@ -137,7 +133,7 @@ impl OciImageManager {
         let scope = Some(refe.image_name);
         let mut reg_rc = self.reg_client.borrow_mut();
         let request = ClientRequest::new_with_content_type(
-            &path, scope, Method::PUT, None, Some(&manifest),
+            &path, scope, Method::PUT, &[], Some(&manifest),
             &RegContentType::OCI_MANIFEST,
             TokenType::PushAndPull,
         );
@@ -180,4 +176,14 @@ pub struct OciManifestLayer {
     pub media_type: String,
     pub size: u64,
     pub digest: String,
+}
+
+impl LayerConvert for OciManifest {
+    fn to_layers(&self) -> Vec<Layer> {
+        self.layers.iter().map(|oci| Layer {
+            media_type: &oci.media_type,
+            size: oci.size,
+            digest: &oci.digest,
+        }).collect::<Vec<Layer>>()
+    }
 }

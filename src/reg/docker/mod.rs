@@ -10,14 +10,14 @@ use serde::Deserialize;
 use serde::Serialize;
 use url::Url;
 
-use crate::reg::{BlobConfig, ImageManager, Reference, RegDigest};
+use crate::reg::{BlobConfig, Reference, RegDigest};
+use crate::reg::docker::image::DockerConfigBlob;
+use crate::reg::home::HomeDir;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::RegContentType;
 use crate::reg::http::upload::RegUploader;
-use crate::reg::docker::image::DockerConfigBlob;
-use crate::reg::home::HomeDir;
+use crate::reg::RegContentType;
 
 pub mod registry;
 pub mod image;
@@ -27,8 +27,6 @@ pub struct DockerImageManager {
     reg_client: Rc<RefCell<RegistryHttpClient>>,
     home_dir: Rc<HomeDir>,
 }
-
-impl ImageManager for DockerImageManager {}
 
 impl DockerImageManager {
     pub fn new(
@@ -48,8 +46,8 @@ impl DockerImageManager {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        let accept_opt = Some(RegContentType::DOCKER_MANIFEST);
-        let request = ClientRequest::new_get_request(&path, scope, accept_opt.as_ref());
+        let accepts = &[RegContentType::DOCKER_MANIFEST];
+        let request = ClientRequest::new_get_request(&path, scope, accepts);
         reg_rc.request_registry_body::<u8, DockerManifest>(request)
     }
 
@@ -74,7 +72,7 @@ impl DockerImageManager {
     pub fn config_blob(&mut self, name: &str, blob_digest: &str) -> Result<DockerConfigBlob> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let mut reg_rc = self.reg_client.borrow_mut();
-        let request = ClientRequest::new_get_request(&url_path, Some(name), None);
+        let request = ClientRequest::new_get_request(&url_path, Some(name), &[]);
         reg_rc.request_registry_body::<u8, DockerConfigBlob>(request)
     }
 
@@ -122,7 +120,7 @@ impl DockerImageManager {
         let url_path = format!("/v2/{}/blobs/uploads/", name);
         let scope = Some(name);
         let mut reg_rc = self.reg_client.borrow_mut();
-        let request = ClientRequest::new(&url_path, scope, Method::POST, None, None, TokenType::PushAndPull);
+        let request = ClientRequest::new(&url_path, scope, Method::POST, &[], None, TokenType::PushAndPull);
         let success_resp = reg_rc.request_full_response::<u8>(request)?;
         let location = success_resp.location_header().expect("location header not found");
         let url = Url::parse(location)?;
@@ -134,7 +132,7 @@ impl DockerImageManager {
         let scope = Some(refe.image_name);
         let mut reg_rc = self.reg_client.borrow_mut();
         let request = ClientRequest::new_with_content_type(
-            &path, scope, Method::PUT, None, Some(&manifest),
+            &path, scope, Method::PUT, &[], Some(&manifest),
             &RegContentType::DOCKER_MANIFEST,
             TokenType::PushAndPull,
         );

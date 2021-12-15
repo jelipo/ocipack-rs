@@ -6,6 +6,7 @@ use reqwest::{Method, Url};
 use reqwest::blocking::{Body, Client, Request, Response};
 use reqwest::header::HeaderMap;
 use serde::Serialize;
+
 use crate::reg::RegContentType;
 
 pub mod auth;
@@ -45,7 +46,7 @@ fn do_request_raw_read<R: Read + Send + 'static>(
     accept: Option<&RegContentType>, body: Option<R>, size: u64,
 ) -> Result<Response> {
     let request_body = body.map(|read| RequestBody::Read(Body::sized(read, size)));
-    let request = build_request::<String>(client, url, method, http_auth_opt, accept, request_body, None)?;
+    let request = build_request::<String>(client, url, method, http_auth_opt, &[], request_body, None)?;
     let http_response = client.execute(request)?;
     Ok(http_response)
 }

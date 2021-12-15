@@ -40,6 +40,8 @@ pub fn run() -> Result<()> {
     };
     let home_dir_path = Path::new(&temp_config.home_dir);
     let home_dir = Rc::new(HomeDir::new_home_dir(home_dir_path)?);
+
+
     let mut from_registry = DockerRegistry::open(temp_config.from.registry.clone(), from_auth_opt, home_dir.clone())?;
 
 

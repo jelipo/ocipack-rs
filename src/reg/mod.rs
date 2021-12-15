@@ -8,6 +8,7 @@ use anyhow::{Error, Result};
 use log::info;
 use reqwest::Method;
 use serde::de;
+use serde::de::DeserializeOwned;
 use url::Url;
 
 use crate::reg::docker::DockerManifest;
@@ -17,6 +18,7 @@ use crate::reg::home::HomeDir;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
+use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::RegUploader;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
@@ -72,6 +74,24 @@ impl RegDigest {
             sha256: digest.as_str()[7..].to_string(),
             digest,
         }
+    }
+}
+
+pub struct Registry {
+    pub image_manager: MyImageManager,
+}
+
+impl Registry {
+    pub fn open(
+        registry_addr: String,
+        auth: Option<RegistryAuth>,
+        home_dir: Rc<HomeDir>,
+    ) -> Result<Registry> {
+        let client = RegistryHttpClient::new(registry_addr.clone(), auth)?;
+        let image = MyImageManager::new(registry_addr.clone(), client, home_dir);
+        Ok(Registry {
+            image_manager: image,
+        })
     }
 }
 
@@ -132,7 +152,7 @@ impl MyImageManager {
         exited(&response)
     }
 
-    pub fn config_blob<'a, T: ConfigBlob + de::Deserialize<'a>>(
+    pub fn config_blob<T: ConfigBlob + DeserializeOwned>(
         &mut self, name: &str, blob_digest: &str,
     ) -> Result<T> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
@@ -230,23 +250,17 @@ pub enum Manifest {
     DockerV2S2(DockerManifest),
 }
 
+pub trait LayerConvert {
+    fn to_layers(&self) -> Vec<Layer>;
+}
+
+pub struct Layer<'a> {
+    pub media_type: &'a str,
+    pub size: u64,
+    pub digest: &'a str,
+}
+
 pub trait ConfigBlob {}
-
-pub trait ImageManager {}
-
-pub enum Registry {
-    Docker(DockerRegistry),
-    Oci(OciRegistry),
-}
-
-impl Registry {
-    pub fn image_manager(&self) -> &dyn ImageManager {
-        match self {
-            Registry::Docker(docker_reg) => &docker_reg.docker_image_manager,
-            Registry::Oci(oci_reg) => &oci_reg.oci_image_manager
-        }
-    }
-}
 
 pub struct RegContentType(&'static str);
 

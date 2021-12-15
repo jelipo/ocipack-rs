@@ -192,6 +192,14 @@ pub struct RawRegistryResponse {
     response: Response,
 }
 
+impl TryInto<T> for RawRegistryResponse {
+    type Error = ();
+
+    fn try_into(self) -> std::result::Result<T, Self::Error> {
+        todo!()
+    }
+}
+
 impl RegistryResponse for RawRegistryResponse {
     fn success(&self) -> bool {
         self.response.status().is_success()
@@ -229,6 +237,7 @@ impl RegistryResponse for RawRegistryResponse {
         }
     }
 }
+
 
 pub struct ClientRequest<'a, B: Serialize + ?Sized> {
     path: &'a str,
