@@ -1,9 +1,8 @@
-use anyhow::{Error, Result};
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::{Layer, LayerConvert, Reference, RegDigest};
-use crate::reg::http::client::{RawRegistryResponse, RegistryHttpClient, RegistryResponse};
+use crate::reg::{Layer, LayerConvert};
+use crate::reg::manifest::{CommonManifestConfig, CommonManifestLayer};
 
 pub mod image;
 
@@ -12,21 +11,13 @@ pub mod image;
 pub struct OciManifest {
     pub schema_version: usize,
     pub media_type: Option<String>,
-    pub config: OciManifestConfig,
-    pub layers: Vec<OciManifestLayer>,
+    pub config: CommonManifestConfig,
+    pub layers: Vec<CommonManifestLayer>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OciManifestConfig {
-    pub media_type: String,
-    pub size: u64,
-    pub digest: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct OciManifestLayer {
     pub media_type: String,
     pub size: u64,
     pub digest: String,

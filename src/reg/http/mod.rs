@@ -70,7 +70,7 @@ fn build_request<T: Serialize + ?Sized>(
         accepts_str.push(accept.val())
     }
     if accepts.len() > 0 {
-        builder = builder.header("Accept", accepts_str.join(";"));
+        builder = builder.header("Accept", accepts_str.join(","));
     }
     if let Some(content_type) = content_type {
         builder = builder.header("Content-Type", content_type.val());

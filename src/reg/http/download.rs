@@ -144,7 +144,7 @@ fn downloading(
     //检查本地是否存在已有
     let parent_path = file_path.parent().expect("find file parent dir failed");
     if !parent_path.exists() {
-        std::fs::create_dir(parent_path);
+        let _create_result = std::fs::create_dir(parent_path);
     }
     // 请求HTTP下载
     let mut http_response = reg_http_downloader.do_request_raw()?;

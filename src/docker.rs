@@ -9,13 +9,13 @@ use tar::Builder;
 
 use crate::progress::{Processor, ProcessResult};
 use crate::progress::manager::ProcessorManager;
-use crate::reg::{ConfigBlob, ConfigBlobEnum, Layer, LayerConvert, Manifest, Reference, RegContentType, RegDigest, Registry};
-use crate::reg::docker::{DockerManifest, DockerManifestLayer};
+use crate::reg::{ConfigBlobEnum, Layer, LayerConvert, Reference, RegContentType, RegDigest, Registry};
 use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::home::HomeDir;
 use crate::reg::http::download::DownloadResult;
 use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::UploadResult;
+use crate::reg::manifest::{CommonManifestLayer, Manifest};
 use crate::reg::oci::image::OciConfigBlob;
 use crate::tempconfig::TempConfig;
 use crate::util::random;
@@ -60,17 +60,12 @@ pub fn run() -> Result<()> {
     let manager = ProcessorManager::new_processor_manager(reg_downloader_vec)?;
     let download_results = manager.wait_all_done()?;
     let layer_digest_map = layer_to_map(&layers);
-    let layer_types = vec![RegContentType::DOCKER_FOREIGN_LAYER_TGZ.val(),
-                           RegContentType::DOCKER_LAYER_TGZ.val()];
     for download_result in &download_results {
         if download_result.local_existed {
             continue;
         }
         let layer = layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str())
             .expect("internal error");
-        if !layer_types.contains(&layer.media_type) {
-            return Err(Error::msg(format!("unknown layer media type:{}", layer.media_type)));
-        }
         let digest = RegDigest::new_with_digest(layer.digest.to_string());
         let (tar_sha256, tar_path) = home_dir.cache.blobs.ungz_download_file(&digest)?;
         home_dir.cache.blobs.create_tar_shafile(&tar_sha256, &tar_path)?;
@@ -134,7 +129,7 @@ fn upload(
     reg_uploader_vec.push(Box::new(custom_layer_uploader));
 
     // config blob 上传
-    let mut to_config_blob_enum = from_config_blob_enum.clone();
+    let to_config_blob_enum = from_config_blob_enum.clone();
     let config_blob_digest = format!("sha256:{}", layer_info.tar_sha256);
     let config_blob_str = match to_config_blob_enum {
         ConfigBlobEnum::OciV1(mut oci_config_blob) => {
@@ -160,17 +155,34 @@ fn upload(
         info!("{}", &upload_result.finished_info());
     }
     // layers上传完成，开始组装manifest
+    let to_type = ToType::DockerV2S2;
     let mut to_manifest = from_manifest.clone();
-
-    to_manifest.config.digest = config_blob_digest.digest;
-    to_manifest.config.media_type = RegContentType::DOCKER_CONTAINER_IMAGE.val().to_string();
-    to_manifest.config.size = config_blob_path.metadata()?.len();
-    // 插入一个layer
-    to_manifest.layers.insert(0, DockerManifestLayer {
-        media_type: RegContentType::DOCKER_LAYER_TGZ.val().to_string(),
-        size: layer_info.gz_temp_file_path.metadata()?.len(),
-        digest: format!("sha256:{}", &layer_info.gz_sha256),
-    });
+    to_manifest = match to_type {
+        ToType::OciV1 => {
+            let mut oci_manifest = to_manifest.to_oci_v1()?;
+            oci_manifest.config.digest = config_blob_digest.digest;
+            oci_manifest.config.media_type = RegContentType::OCI_IMAGE_CONFIG.val().to_string();
+            oci_manifest.config.size = config_blob_path.metadata()?.len();
+            oci_manifest.layers.insert(0, CommonManifestLayer {
+                media_type: RegContentType::OCI_LAYER_TGZ.val().to_string(),
+                size: layer_info.gz_temp_file_path.metadata()?.len(),
+                digest: format!("sha256:{}", &layer_info.gz_sha256),
+            });
+            Manifest::OciV1(oci_manifest)
+        }
+        ToType::DockerV2S2 => {
+            let mut docker_manifest = to_manifest.to_docker_v2_s2()?;
+            docker_manifest.config.digest = config_blob_digest.digest;
+            docker_manifest.config.media_type = RegContentType::DOCKER_CONTAINER_IMAGE.val().to_string();
+            docker_manifest.config.size = config_blob_path.metadata()?.len();
+            docker_manifest.layers.insert(0, CommonManifestLayer {
+                media_type: RegContentType::DOCKER_LAYER_TGZ.val().to_string(),
+                size: layer_info.gz_temp_file_path.metadata()?.len(),
+                digest: format!("sha256:{}", &layer_info.gz_sha256),
+            });
+            Manifest::DockerV2S2(docker_manifest)
+        }
+    };
     let put_result = to_registry.image_manager.put_manifest(&Reference {
         image_name: to_config.image_name.as_str(),
         reference: to_config.reference.as_str(),
@@ -185,4 +197,9 @@ fn layer_to_map<'a>(layers: &'a Vec<Layer>) -> HashMap<&'a str, &'a Layer<'a>> {
         map.insert(&layer.digest, layer);
     }
     map
+}
+
+pub enum ToType {
+    OciV1,
+    DockerV2S2,
 }

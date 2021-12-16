@@ -8,7 +8,9 @@ use reqwest::Method;
 use serde::de::DeserializeOwned;
 use url::Url;
 
-use crate::reg::docker::{DockerManifest, DockerManifestConfig, DockerManifestLayer};
+use manifest::Manifest;
+
+use crate::reg::docker::DockerManifest;
 use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::home::HomeDir;
 use crate::reg::http::auth::TokenType;
@@ -16,13 +18,15 @@ use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpC
 use crate::reg::http::download::RegDownloader;
 use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::RegUploader;
-use crate::reg::oci::{OciManifest, OciManifestConfig, OciManifestLayer};
+use crate::reg::manifest::CommonManifestLayer;
 use crate::reg::oci::image::OciConfigBlob;
+use crate::reg::oci::OciManifest;
 
 pub mod home;
 pub mod docker;
 pub mod oci;
 pub mod http;
+pub mod manifest;
 
 
 pub struct Reference<'a> {
@@ -116,7 +120,7 @@ impl MyImageManager {
         let accepts = &[RegContentType::OCI_MANIFEST, RegContentType::DOCKER_MANIFEST];
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&path, scope, accepts);
         let response = self.reg_client.simple_request(request)?;
-        let content_type = response.content_type()
+        let content_type = (&response).content_type()
             .ok_or(Error::msg("manifest content-type header not found"))?;
         if RegContentType::DOCKER_MANIFEST.val() == content_type {
             let manifest = serde_json::from_str::<DockerManifest>(&response.string_body())?;
@@ -125,7 +129,8 @@ impl MyImageManager {
             let manifest = serde_json::from_str::<OciManifest>(&response.string_body())?;
             Ok(Manifest::OciV1(manifest))
         } else {
-            Err(Error::msg(format!("unknown content-type:{}", content_type)))
+            let msg = format!("unknown content-type:{},body:{}", content_type.to_string(), response.string_body());
+            Err(Error::msg(msg))
         }
     }
 
@@ -240,64 +245,6 @@ fn exited(simple_response: &RawRegistryResponse) -> Result<bool> {
     }
 }
 
-#[derive(Clone)]
-pub enum Manifest {
-    OciV1(OciManifest),
-    DockerV2S2(DockerManifest),
-}
-
-impl Manifest {
-    pub fn to_oci_v1(self) -> Result<OciManifest> {
-        Ok(match self {
-            Manifest::OciV1(oci) => oci,
-            Manifest::DockerV2S2(docker) => {
-                // TODO 适配media_type
-                OciManifest {
-                    schema_version: 2,
-                    media_type: Some(RegContentType::OCI_MANIFEST.val().to_string()),
-                    config: OciManifestConfig {
-                        media_type: RegContentType::OCI_IMAGE_CONFIG.val().to_string(),
-                        size: docker.config.size,
-                        digest: docker.config.digest,
-                    },
-                    layers: docker.layers.into_iter().map(|docker_layer| {
-                        OciManifestLayer {
-                            media_type: "TODO".to_string(),
-                            size: docker_layer.size,
-                            digest: docker_layer.digest,
-                        }
-                    }).collect::<Vec<OciManifestLayer>>(),
-                }
-            }
-        })
-    }
-
-    pub fn to_docker_v2_s2(self) -> Result<DockerManifest> {
-        // TODO 适配media_type
-        Ok(match self {
-            Manifest::OciV1(oci) => {
-                DockerManifest {
-                    schema_version: 2,
-                    media_type: RegContentType::DOCKER_MANIFEST.val().to_string(),
-                    config: DockerManifestConfig {
-                        media_type: RegContentType::DOCKER_CONTAINER_IMAGE.val().to_string(),
-                        size: oci.config.size,
-                        digest: oci.config.digest,
-                    },
-                    layers: oci.layers.into_iter().map(|docker_layer| {
-                        DockerManifestLayer {
-                            media_type: "TODO".to_string(),
-                            size: docker_layer.size,
-                            digest: docker_layer.digest,
-                        }
-                    }).collect::<Vec<DockerManifestLayer>>(),
-                }
-            }
-            Manifest::DockerV2S2(docker) => docker,
-        })
-    }
-}
-
 pub trait LayerConvert {
     fn to_layers(&self) -> Vec<Layer>;
 }
@@ -334,21 +281,10 @@ impl RegContentType {
     pub const OCI_LAYER_NONDISTRIBUTABLE_TGZ: Self = Self("application/vnd.oci.image.layer.nondistributable.v1.tar+gzip");
     pub const OCI_IMAGE_CONFIG: Self = Self("application/vnd.oci.image.config.v1+json");
 
-    pub const ALL: Self = Self(" */*");
+    pub const ALL: Self = Self("*/*");
 
     pub fn val(&self) -> &'static str {
         self.0
     }
 }
 
-pub const DOCKER_LAYER_TYPE: Vec<&str> = vec![
-    RegContentType::DOCKER_FOREIGN_LAYER_TGZ.val(),
-    RegContentType::DOCKER_LAYER_TGZ.val(),
-];
-
-pub const OCI_LAYER_TYPE: Vec<&str> = vec![
-    RegContentType::OCI_LAYER_TAR.val(),
-    RegContentType::OCI_LAYER_TGZ.val(),
-    RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.val(),
-    RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.val(),
-];

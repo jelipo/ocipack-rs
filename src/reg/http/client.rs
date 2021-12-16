@@ -7,7 +7,6 @@ use anyhow::{Error, Result};
 use bytes::Bytes;
 use reqwest::{Method, StatusCode};
 use reqwest::blocking::{Client, Response};
-
 use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -214,7 +213,7 @@ impl RegistryResponse for RawRegistryResponse {
         match self.response.content_length() {
             None => {
                 let mut string = String::new();
-                self.response.read_to_string(&mut string);
+                let _result = self.response.read_to_string(&mut string);
                 string
             }
             Some(len) => {
@@ -222,7 +221,7 @@ impl RegistryResponse for RawRegistryResponse {
                     String::default()
                 } else {
                     let mut string = String::with_capacity(len as usize);
-                    self.response.read_to_string(&mut string);
+                    let _result = self.response.read_to_string(&mut string);
                     string
                 }
             }
