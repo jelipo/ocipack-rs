@@ -131,6 +131,7 @@ fn upload(
     // config blob 上传
     let to_config_blob_enum = from_config_blob_enum.clone();
     let config_blob_digest = format!("sha256:{}", layer_info.tar_sha256);
+    // TODO 改为不同的config_blob
     let config_blob_str = match to_config_blob_enum {
         ConfigBlobEnum::OciV1(mut oci_config_blob) => {
             oci_config_blob.rootfs.diff_ids.insert(0, config_blob_digest);

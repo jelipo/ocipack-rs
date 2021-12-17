@@ -287,4 +287,3 @@ impl RegContentType {
         self.0
     }
 }
-

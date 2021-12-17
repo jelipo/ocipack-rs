@@ -1,20 +1,18 @@
-
 use std::fs::File;
-
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use home::home_dir;
- 
-use crate::config::userconfig::{UserDockerConfig};
+
+use crate::config::userconfig::UserDockerConfig;
 use crate::reg::http::RegistryAuth;
 
-
-pub mod dockerfile;
-pub mod ocifile;
 pub mod userconfig;
+pub mod global;
+pub mod cmd;
 
 pub struct BaseImage {
+    pub use_https: bool,
     /// registry的host地址
     pub reg_host: String,
     /// image的名称
@@ -25,6 +23,7 @@ pub struct BaseImage {
     pub auth_type: RegAuthType,
 }
 
+#[derive(Clone)]
 pub enum RegAuthType {
     LocalDockerAuth { reg_host: String },
     CustomPassword { username: String, password: String },
