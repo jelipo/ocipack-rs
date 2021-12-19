@@ -1,7 +1,10 @@
 #![feature(exclusive_range_pattern)]
 #![feature(once_cell)]
 
-use std::lazy::{OnceCell, SyncLazy};
+use std::any::Any;
+use std::borrow::Borrow;
+use std::lazy::{OnceCell, SyncLazy, SyncOnceCell};
+use std::sync::Arc;
 
 use anyhow::Result;
 use clap::Parser;
@@ -26,7 +29,15 @@ pub static GLOBAL_CONFIG: SyncLazy<CmdArgs> = SyncLazy::new(|| {
     args
 });
 
+
 fn main() -> Result<()> {
+    let x: &CmdArgs = GLOBAL_CONFIG.borrow();
+    match x {
+        CmdArgs::Build(a) => {
+            println!("{}", a.allow_insecure);
+        }
+        CmdArgs::Transform => {}
+    }
     init::init()?;
     docker::run()
 }

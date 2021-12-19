@@ -17,8 +17,8 @@ pub struct BuildArgs {
     #[clap(long, short, parse(from_flag))]
     pub allow_insecure: bool,
     /// Source type
-    /// Support 'dockerfile','cmd'
-    /// Example: 'dockerfile:/path/to/.Dockerfile','cmd:my.reg.com/source/image:1.0'
+    /// Support 'dockerfile','cmd' type
+    /// Example:'dockerfile:/path/to/.Dockerfile','cmd:my.reg.com/source/image:1.0'
     #[clap(long, short)]
     pub source: SourceType,
     /// [Option] Auth of pull source image. Example:'myname:mypass','myname:&{MY_PASSWORD_ENV}'
@@ -33,6 +33,14 @@ pub struct BuildArgs {
     /// [Option] Auth of push target image. Example:'myname:mypass','myname:&{MY_PASSWORD_ENV}'
     #[clap(long)]
     pub target_auth: Option<BaseAuth>,
+    #[clap(long, arg_enum)]
+    pub target_format: Option<TargetFormat>,
+}
+
+#[derive(ArgEnum, PartialEq, Debug, Clone)]
+pub enum TargetFormat {
+    Docker,
+    Oci,
 }
 
 pub enum SourceType {
