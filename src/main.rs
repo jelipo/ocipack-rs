@@ -1,18 +1,14 @@
 #![feature(exclusive_range_pattern)]
 #![feature(once_cell)]
 
-use std::any::Any;
+
 use std::borrow::Borrow;
-use std::lazy::{OnceCell, SyncLazy, SyncOnceCell};
-use std::sync::Arc;
+use std::lazy::SyncLazy;
 
 use anyhow::Result;
 use clap::Parser;
-use env_logger::Env;
-use log::Level::Info;
 
 use crate::config::cmd::CmdArgs;
-use crate::config::global::GlobalAppConfig;
 
 mod progress;
 mod reg;

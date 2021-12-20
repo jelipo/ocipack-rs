@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use anyhow::{anyhow, Error};
-use clap::{ArgEnum, Parser, Subcommand};
+use anyhow::Error;
+use clap::{ArgEnum, Parser};
 
 #[derive(Parser)]
 #[clap(about = "An image tool", version, author = "jelipo <me@jelipo.com>")]
@@ -11,17 +11,16 @@ pub enum CmdArgs {
 }
 
 #[derive(clap::Args)]
-#[clap(about, author, version)]
 pub struct BuildArgs {
     /// Allow insecure registry
     #[clap(long, short, parse(from_flag))]
     pub allow_insecure: bool,
-    /// Source type
-    /// Support 'dockerfile','cmd' type
+    /// Source type.
+    /// Support dockerfile,cmd type
     /// Example:'dockerfile:/path/to/.Dockerfile','cmd:my.reg.com/source/image:1.0'
     #[clap(long, short)]
     pub source: SourceType,
-    /// [Option] Auth of pull source image. Example:'myname:mypass','myname:&{MY_PASSWORD_ENV}'
+    /// [OPTION] Auth of pull source image. Example:'myname:mypass','myname:${MY_PASSWORD_ENV}'
     #[clap(long)]
     pub source_auth: Option<BaseAuth>,
 
@@ -30,17 +29,29 @@ pub struct BuildArgs {
     /// Example:'registry:my.reg.com/target/image:1.1'
     #[clap(long, short)]
     pub target: TargetType,
-    /// [Option] Auth of push target image. Example:'myname:mypass','myname:&{MY_PASSWORD_ENV}'
+    /// [OPTION] Auth of push target image. Example:'myname:mypass','myname:${MY_PASSWORD_ENV}'
     #[clap(long)]
     pub target_auth: Option<BaseAuth>,
-    #[clap(long, arg_enum)]
-    pub target_format: Option<TargetFormat>,
+    /// [OPTION] Target format type. Support 'docker' and 'oci'.
+    #[clap(long, short, default_value = "docker")]
+    pub format: TargetFormat,
 }
 
-#[derive(ArgEnum, PartialEq, Debug, Clone)]
 pub enum TargetFormat {
     Docker,
     Oci,
+}
+
+impl FromStr for TargetFormat {
+    type Err = anyhow::Error;
+
+    fn from_str(arg: &str) -> Result<Self, Self::Err> {
+        Ok(match arg {
+            "docker" => TargetFormat::Docker,
+            "oci" => TargetFormat::Oci,
+            _ => return Err(Error::msg(format!("unknown target format type: {}", arg)))
+        })
+    }
 }
 
 pub enum SourceType {

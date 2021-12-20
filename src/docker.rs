@@ -3,7 +3,7 @@ use std::fs::File;
 use std::path::Path;
 use std::rc::Rc;
 
-use anyhow::{Error, Result};
+use anyhow::{Result};
 use log::info;
 use tar::Builder;
 

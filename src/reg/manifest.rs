@@ -3,7 +3,6 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg;
 use crate::reg::docker::DockerManifest;
 use crate::reg::oci::OciManifest;
 use crate::reg::RegContentType;

@@ -18,7 +18,6 @@ use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpC
 use crate::reg::http::download::RegDownloader;
 use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::RegUploader;
-use crate::reg::manifest::CommonManifestLayer;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
 
