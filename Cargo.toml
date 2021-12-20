@@ -32,3 +32,4 @@ url = "2.2"
 home = "0.5"
 base64 = "0.13"
 clap = { version = "3.0.0-rc.7", features = ["derive"] }
+dockerfile-parser = "0.8.0"

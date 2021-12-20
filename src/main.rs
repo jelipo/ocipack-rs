@@ -9,6 +9,7 @@ use anyhow::Result;
 use clap::Parser;
 
 use crate::config::cmd::CmdArgs;
+use crate::subcmd::build::BuildCommand;
 
 mod progress;
 mod reg;
@@ -19,6 +20,7 @@ mod docker;
 mod tempconfig;
 mod adapter;
 mod init;
+mod subcmd;
 
 pub static GLOBAL_CONFIG: SyncLazy<CmdArgs> = SyncLazy::new(|| {
     let args: CmdArgs = CmdArgs::parse();
@@ -29,8 +31,11 @@ pub static GLOBAL_CONFIG: SyncLazy<CmdArgs> = SyncLazy::new(|| {
 fn main() -> Result<()> {
     let x: &CmdArgs = GLOBAL_CONFIG.borrow();
     match x {
-        CmdArgs::Build(a) => {
-            println!("{}", a.allow_insecure);
+        CmdArgs::Build(build_args) => {
+            let command = BuildCommand {
+                build_args
+            };
+            command.build()?;
         }
         CmdArgs::Transform => {}
     }

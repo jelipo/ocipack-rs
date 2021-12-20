@@ -14,6 +14,7 @@ pub trait FromImageAdapter: Adapter {
     fn new_envs(&self) -> Option<&[String]>;
     /// 覆盖的Cmd
     fn new_cmds(&self) -> Option<&[String]>;
+
 }
 
 pub trait ToImageAdapter: Adapter {}
