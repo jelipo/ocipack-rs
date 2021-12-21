@@ -10,6 +10,8 @@ use clap::Parser;
 
 use crate::config::cmd::CmdArgs;
 use crate::subcmd::build::BuildCommand;
+#[macro_use]
+extern crate derive_builder;
 
 mod progress;
 mod reg;
@@ -29,6 +31,7 @@ pub static GLOBAL_CONFIG: SyncLazy<CmdArgs> = SyncLazy::new(|| {
 
 
 fn main() -> Result<()> {
+    init::init()?;
     let x: &CmdArgs = GLOBAL_CONFIG.borrow();
     match x {
         CmdArgs::Build(build_args) => {
@@ -39,6 +42,5 @@ fn main() -> Result<()> {
         }
         CmdArgs::Transform => {}
     }
-    init::init()?;
     docker::run()
 }
