@@ -12,7 +12,7 @@ use crate::config::cmd::BaseAuth;
 
 pub struct DockerfileAdapter {
     docker_file_path: String,
-
+    info: DockerfileInfo,
     /// 验证方式
     auth_type: RegAuthType,
 }
@@ -27,20 +27,23 @@ impl DockerfileAdapter {
         if stages.len() != 1 {
             return Err(Error::msg("Only support one stage in Dockerfile"));
         }
-        let dsa: DockerfileInfoBuilder = DockerfileInfoBuilder::default();
+        let mut label_map = HashMap::<String, String>::new();
+        let mut from_image = None;
         for instruction in dockerfile.instructions {
             println!("{:?}", instruction);
             match instruction {
-                Instruction::From(from) => {}
+                Instruction::From(from) => from_image = Some(FromImage {
+                    image_host: from.image_parsed.registry,
+                    image_name: from.image_parsed.image,
+                    reference: from.image_parsed.tag.or(from.image_parsed.hash)
+                        .ok_or(Error::msg("dasdas"))?,
+                }),
                 Instruction::Arg(_) | Instruction::Run(_) => {
                     warn!("un support ARG and RUN")
                 }
-                Instruction::Label(label_i) => {
-                    let mut map = HashMap::with_capacity(label_i.labels.len());
-                    for label in label_i.labels {
-                        let _ = map.insert(label.name.content, label.value.content);
-                    }
-                }
+                Instruction::Label(label_i) => for label in label_i.labels {
+                    let _ = label_map.insert(label.name.content, label.value.content);
+                },
                 Instruction::Entrypoint(entrypoint) => match &entrypoint.expr {
                     ShellOrExecExpr::Shell(shell) => {}
                     ShellOrExecExpr::Exec(exec) => {}
@@ -62,6 +65,10 @@ impl DockerfileAdapter {
 
         Ok(DockerfileAdapter {
             docker_file_path: "".to_string(),
+            info: DockerfileInfo {
+                from_info: from_image.ok_or(Error::msg("dockerfile must has a 'From'"))?,
+                labels: label_map,
+            },
             auth_type: match auth {
                 None => RegAuthType::LocalDockerAuth { reg_host: "".to_string() },
                 Some(auth) => RegAuthType::CustomPassword {
@@ -73,16 +80,14 @@ impl DockerfileAdapter {
     }
 }
 
-#[derive(Default, Builder, Debug)]
-#[builder(setter(into))]
+
 struct DockerfileInfo {
-    from_info: Option<FromImage>,
+    from_info: FromImage,
     labels: HashMap<String, String>,
 }
 
-#[derive(Debug, Clone)]
 struct FromImage {
-    image_host: String,
+    image_host: Option<String>,
     image_name: String,
     reference: String,
 }
