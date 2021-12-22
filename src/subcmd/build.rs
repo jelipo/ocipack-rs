@@ -9,7 +9,7 @@ pub struct BuildCommand<'a> {
 
 impl<'a> BuildCommand<'a> {
     pub fn build(&self) -> Result<()> {
-        let adapter = self.build_from_info()?;
+        let _adapter = self.build_from_info()?;
         Ok(())
     }
 
@@ -18,7 +18,7 @@ impl<'a> BuildCommand<'a> {
             SourceType::Dockerfile { path } => {
                 DockerfileAdapter::new(&path, self.build_args.source_auth.as_ref())
             }
-            SourceType::Cmd { tag } => { todo!() }
+            SourceType::Cmd { tag: _ } => { todo!() }
         }
     }
 }

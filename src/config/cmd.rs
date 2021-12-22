@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::Error;
-use clap::{ArgEnum, Parser};
+use clap::Parser;
 
 #[derive(Parser)]
 #[clap(about = "An image tool", version, author = "jelipo <me@jelipo.com>")]
