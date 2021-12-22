@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use anyhow::Result;
 
 use crate::config::BaseImage;
@@ -14,7 +16,12 @@ pub trait FromImageAdapter: Adapter {
     fn new_envs(&self) -> Option<&[String]>;
     /// 覆盖的Cmd
     fn new_cmds(&self) -> Option<&[String]>;
-
 }
 
 pub trait ToImageAdapter: Adapter {}
+
+
+pub struct CopyFile {
+    source_path: Vec<String>,
+    dest_path: String,
+}

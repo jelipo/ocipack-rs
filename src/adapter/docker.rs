@@ -6,7 +6,7 @@ use anyhow::{Error, Result};
 use dockerfile_parser::{BreakableStringComponent, Dockerfile, Instruction, ShellOrExecExpr};
 use log::warn;
 
-use crate::adapter::{Adapter, FromImageAdapter};
+use crate::adapter::{Adapter, CopyFile, FromImageAdapter};
 use crate::config::{BaseImage, RegAuthType};
 use crate::config::cmd::BaseAuth;
 
@@ -31,6 +31,9 @@ impl DockerfileAdapter {
         let mut from_image = None;
         let mut user = None;
         let mut workdir = None;
+        let mut envs_map = HashMap::<String, String>::new();
+        let mut cmd = None;
+        let mut copy_files = Vec::new();
         for instruction in dockerfile.instructions {
             println!("{:?}", instruction);
             match instruction {
@@ -50,21 +53,44 @@ impl DockerfileAdapter {
                     ShellOrExecExpr::Shell(_shell) => {}
                     ShellOrExecExpr::Exec(_exec) => {}
                 },
-                Instruction::Cmd(_cmd) => {}
-                Instruction::Copy(_copy) => {}
-                Instruction::Env(_env) => {}
+                Instruction::Cmd(cmd_i) => cmd = Some(match cmd_i.expr {
+                    ShellOrExecExpr::Shell(shell) => shell.components.into_iter()
+                        .map(|component| match component {
+                            BreakableStringComponent::String(str) => str.content,
+                            BreakableStringComponent::Comment(comment) => comment.content
+                        }).collect::<Vec<String>>(),
+                    ShellOrExecExpr::Exec(exec) => exec.elements.into_iter()
+                        .map(|str| str.content).collect::<Vec<String>>()
+                }),
+                Instruction::Copy(copy) => {
+                    if copy.flags.len() > 0 { return Ererr(Error::msg("copy not support flag")); };
+                    copy_files.push(CopyFile {
+                        source_path: copy.sources.into_iter().
+                            map(|str| str.content).collect::<Vec<String>>(),
+                        dest_path: copy.destination.content,
+                    });
+                }
+                Instruction::Env(env_i) => for mut env in env_i.vars {
+                    envs_map.insert(env.key.content, match env.value.components.remove(0) {
+                        BreakableStringComponent::String(string) => string.content,
+                        BreakableStringComponent::Comment(comment) => comment.content,
+                    });
+                }
                 Instruction::Misc(mut misc) => match misc.instruction.content.as_str() {
                     "USER" => match misc.arguments.components.remove(0) {
                         BreakableStringComponent::String(str) => user = Some(str.content.trim().to_string()),
                         _ => {}
                     }
-                    "WORKDIR" => match misc.arguments.components.remove(0) {
-                        BreakableStringComponent::String(str) => workdir = Some(str.content.trim().to_string()),
-                        _ => {}
+                    "WORKDIR" => if let BreakableStringComponent::String(str) = misc.arguments.components.remove(0) {
+                        workdir = Some(str.content.trim().to_string());
                     }
-                    "EXPOSE" => { todo!() }
-                    "VOLUME" => {}
-                    "ADD" => {}
+                    "EXPOSE" => {
+                        // TODO
+                    }
+                    "VOLUME" => warn!("un support VOLUME"),
+                    "ADD" => {
+                        // TODO
+                    }
                     "MAINTAINER" => warn!("un support MAINTAINER"),
                     _ => warn!("unknown dockerfile field:{}",misc.instruction.content)
                 }
@@ -78,6 +104,7 @@ impl DockerfileAdapter {
                 labels: label_map,
                 user,
                 workdir,
+                cmd,
             },
             auth_type: match auth {
                 None => RegAuthType::LocalDockerAuth { reg_host: "".to_string() },
@@ -96,6 +123,7 @@ struct DockerfileInfo {
     labels: HashMap<String, String>,
     user: Option<String>,
     workdir: Option<String>,
+    cmd: Option<Vec<String>>,
 }
 
 struct FromImage {
