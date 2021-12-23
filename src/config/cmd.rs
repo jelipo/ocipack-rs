@@ -76,7 +76,6 @@ impl FromStr for SourceType {
 
 pub enum TargetType {
     Registry(String),
-
 }
 
 impl FromStr for TargetType {

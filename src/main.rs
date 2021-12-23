@@ -35,10 +35,7 @@ fn main() -> Result<()> {
     let x: &CmdArgs = GLOBAL_CONFIG.borrow();
     match x {
         CmdArgs::Build(build_args) => {
-            let command = BuildCommand {
-                build_args
-            };
-            command.build()?;
+            let command = BuildCommand::build(build_args)?;
         }
         CmdArgs::Transform => {}
     }

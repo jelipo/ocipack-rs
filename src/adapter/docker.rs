@@ -1,24 +1,25 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
+use std::num::ParseIntError;
+use std::str::FromStr;
 
 use anyhow::{Error, Result};
 use dockerfile_parser::{BreakableStringComponent, Dockerfile, Instruction, ShellOrExecExpr};
 use log::warn;
+use regex::Regex;
 
-use crate::adapter::{Adapter, CopyFile, FromImageAdapter};
+use crate::adapter::{CopyFile, ImageInfo, SourceImageAdapter, SourceInfo};
 use crate::config::{BaseImage, RegAuthType};
 use crate::config::cmd::BaseAuth;
 
 pub struct DockerfileAdapter {
     docker_file_path: String,
-    info: DockerfileInfo,
-    /// 验证方式
-    auth_type: RegAuthType,
+    info: SourceInfo,
 }
 
 impl DockerfileAdapter {
-    pub fn new(path: &str, auth: Option<&BaseAuth>) -> Result<DockerfileAdapter> {
+    pub fn new(path: &str) -> Result<DockerfileAdapter> {
         let mut dockerfile_file = File::open(path)?;
         let mut str_body = String::new();
         let _read_size = dockerfile_file.read_to_string(&mut str_body)?;
@@ -34,10 +35,11 @@ impl DockerfileAdapter {
         let mut envs_map = HashMap::<String, String>::new();
         let mut cmd = None;
         let mut copy_files = Vec::new();
+        let mut ports: Vec<String> = Vec::new();
         for instruction in dockerfile.instructions {
             println!("{:?}", instruction);
             match instruction {
-                Instruction::From(from) => from_image = Some(FromImage {
+                Instruction::From(from) => from_image = Some(ImageInfo {
                     image_host: from.image_parsed.registry,
                     image_name: from.image_parsed.image,
                     reference: from.image_parsed.tag.or(from.image_parsed.hash)
@@ -63,7 +65,7 @@ impl DockerfileAdapter {
                         .map(|str| str.content).collect::<Vec<String>>()
                 }),
                 Instruction::Copy(copy) => {
-                    if copy.flags.len() > 0 { return Ererr(Error::msg("copy not support flag")); };
+                    if copy.flags.len() > 0 { return Err(Error::msg("copy not support flag")); };
                     copy_files.push(CopyFile {
                         source_path: copy.sources.into_iter().
                             map(|str| str.content).collect::<Vec<String>>(),
@@ -84,72 +86,46 @@ impl DockerfileAdapter {
                     "WORKDIR" => if let BreakableStringComponent::String(str) = misc.arguments.components.remove(0) {
                         workdir = Some(str.content.trim().to_string());
                     }
-                    "EXPOSE" => {
-                        // TODO
+                    "EXPOSE" => if let BreakableStringComponent::String(ports_str) = misc.arguments.components.remove(0) {
+                        for str in ports_str.content.trim().split_whitespace() {
+                            let expose = if str.ends_with("/tcp") || str.ends_with("/udp") {
+                                let _port_num = u16::from_str(&str[..str.len() - 4])?;
+                                str.to_string()
+                            } else {
+                                format!("{}/tcp", u16::from_str(str)?)
+                            };
+                            ports.push(expose)
+                        }
                     }
                     "VOLUME" => warn!("un support VOLUME"),
-                    "ADD" => {
-                        // TODO
-                    }
+                    "ADD" => warn!("TODO , need support ADD"),
                     "MAINTAINER" => warn!("un support MAINTAINER"),
                     _ => warn!("unknown dockerfile field:{}",misc.instruction.content)
                 }
             }
         }
-
         Ok(DockerfileAdapter {
             docker_file_path: "".to_string(),
-            info: DockerfileInfo {
-                from_info: from_image.ok_or(Error::msg("dockerfile must has a 'From'"))?,
+            info: SourceInfo {
+                image_info: from_image.ok_or(Error::msg("dockerfile must has a 'From'"))?,
                 labels: label_map,
+                envs: envs_map,
                 user,
                 workdir,
                 cmd,
-            },
-            auth_type: match auth {
-                None => RegAuthType::LocalDockerAuth { reg_host: "".to_string() },
-                Some(auth) => RegAuthType::CustomPassword {
-                    username: auth.username.clone(),
-                    password: auth.password.clone(),
-                }
+                copy_files,
+                ports,
             },
         })
     }
 }
 
-
-struct DockerfileInfo {
-    from_info: FromImage,
-    labels: HashMap<String, String>,
-    user: Option<String>,
-    workdir: Option<String>,
-    cmd: Option<Vec<String>>,
-}
-
-struct FromImage {
-    image_host: Option<String>,
-    image_name: String,
-    reference: String,
-}
-
-impl Adapter for DockerfileAdapter {
-    fn image_info(&self) -> Result<BaseImage> {
-        Ok(BaseImage {
-            use_https: true,
-            reg_host: "".to_string(),
-            image_name: "".to_string(),
-            reference: "".to_string(),
-            auth_type: self.auth_type.clone(),
-        })
-    }
-}
-
-impl FromImageAdapter for DockerfileAdapter {
-    fn new_envs(&self) -> Option<&[String]> {
-        todo!()
+impl SourceImageAdapter for DockerfileAdapter {
+    fn info(&self) -> &SourceInfo {
+        &self.info
     }
 
-    fn new_cmds(&self) -> Option<&[String]> {
-        todo!()
+    fn into_info(self) -> SourceInfo {
+        self.info
     }
 }
