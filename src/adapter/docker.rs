@@ -65,6 +65,7 @@ impl DockerfileAdapter {
                         .map(|str| str.content).collect::<Vec<String>>()
                 }),
                 Instruction::Copy(copy) => {
+                    let i = copy.flags.len();
                     if copy.flags.len() > 0 { return Err(Error::msg("copy not support flag")); };
                     copy_files.push(CopyFile {
                         source_path: copy.sources.into_iter().
@@ -125,7 +126,7 @@ impl SourceImageAdapter for DockerfileAdapter {
         &self.info
     }
 
-    fn into_info(self) -> SourceInfo {
+    fn into_info(self: Box<Self>) -> SourceInfo {
         self.info
     }
 }

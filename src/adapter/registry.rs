@@ -37,7 +37,7 @@ impl RegistryTargetAdapter {
 
 #[test]
 fn test() -> Result<()> {
-    RegistryTargetAdapter::new("harbor.jelipo.com/dsad/dwsdwsd:e231q")?;
+    let _adapter = RegistryTargetAdapter::new("harbor.test.com/dsad/dwsdwsd:e231q")?;
     Ok(())
 }
 

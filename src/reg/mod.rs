@@ -81,12 +81,14 @@ pub struct Registry {
 
 impl Registry {
     pub fn open(
-        registry_addr: String,
+        use_https: bool,
+        host: String,
         auth: Option<RegistryAuth>,
         home_dir: Rc<HomeDir>,
     ) -> Result<Registry> {
-        let client = RegistryHttpClient::new(registry_addr.clone(), auth)?;
-        let image = MyImageManager::new(registry_addr.clone(), client, home_dir);
+        let reg_addr = format!("{}{}", if use_https { "https" } else { "http" }, host);
+        let client = RegistryHttpClient::new(reg_addr.clone(), auth)?;
+        let image = MyImageManager::new(reg_addr.clone(), client, home_dir);
         Ok(Registry {
             image_manager: image,
         })

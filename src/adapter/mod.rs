@@ -33,7 +33,7 @@ pub struct TargetInfo {
 pub trait SourceImageAdapter {
     fn info(&self) -> &SourceInfo;
 
-    fn into_info(self) -> SourceInfo;
+    fn into_info(self: Box<Self>) -> SourceInfo;
 }
 
 pub trait TargetImageAdapter {

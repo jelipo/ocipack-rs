@@ -37,7 +37,7 @@ pub fn run() -> Result<()> {
     let home_dir_path = Path::new(&temp_config.home_dir);
     let home_dir = Rc::new(HomeDir::new_home_dir(home_dir_path)?);
 
-    let mut from_registry = Registry::open(temp_config.from.registry.clone(), from_auth_opt, home_dir.clone())?;
+    let mut from_registry = Registry::open(true, temp_config.from.registry.clone(), from_auth_opt, home_dir.clone())?;
 
 
     let from_image_reference = Reference {
@@ -105,7 +105,7 @@ fn upload(
         }),
     };
 
-    let mut to_registry = Registry::open(to_config.registry.clone(), to_auth_opt, home_dir.clone())?;
+    let mut to_registry = Registry::open(true, to_config.registry.clone(), to_auth_opt, home_dir.clone())?;
     let mut reg_uploader_vec = Vec::<Box<dyn Processor<UploadResult>>>::new();
 
     let from_layers = match &from_manifest {

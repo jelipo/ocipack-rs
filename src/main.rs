@@ -23,6 +23,7 @@ mod tempconfig;
 mod adapter;
 mod init;
 mod subcmd;
+mod pull;
 
 pub static GLOBAL_CONFIG: SyncLazy<CmdArgs> = SyncLazy::new(|| {
     let args: CmdArgs = CmdArgs::parse();
@@ -32,8 +33,8 @@ pub static GLOBAL_CONFIG: SyncLazy<CmdArgs> = SyncLazy::new(|| {
 
 fn main() -> Result<()> {
     init::init()?;
-    let x: &CmdArgs = GLOBAL_CONFIG.borrow();
-    match x {
+    let cmd_args: &CmdArgs = GLOBAL_CONFIG.borrow();
+    match cmd_args {
         CmdArgs::Build(build_args) => {
             let command = BuildCommand::build(build_args)?;
         }
