@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::reg::docker::DockerManifest;
 use crate::reg::oci::OciManifest;
-use crate::reg::RegContentType;
+use crate::reg::{Layer, LayerConvert, RegContentType};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -64,6 +64,13 @@ impl Manifest {
             },
             Manifest::DockerV2S2(docker) => docker,
         })
+    }
+
+    pub fn layers(&self) -> Vec<Layer> {
+        match &self {
+            Manifest::OciV1(oci) => oci.get_layers(),
+            Manifest::DockerV2S2(docker) => docker.get_layers(),
+        }
     }
 }
 

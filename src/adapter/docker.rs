@@ -19,7 +19,7 @@ pub struct DockerfileAdapter {
 }
 
 impl DockerfileAdapter {
-    pub fn new(path: &str) -> Result<DockerfileAdapter> {
+    pub fn parse(path: &str) -> Result<SourceInfo> {
         let mut dockerfile_file = File::open(path)?;
         let mut str_body = String::new();
         let _read_size = dockerfile_file.read_to_string(&mut str_body)?;
@@ -105,18 +105,15 @@ impl DockerfileAdapter {
                 }
             }
         }
-        Ok(DockerfileAdapter {
-            docker_file_path: "".to_string(),
-            info: SourceInfo {
-                image_info: from_image.ok_or(Error::msg("dockerfile must has a 'From'"))?,
-                labels: label_map,
-                envs: envs_map,
-                user,
-                workdir,
-                cmd,
-                copy_files,
-                ports,
-            },
+        Ok(SourceInfo {
+            image_info: from_image.ok_or(Error::msg("dockerfile must has a 'From'"))?,
+            labels: label_map,
+            envs: envs_map,
+            user,
+            workdir,
+            cmd,
+            copy_files,
+            ports,
         })
     }
 }

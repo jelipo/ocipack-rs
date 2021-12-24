@@ -16,7 +16,7 @@ pub struct DockerManifest {
 }
 
 impl LayerConvert for DockerManifest {
-    fn to_layers(&self) -> Vec<Layer> {
+    fn get_layers(&self) -> Vec<Layer> {
         self.layers.iter().map(|docker| Layer {
             media_type: &docker.media_type,
             size: docker.size,

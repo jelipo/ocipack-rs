@@ -4,6 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use crate::config::BaseImage;
+use crate::config::cmd::TargetFormat;
 
 pub mod docker;
 pub mod registry;
@@ -27,6 +28,7 @@ pub struct SourceInfo {
 
 pub struct TargetInfo {
     pub image_info: ImageInfo,
+    pub format: TargetFormat,
 }
 
 

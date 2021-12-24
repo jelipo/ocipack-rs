@@ -1,86 +1,23 @@
-use std::collections::HashMap;
 use std::fs::File;
-use std::path::Path;
 use std::rc::Rc;
 
 use anyhow::Result;
 use log::info;
 use tar::{Builder, Header};
 
-use crate::progress::{Processor, ProcessResult};
+use crate::config::cmd::{TargetFormat, TargetType};
+use crate::docker::ToType;
 use crate::progress::manager::ProcessorManager;
-use crate::reg::{ConfigBlobEnum, Layer, LayerConvert, Reference, RegContentType, RegDigest, Registry};
-use crate::reg::docker::image::DockerConfigBlob;
+use crate::progress::Processor;
+use crate::progress::ProcessResult;
+use crate::reg::{ConfigBlobEnum, LayerConvert, Reference, RegContentType, RegDigest, Registry};
 use crate::reg::home::HomeDir;
-use crate::reg::http::download::DownloadResult;
 use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::UploadResult;
 use crate::reg::manifest::{CommonManifestLayer, Manifest};
-use crate::reg::oci::image::OciConfigBlob;
 use crate::tempconfig::TempConfig;
 use crate::util::random;
 use crate::util::sha::file_sha256;
-
-pub fn run() -> Result<()> {
-    let config_path = Path::new("config.json");
-    let config_file = File::open(config_path).expect("Open config file failed.");
-
-    let temp_config = serde_json::from_reader::<_, TempConfig>(config_file)?;
-
-    let from_auth_opt = match temp_config.from.username.as_str() {
-        "" => None,
-        _username => Some(RegistryAuth {
-            username: temp_config.from.username.clone(),
-            password: temp_config.from.password.clone(),
-        }),
-    };
-    let home_dir_path = Path::new(&temp_config.home_dir);
-    let home_dir = Rc::new(HomeDir::new_home_dir(home_dir_path)?);
-
-    let mut from_registry = Registry::open(true, &temp_config.from.registry, from_auth_opt)?;
-
-
-    let from_image_reference = Reference {
-        image_name: temp_config.from.image_name.as_str(),
-        reference: temp_config.from.reference.as_str(),
-    };
-    let manifest = from_registry.image_manager.manifests(&from_image_reference)?;
-    let (config_digest, layers) = match &manifest {
-        Manifest::OciV1(oci) => (&oci.config.digest, oci.get_layers()),
-        Manifest::DockerV2S2(docker) => (&docker.config.digest, docker.get_layers()),
-    };
-
-    let mut reg_downloader_vec = Vec::<Box<dyn Processor<DownloadResult>>>::new();
-    for layer in &layers {
-        let digest = RegDigest::new_with_digest(layer.digest.to_string());
-        let downloader = from_registry.image_manager.layer_blob_download(&from_image_reference.image_name, &digest, Some(layer.size))?;
-        reg_downloader_vec.push(Box::new(downloader))
-    }
-    info!("创建manager");
-    let manager = ProcessorManager::new_processor_manager(reg_downloader_vec)?;
-    let download_results = manager.wait_all_done()?;
-    let layer_digest_map = layer_to_map(&layers);
-    for download_result in &download_results {
-        if download_result.local_existed {
-            continue;
-        }
-        let layer = layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str())
-            .expect("internal error");
-        let digest = RegDigest::new_with_digest(layer.digest.to_string());
-        let (tar_sha256, tar_path) = home_dir.cache.blobs.ungz_download_file(&digest)?;
-        home_dir.cache.blobs.create_tar_shafile(&tar_sha256, &tar_path)?;
-    }
-
-    let config_blob_enum = match &manifest {
-        Manifest::OciV1(_) => ConfigBlobEnum::OciV1(from_registry.image_manager
-            .config_blob::<OciConfigBlob>(&temp_config.from.image_name, config_digest)?),
-        Manifest::DockerV2S2(_) => ConfigBlobEnum::DockerV2S2(from_registry.image_manager
-            .config_blob::<DockerConfigBlob>(&temp_config.from.image_name, config_digest)?)
-    };
-
-    upload(home_dir.clone(), &temp_config, &config_blob_enum, &manifest)?;
-    Ok(())
-}
 
 fn upload(
     home_dir: Rc<HomeDir>, temp_config: &TempConfig, from_config_blob_enum: &ConfigBlobEnum, from_manifest: &Manifest,
@@ -191,17 +128,4 @@ fn upload(
     }, to_manifest)?;
     info!("put result: {}",put_result);
     Ok(())
-}
-
-fn layer_to_map<'a>(layers: &'a Vec<Layer>) -> HashMap<&'a str, &'a Layer<'a>> {
-    let mut map = HashMap::<&str, &Layer>::with_capacity(layers.len());
-    for layer in layers {
-        map.insert(&layer.digest, layer);
-    }
-    map
-}
-
-pub enum ToType {
-    OciV1,
-    DockerV2S2,
 }

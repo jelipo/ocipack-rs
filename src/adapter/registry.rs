@@ -1,11 +1,32 @@
+use std::fs::File;
+use std::rc::Rc;
+
 use anyhow::{Error, Result};
 use dockerfile_parser::{Dockerfile, FromInstruction, Instruction};
+use log::info;
+use tar::{Builder, Header};
 
 use crate::adapter::{ImageInfo, TargetImageAdapter, TargetInfo};
+use crate::config::cmd::{TargetFormat, TargetType};
+use crate::config::RegAuthType;
+use crate::docker::ToType;
+use crate::GLOBAL_CONFIG;
+use crate::progress::manager::ProcessorManager;
+use crate::progress::Processor;
+use crate::progress::ProcessResult;
+use crate::reg::{ConfigBlobEnum, Layer, LayerConvert, Reference, RegContentType, RegDigest, Registry};
+use crate::reg::home::{HomeDir, LayerInfo};
+use crate::reg::http::RegistryAuth;
+use crate::reg::http::upload::UploadResult;
+use crate::reg::manifest::{CommonManifestLayer, Manifest};
+use crate::tempconfig::TempConfig;
 use crate::util::file::remove;
+use crate::util::random;
+use crate::util::sha::file_sha256;
 
 pub struct RegistryTargetAdapter {
     info: TargetInfo,
+    use_https: bool,
 }
 
 impl TargetImageAdapter for RegistryTargetAdapter {
@@ -15,7 +36,7 @@ impl TargetImageAdapter for RegistryTargetAdapter {
 }
 
 impl RegistryTargetAdapter {
-    pub fn new(image: &str) -> Result<RegistryTargetAdapter> {
+    pub fn new(image: &str, format: TargetFormat, use_https: bool) -> Result<RegistryTargetAdapter> {
         let temp_from = format!("FROM {}", image);
         let instruction = Dockerfile::parse(&temp_from)?.instructions.remove(0);
         let image_info = match instruction {
@@ -29,15 +50,42 @@ impl RegistryTargetAdapter {
         };
         Ok(RegistryTargetAdapter {
             info: TargetInfo {
-                image_info
-            }
+                image_info,
+                format,
+            },
+            use_https,
         })
     }
 }
 
-#[test]
-fn test() -> Result<()> {
-    let _adapter = RegistryTargetAdapter::new("harbor.test.com/dsad/dwsdwsd:e231q")?;
+fn upload(use_https: bool, info: TargetInfo, auth: RegAuthType, source_manifest: &Manifest, new_layers: Vec<LayerInfo>) -> Result<()> {
+    let home_dir = GLOBAL_CONFIG.home_dir.clone();
+    let reg_auth = auth.get_auth()?;
+    let host = info.image_info.image_host.unwrap_or("registry-1.docker.io/v2".to_string());
+    let mut target_reg = Registry::open(use_https, &host, reg_auth)?;
+    let mut manager = target_reg.image_manager;
+    let source_layers = source_manifest.layers();
+
+    let mut reg_uploader_vec = Vec::<Box<dyn Processor<UploadResult>>>::new();
+
+    for layer in source_layers.iter() {
+        let layer_digest = RegDigest::new_with_digest(layer.digest.to_string());
+        let tgz_file_path = home_dir.cache.blobs.tgz_file_path(&layer_digest)
+            .expect("local download file not found");
+        let file_path_str = tgz_file_path.as_os_str().to_string_lossy().to_string();
+        let reg_uploader = manager.layer_blob_upload(
+            &info.image_info.image_name, &layer_digest, &file_path_str,
+        )?;
+        reg_uploader_vec.push(Box::new(reg_uploader))
+    }
+    for new_layer in new_layers {
+        let custom_layer_uploader = manager.layer_blob_upload(
+            &info.image_info.image_name, &RegDigest::new_with_sha256(new_layer.gz_sha256.clone()),
+            &new_layer.gz_temp_file_path.as_os_str().to_string_lossy().to_string(),
+        )?;
+        reg_uploader_vec.push(Box::new(custom_layer_uploader));
+    }
+
     Ok(())
 }
 

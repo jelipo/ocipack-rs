@@ -10,6 +10,7 @@ use url::Url;
 
 use manifest::Manifest;
 
+use crate::GLOBAL_CONFIG;
 use crate::reg::docker::DockerManifest;
 use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::home::HomeDir;
@@ -82,13 +83,12 @@ pub struct Registry {
 impl Registry {
     pub fn open(
         use_https: bool,
-        host: String,
+        host: &str,
         auth: Option<RegistryAuth>,
-        home_dir: Rc<HomeDir>,
     ) -> Result<Registry> {
         let reg_addr = format!("{}{}", if use_https { "https" } else { "http" }, host);
         let client = RegistryHttpClient::new(reg_addr.clone(), auth)?;
-        let image = MyImageManager::new(reg_addr.clone(), client, home_dir);
+        let image = MyImageManager::new(reg_addr.clone(), client);
         Ok(Registry {
             image_manager: image,
         })
@@ -98,19 +98,16 @@ impl Registry {
 pub struct MyImageManager {
     registry_addr: String,
     reg_client: RegistryHttpClient,
-    home_dir: Rc<HomeDir>,
 }
 
 impl MyImageManager {
     pub fn new(
         registry_addr: String,
         client: RegistryHttpClient,
-        home_dir: Rc<HomeDir>,
     ) -> MyImageManager {
         MyImageManager {
             registry_addr,
             reg_client: client,
-            home_dir,
         }
     }
 
@@ -164,10 +161,10 @@ impl MyImageManager {
 
     pub fn layer_blob_download(&mut self, name: &str, blob_digest: &RegDigest, layer_size: Option<u64>) -> Result<RegDownloader> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest.digest);
-        let file_path = self.home_dir.cache.blobs.download_ready(blob_digest);
+        let file_path = GLOBAL_CONFIG.home_dir.cache.blobs.download_ready(blob_digest);
         let file_name = blob_digest.sha256.clone();
         let mut blob_config = BlobConfig::new(file_path, file_name, blob_digest.clone());
-        if let Some(exists_file) = self.home_dir.cache.blobs.tgz_file_path(blob_digest) {
+        if let Some(exists_file) = GLOBAL_CONFIG.home_dir.cache.blobs.tgz_file_path(blob_digest) {
             let file = File::open(&exists_file)?;
             blob_config.file_path = exists_file;
             let finished_downloader = RegDownloader::new_finished_downloader(
@@ -247,7 +244,7 @@ fn exited(simple_response: &RawRegistryResponse) -> Result<bool> {
 }
 
 pub trait LayerConvert {
-    fn to_layers(&self) -> Vec<Layer>;
+    fn get_layers(&self) -> Vec<Layer>;
 }
 
 pub struct Layer<'a> {

@@ -24,7 +24,7 @@ pub struct OciManifestConfig {
 }
 
 impl LayerConvert for OciManifest {
-    fn to_layers(&self) -> Vec<Layer> {
+    fn get_layers(&self) -> Vec<Layer> {
         self.layers.iter().map(|oci| Layer {
             media_type: &oci.media_type,
             size: oci.size,
