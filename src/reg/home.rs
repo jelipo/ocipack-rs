@@ -1,6 +1,7 @@
+use std::cell::{RefCell, RefMut};
 use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Error, Result};
 use sha2::{Digest, Sha256};
@@ -103,21 +104,9 @@ impl BlobsDir {
         Ok((tar_sha256, tar_file_path.into_boxed_path()))
     }
 
-    pub fn move_tar_download_file(&self, digest: &RegDigest) -> Result<Box<Path>> {
-        let tar_download_file_path = self.download_ready(digest);
-        let tar_sha256 = &digest.sha256;
-        let layer_dir = self.layers_path.join(&digest.sha256);
-        let tar_file_path = layer_dir.join(&tar_sha256);
-        tar_file_path.remove()?;
-        create_dir_all(&layer_dir)?;
-        std::fs::rename(tar_download_file_path, &tar_file_path)?;
-        Ok(tar_file_path.into_boxed_path())
-    }
-
-
     pub fn create_tar_shafile(&self, sha256: &str, tar_file_path: &Path) -> Result<()> {
         let tar_file_parent = tar_file_path.parent().ok_or(Error::msg("illegal tar file path"))?;
-        let tar_sha_file_path = self.tar_sha_file_path(tar_file_parent);
+        let tar_sha_file_path = self.diff_layer_config_path(tar_file_parent);
         tar_sha_file_path.remove()?;
         let mut tar_sha_file = File::create(tar_sha_file_path)?;
         tar_sha_file.write(sha256.as_bytes())?;
@@ -125,24 +114,21 @@ impl BlobsDir {
         Ok(())
     }
 
-    pub fn tar_sha_file_path(&self, layer_dir: &Path) -> Box<Path> {
-        layer_dir.join("tar_sha256").into_boxed_path()
+    pub fn diff_layer_config_path(&self, layer_dir: &Path) -> PathBuf {
+        layer_dir.join("diff_layer")
     }
 
+    pub fn local_file(&self, layer_sha: RegDigest) {}
 
-    pub fn tgz_file_path(&self, digest: &RegDigest) -> Option<Box<Path>> {
+    pub fn diff_layer_path(&self, digest: &RegDigest) -> Option<PathBuf> {
         let layer_file_parent = self.layers_path.join(&digest.sha256);
-        let ungzip_sha_file = self.tar_sha_file_path(layer_file_parent.as_path());
-        if let Ok(mut file) = File::open(ungzip_sha_file) {
+        let diff_layer_config = self.diff_layer_config_path(layer_file_parent.as_path());
+        if let Ok(mut file) = File::open(diff_layer_config) {
             let mut tgz_file_name = String::new();
             file.read_to_string(&mut tgz_file_name);
-            return Some(layer_file_parent.join(tgz_file_name).into_boxed_path());
+            return Some(layer_file_parent.join(tgz_file_name));
         }
         return None;
-    }
-
-    fn digest_to_sha(&self, digest: &str) -> String {
-        digest.replace("sha256:", "")
     }
 }
 
@@ -150,4 +136,56 @@ pub struct LayerInfo {
     pub gz_sha256: String,
     pub tar_sha256: String,
     pub gz_temp_file_path: Box<Path>,
+}
+
+pub struct LocalLayer<'a> {
+    layer_sha: &'a str,
+    layers_dir: &'a Path,
+    layer_sha_dir_path: PathBuf,
+    diff_layer_config: PathBuf,
+    diff_layer_path: RefCell<Option<PathBuf>>,
+}
+
+impl<'a> LocalLayer<'a> {
+    pub fn new(layer_sha: &'a str, layers_dir: &'a Path) -> LocalLayer<'a> {
+        let layer_sha_dir_path = layers_dir.join(layers_dir);
+        let diff_layer_config = layer_sha_dir_path.join("diff_layer");
+        LocalLayer {
+            layer_sha,
+            layers_dir,
+            layer_sha_dir_path,
+            diff_layer_config,
+            diff_layer_path: RefCell::new(None),
+        }
+    }
+
+    pub fn diff_layer_path(&self) -> Option<&PathBuf> {
+        if let Some(path) = self.diff_layer_path.borrow_mut().as_ref() {
+            return Some(path);
+        }
+        if !self.diff_layer_config.exists() {
+            return None;
+        }
+        match self.build_exists_diff_layer_path() {
+            Ok(diff_layer_path) => {
+                let _opt = self.diff_layer_path.replace(Some(diff_layer_path));
+                self.diff_layer_path()
+            }
+            Err(_) => None
+        }
+    }
+
+    fn build_exists_diff_layer_path(&self) -> Result<PathBuf> {
+        let diff_layer_sha = self.read_file_str(&self.diff_layer_config)?;
+        let diff_layer_path = self.diff_layer_config.join(diff_layer_sha);
+        if diff_layer_path.exists()
+        { Ok(diff_layer_path) } else { Err(Error::msg("diff layer file not exists")) }
+    }
+
+    fn read_file_str(&self, path: &Path) -> Result<String> {
+        let mut file = File::open(path)?;
+        let mut str = String::new();
+        let _size = file.read_to_string(&mut str)?;
+        Ok(str)
+    }
 }

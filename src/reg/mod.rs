@@ -164,9 +164,9 @@ impl MyImageManager {
         let file_path = GLOBAL_CONFIG.home_dir.cache.blobs.download_ready(blob_digest);
         let file_name = blob_digest.sha256.clone();
         let mut blob_config = BlobConfig::new(file_path, file_name, blob_digest.clone());
-        if let Some(exists_file) = GLOBAL_CONFIG.home_dir.cache.blobs.tgz_file_path(blob_digest) {
+        if let Some(exists_file) = GLOBAL_CONFIG.home_dir.cache.blobs.diff_layer_path(blob_digest) {
             let file = File::open(&exists_file)?;
-            blob_config.file_path = exists_file;
+            blob_config.file_path = exists_file.into_boxed_path();
             let finished_downloader = RegDownloader::new_finished_downloader(
                 blob_config, file.metadata()?.len())?;
             return Ok(finished_downloader);

@@ -70,7 +70,7 @@ fn upload(use_https: bool, info: TargetInfo, auth: RegAuthType, source_manifest:
 
     for layer in source_layers.iter() {
         let layer_digest = RegDigest::new_with_digest(layer.digest.to_string());
-        let tgz_file_path = home_dir.cache.blobs.tgz_file_path(&layer_digest)
+        let tgz_file_path = home_dir.cache.blobs.diff_layer_path(&layer_digest)
             .expect("local download file not found");
         let file_path_str = tgz_file_path.as_os_str().to_string_lossy().to_string();
         let reg_uploader = manager.layer_blob_upload(
@@ -85,6 +85,13 @@ fn upload(use_https: bool, info: TargetInfo, auth: RegAuthType, source_manifest:
         )?;
         reg_uploader_vec.push(Box::new(custom_layer_uploader));
     }
+
+    let manager = ProcessorManager::new_processor_manager(reg_uploader_vec)?;
+    let upload_results = manager.wait_all_done()?;
+    for upload_result in upload_results {
+        info!("{}", &upload_result.finished_info());
+    }
+
 
     Ok(())
 }

@@ -51,7 +51,7 @@ fn upload(
     };
     for layer in from_layers.iter() {
         let layer_digest = RegDigest::new_with_digest(layer.digest.to_string());
-        let tgz_file_path = home_dir.cache.blobs.tgz_file_path(&layer_digest)
+        let tgz_file_path = home_dir.cache.blobs.diff_layer_path(&layer_digest)
             .expect("local download file not found");
         let file_path_str = tgz_file_path.as_os_str().to_string_lossy().to_string();
         let reg_uploader = to_registry.image_manager.layer_blob_upload(
