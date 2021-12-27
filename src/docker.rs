@@ -68,7 +68,7 @@ pub fn run() -> Result<()> {
             .expect("internal error");
         let digest = RegDigest::new_with_digest(layer.digest.to_string());
         let (tar_sha256, tar_path) = home_dir.cache.blobs.ungz_download_file(&digest)?;
-        home_dir.cache.blobs.create_tar_shafile(&tar_sha256, &tar_path)?;
+        home_dir.cache.blobs.create_layer_config(&tar_sha256, &tar_path)?;
     }
 
     let config_blob_enum = match &manifest {
