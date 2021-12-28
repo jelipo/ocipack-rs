@@ -108,9 +108,10 @@ impl BlobsDir {
         Ok((tar_sha256, tar_file_path.into_boxed_path()))
     }
 
-    pub fn create_tar_shafile(&self, sha256: &str, tar_file_path: &Path) -> Result<()> {
-        let tar_file_parent = tar_file_path.parent().ok_or(Error::msg("illegal tar file path"))?;
-        let tar_sha_file_path = self.diff_layer_config_path(tar_file_parent);
+    pub fn create_layer_config(&self, sha256: &str, tar_file_path: &Path) -> Result<()> {
+        let layer_config_parent = tar_file_path.parent()
+            .ok_or(Error::msg("illegal layer config path"))?;
+        let tar_sha_file_path = self.diff_layer_config_path(layer_config_parent);
         tar_sha_file_path.remove()?;
         let mut tar_sha_file = File::create(tar_sha_file_path)?;
         tar_sha_file.write(sha256.as_bytes())?;
