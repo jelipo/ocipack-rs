@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::str::FromStr;
 
 use anyhow::{Error, Result};
 use log::info;
@@ -312,3 +313,17 @@ pub enum CompressType {
     TGZ,
     ZSTD,
 }
+
+impl FromStr for CompressType {
+    type Err = anyhow::Error;
+
+    fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
+        match str {
+            "TAR" => Ok(CompressType::TAR),
+            "TGZ" => Ok(CompressType::TGZ),
+            "ZSTD" => Ok(CompressType::ZSTD),
+            _ => Err(Error::msg(format!("unknown compress type:{}", str)))
+        }
+    }
+}
+

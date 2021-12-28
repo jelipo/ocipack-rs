@@ -1,12 +1,13 @@
 use std::cell::{RefCell, RefMut};
-use std::fs::{create_dir_all, File};
+use std::fs::{create_dir_all, File, read_to_string};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use anyhow::{Error, Result};
 use sha2::{Digest, Sha256};
 
-use crate::reg::RegDigest;
+use crate::reg::{CompressType, RegDigest};
 use crate::util::{compress, random};
 use crate::util::compress::ungz_file;
 use crate::util::file::PathExt;
@@ -25,7 +26,7 @@ impl HomeDir {
                     blob_path: blob_cache_dir_path.clone().into_boxed_path(),
                     config_path: blob_cache_dir_path.join("config").into_boxed_path(),
                     layers_path: blob_cache_dir_path.join("layers").into_boxed_path(),
-                    download_path: cache_dir_path.join("download").into_boxed_path(),
+                    download_dir: cache_dir_path.join("download").into_boxed_path(),
                 },
                 temp_dir: cache_dir_path.join("temp").into_boxed_path(),
             },
@@ -34,7 +35,7 @@ impl HomeDir {
         create_dir_all(&home_dir.cache.blobs.config_path)?;
         create_dir_all(&home_dir.cache.blobs.layers_path)?;
         create_dir_all(&home_dir.cache.blobs.layers_path)?;
-        create_dir_all(&home_dir.cache.blobs.download_path)?;
+        create_dir_all(&home_dir.cache.blobs.download_dir)?;
         Ok(home_dir)
     }
 }
@@ -77,19 +78,28 @@ pub struct BlobsDir {
     blob_path: Box<Path>,
     pub config_path: Box<Path>,
     pub layers_path: Box<Path>,
-    pub download_path: Box<Path>,
+    pub download_dir: Box<Path>,
 }
 
 impl BlobsDir {
     pub fn download_ready(&self, digest: &RegDigest) -> Box<Path> {
-        let file_parent_dir = &self.download_path;
+        let file_parent_dir = &self.download_dir;
         let file_path = file_parent_dir.join(&digest.sha256)
             .into_boxed_path();
         file_path
     }
 
-    pub fn uncompress_downloaded_manifest_layer(&self,digest: &RegDigest,) {
-
+    pub fn save_layer_cache(
+        &self, digest: &RegDigest, compress_type: CompressType,
+    ) -> Result<()> {
+        let download_path = self.download_dir.join(&digest.sha256);
+        let download_file = File::open(&download_path)?;
+        match compress_type {
+            CompressType::TAR => {}
+            CompressType::TGZ => {}
+            CompressType::ZSTD => {}
+        }
+        Ok(())
     }
 
     pub fn ungz_download_file(&self, digest: &RegDigest) -> Result<(String, Box<Path>)> {
@@ -135,6 +145,13 @@ impl BlobsDir {
         }
         return None;
     }
+
+    pub fn local_layer(&self, manifest_layer_digest: &RegDigest) -> Option<LocalLayer> {
+        match LocalLayer::try_pares(&self.layers_path, &manifest_layer_digest.sha256) {
+            Ok(local) => Some(local),
+            Err(_) => None,
+        }
+    }
 }
 
 pub struct LayerInfo {
@@ -143,12 +160,37 @@ pub struct LayerInfo {
     pub gz_temp_file_path: Box<Path>,
 }
 
-pub struct LocalLayer<'a> {
-    layer_sha: &'a str,
-    layers_dir: &'a Path,
-    layer_sha_dir_path: PathBuf,
+
+pub struct LocalLayer {
+    diff_layer_sha: String,
+    compress_type: CompressType,
     diff_layer_config: PathBuf,
-    diff_layer_path: RefCell<Option<PathBuf>>,
+    diff_layer_path: PathBuf,
+}
+
+impl LocalLayer {
+    pub fn try_pares(layer_cache_dir: &Path, manifest_sha: &str) -> Result<LocalLayer> {
+        let diff_layer_dir = layer_cache_dir.join(manifest_sha);
+        let diff_layer_config = diff_layer_dir.join("diff_layer_config");
+        let config_str = read_to_string(diff_layer_dir.clone())?;
+        let (compress_type, diff_layer_sha) = LocalLayer::pares_config(&config_str)?;
+        let diff_layer_path = diff_layer_dir.join(diff_layer_sha);
+        if !diff_layer_path.exists() { return Err(Error::msg("diff layer not found")); }
+        Ok(LocalLayer {
+            diff_layer_sha: diff_layer_sha.to_string(),
+            compress_type,
+            diff_layer_config,
+            diff_layer_path,
+        })
+    }
+
+    fn pares_config(config_str: &str) -> Result<(CompressType, &str)> {
+        let split = config_str.split('\n').collect::<Vec<&str>>();
+        if split.len() < 2 { return Err(Error::msg("error diff layer config file")); }
+        let compress_type = CompressType::from_str(split[0])?;
+        let diff_layer_sha = split[2];
+        Ok((compress_type, diff_layer_sha))
+    }
 }
 
 // impl<'a> LocalLayer<'a> {

@@ -9,6 +9,7 @@ use flate2::write::GzEncoder;
 
 pub fn ungz_file<W: ?Sized + Write>(gzip_file: &File, output_writer: &mut W) -> Result<()> {
     let mut decoder = GzDecoder::new(gzip_file);
+
     let mut buffer = vec![0u8; 1024 * 4].into_boxed_slice();
     loop {
         let read_size = decoder.read(&mut buffer)?;
