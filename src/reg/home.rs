@@ -88,6 +88,10 @@ impl BlobsDir {
         file_path
     }
 
+    pub fn uncompress_downloaded_manifest_layer(&self,digest: &RegDigest,) {
+
+    }
+
     pub fn ungz_download_file(&self, digest: &RegDigest) -> Result<(String, Box<Path>)> {
         let tgz_download_file_path = self.download_ready(digest);
         let download_file = File::open(&tgz_download_file_path)?;
@@ -146,46 +150,46 @@ pub struct LocalLayer<'a> {
     diff_layer_path: RefCell<Option<PathBuf>>,
 }
 
-impl<'a> LocalLayer<'a> {
-    pub fn new(layer_sha: &'a str, layers_dir: &'a Path) -> LocalLayer<'a> {
-        let layer_sha_dir_path = layers_dir.join(layers_dir);
-        let diff_layer_config = layer_sha_dir_path.join("diff_layer");
-        LocalLayer {
-            layer_sha,
-            layers_dir,
-            layer_sha_dir_path,
-            diff_layer_config,
-            diff_layer_path: RefCell::new(None),
-        }
-    }
-
-    pub fn diff_layer_path(&self) -> Option<&PathBuf> {
-        if let Some(path) = self.diff_layer_path.borrow_mut().as_ref() {
-            return Some(path);
-        }
-        if !self.diff_layer_config.exists() {
-            return None;
-        }
-        match self.build_exists_diff_layer_path() {
-            Ok(diff_layer_path) => {
-                let _opt = self.diff_layer_path.replace(Some(diff_layer_path));
-                self.diff_layer_path()
-            }
-            Err(_) => None
-        }
-    }
-
-    fn build_exists_diff_layer_path(&self) -> Result<PathBuf> {
-        let diff_layer_sha = self.read_file_str(&self.diff_layer_config)?;
-        let diff_layer_path = self.diff_layer_config.join(diff_layer_sha);
-        if diff_layer_path.exists()
-        { Ok(diff_layer_path) } else { Err(Error::msg("diff layer file not exists")) }
-    }
-
-    fn read_file_str(&self, path: &Path) -> Result<String> {
-        let mut file = File::open(path)?;
-        let mut str = String::new();
-        let _size = file.read_to_string(&mut str)?;
-        Ok(str)
-    }
-}
+// impl<'a> LocalLayer<'a> {
+//     pub fn new(layer_sha: &'a str, layers_dir: &'a Path) -> LocalLayer<'a> {
+//         let layer_sha_dir_path = layers_dir.join(layers_dir);
+//         let diff_layer_config = layer_sha_dir_path.join("diff_layer");
+//         LocalLayer {
+//             layer_sha,
+//             layers_dir,
+//             layer_sha_dir_path,
+//             diff_layer_config,
+//             diff_layer_path: RefCell::new(None),
+//         }
+//     }
+//
+//     pub fn diff_layer_path(&self) -> Option<&PathBuf> {
+//         if let Some(path) = self.diff_layer_path.borrow_mut().as_ref() {
+//             return Some(path);
+//         }
+//         if !self.diff_layer_config.exists() {
+//             return None;
+//         }
+//         match self.build_exists_diff_layer_path() {
+//             Ok(diff_layer_path) => {
+//                 let _opt = self.diff_layer_path.replace(Some(diff_layer_path));
+//                 self.diff_layer_path()
+//             }
+//             Err(_) => None
+//         }
+//     }
+//
+//     fn build_exists_diff_layer_path(&self) -> Result<PathBuf> {
+//         let diff_layer_sha = self.read_file_str(&self.diff_layer_config)?;
+//         let diff_layer_path = self.diff_layer_config.join(diff_layer_sha);
+//         if diff_layer_path.exists()
+//         { Ok(diff_layer_path) } else { Err(Error::msg("diff layer file not exists")) }
+//     }
+//
+//     fn read_file_str(&self, path: &Path) -> Result<String> {
+//         let mut file = File::open(path)?;
+//         let mut str = String::new();
+//         let _size = file.read_to_string(&mut str)?;
+//         Ok(str)
+//     }
+// }

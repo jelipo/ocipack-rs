@@ -275,8 +275,10 @@ impl RegContentType {
     pub const OCI_MANIFEST: Self = Self("application/vnd.oci.image.manifest.v1+json");
     pub const OCI_LAYER_TAR: Self = Self("application/vnd.oci.image.layer.v1.tar");
     pub const OCI_LAYER_TGZ: Self = Self("application/vnd.oci.image.layer.v1.tar+gzip");
+    pub const OCI_LAYER_ZSTD: Self = Self("application/vnd.oci.image.layer.v1.tar+zstd");
     pub const OCI_LAYER_NONDISTRIBUTABLE_TAR: Self = Self("application/vnd.oci.image.layer.nondistributable.v1.tar");
     pub const OCI_LAYER_NONDISTRIBUTABLE_TGZ: Self = Self("application/vnd.oci.image.layer.nondistributable.v1.tar+gzip");
+    pub const OCI_LAYER_NONDISTRIBUTABLE_ZSTD: Self = Self("application/vnd.oci.image.layer.nondistributable.v1.tar+zstd");
     pub const OCI_IMAGE_CONFIG: Self = Self("application/vnd.oci.image.config.v1+json");
 
     pub const ALL: Self = Self("*/*");
@@ -284,4 +286,29 @@ impl RegContentType {
     pub fn val(&self) -> &'static str {
         self.0
     }
+
+    pub fn compress_type(&self) -> Result<CompressType> {
+        if [RegContentType::OCI_LAYER_TAR.0, RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0]
+            .contains(&self.0) {
+            Ok(CompressType::TAR)
+        } else if [
+            RegContentType::DOCKER_FOREIGN_LAYER_TGZ.0,
+            RegContentType::OCI_LAYER_TGZ.0,
+            RegContentType::DOCKER_LAYER_TGZ.0,
+            RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
+        ].contains(&self.0) {
+            Ok(CompressType::TGZ)
+        } else if [RegContentType::OCI_LAYER_ZSTD.0, RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0]
+            .contains(&self.0) {
+            Ok(CompressType::ZSTD)
+        } else {
+            Err(Error::msg("not a layer media type"))
+        }
+    }
+}
+
+pub enum CompressType {
+    TAR,
+    TGZ,
+    ZSTD,
 }
