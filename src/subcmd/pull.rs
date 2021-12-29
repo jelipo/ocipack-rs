@@ -10,7 +10,7 @@ use crate::config::RegAuthType;
 use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
-use crate::reg::{ConfigBlobEnum, Layer, LayerConvert, Reference, RegDigest, Registry};
+use crate::reg::{ConfigBlob, ConfigBlobEnum, Layer, LayerConvert, Reference, RegDigest, Registry};
 use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::home::HomeDir;
 use crate::reg::http::download::DownloadResult;
@@ -21,7 +21,7 @@ pub fn pull(
     source_info: &SourceInfo,
     source_auth: RegAuthType,
     use_https: bool,
-) -> Result<()> {
+) -> Result<PullResult> {
     let image_info = &source_info.image_info;
     let image_host = image_info.image_host.clone()
         .unwrap_or("registry-1.docker.io/v2".into());
@@ -66,7 +66,9 @@ pub fn pull(
         Manifest::DockerV2S2(_) => ConfigBlobEnum::DockerV2S2(from_registry.image_manager
             .config_blob::<DockerConfigBlob>(&image_info.image_name, config_digest)?)
     };
-    Ok(())
+    Ok(PullResult {
+        config_blob: config_blob_enum
+    })
 }
 
 
@@ -76,4 +78,8 @@ fn layer_to_map<'a>(layers: &'a Vec<Layer>) -> HashMap<&'a str, &'a Layer<'a>> {
         map.insert(&layer.digest, layer);
     }
     map
+}
+
+pub struct PullResult {
+    config_blob: ConfigBlobEnum,
 }

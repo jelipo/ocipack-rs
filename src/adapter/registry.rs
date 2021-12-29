@@ -70,11 +70,11 @@ fn upload(use_https: bool, info: TargetInfo, auth: RegAuthType, source_manifest:
 
     for layer in source_layers.iter() {
         let layer_digest = RegDigest::new_with_digest(layer.digest.to_string());
-        let tgz_file_path = home_dir.cache.blobs.diff_layer_path(&layer_digest)
+        let local_layer = home_dir.cache.blobs.local_layer(&layer_digest)
             .expect("local download file not found");
-        let file_path_str = tgz_file_path.as_os_str().to_string_lossy().to_string();
+        let layer_path = local_layer.layer_path();
         let reg_uploader = manager.layer_blob_upload(
-            &info.image_info.image_name, &layer_digest, &file_path_str,
+            &info.image_info.image_name, &layer_digest, &layer_path,
         )?;
         reg_uploader_vec.push(Box::new(reg_uploader))
     }

@@ -100,7 +100,7 @@ impl RegistryHttpClient {
     pub fn download(&mut self, path: &str, blob_down_config: BlobConfig, scope: &str, layer_size: Option<u64>) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
         let token = self.reg_token_handler.token(Some(scope), TokenType::Pull)?;
-        let downloader = RegDownloader::new_reg_downloader(
+        let downloader = RegDownloader::new_reg(
             url, Some(HttpAuth::BearerToken { token }), self.client.clone(),
             blob_down_config, layer_size,
         )?;

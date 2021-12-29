@@ -138,12 +138,10 @@ impl BlobsDir {
     pub fn diff_layer_path(&self, digest: &RegDigest) -> Option<PathBuf> {
         let layer_file_parent = self.layers_path.join(&digest.sha256);
         let diff_layer_config = self.diff_layer_config_path(layer_file_parent.as_path());
-        if let Ok(mut file) = File::open(diff_layer_config) {
-            let mut tgz_file_name = String::new();
-            file.read_to_string(&mut tgz_file_name);
-            return Some(layer_file_parent.join(tgz_file_name));
+        match read_to_string(diff_layer_config) {
+            Ok(tgz_file_name) => Some(layer_file_parent.join(tgz_file_name)),
+            Err(_) => None
         }
-        return None;
     }
 
     pub fn local_layer(&self, manifest_layer_digest: &RegDigest) -> Option<LocalLayer> {
@@ -162,10 +160,10 @@ pub struct LayerInfo {
 
 
 pub struct LocalLayer {
-    diff_layer_sha: String,
-    compress_type: CompressType,
-    diff_layer_config: PathBuf,
-    diff_layer_path: PathBuf,
+    pub diff_layer_sha: String,
+    pub compress_type: CompressType,
+    pub diff_layer_config: PathBuf,
+    pub layer_path: PathBuf,
 }
 
 impl LocalLayer {
@@ -174,13 +172,13 @@ impl LocalLayer {
         let diff_layer_config = diff_layer_dir.join("diff_layer_config");
         let config_str = read_to_string(diff_layer_dir.clone())?;
         let (compress_type, diff_layer_sha) = LocalLayer::pares_config(&config_str)?;
-        let diff_layer_path = diff_layer_dir.join(diff_layer_sha);
-        if !diff_layer_path.exists() { return Err(Error::msg("diff layer not found")); }
+        let layer_path = diff_layer_dir.join(diff_layer_sha);
+        if !layer_path.exists() { return Err(Error::msg("diff layer not found")); }
         Ok(LocalLayer {
             diff_layer_sha: diff_layer_sha.to_string(),
             compress_type,
             diff_layer_config,
-            diff_layer_path,
+            layer_path,
         })
     }
 
@@ -190,6 +188,10 @@ impl LocalLayer {
         let compress_type = CompressType::from_str(split[0])?;
         let diff_layer_sha = split[2];
         Ok((compress_type, diff_layer_sha))
+    }
+
+    pub fn layer_path(&self) -> String {
+        self.layer_path.to_string_lossy().to_string()
     }
 }
 

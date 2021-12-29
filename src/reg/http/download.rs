@@ -25,7 +25,7 @@ pub struct RegDownloader {
 }
 
 impl RegDownloader {
-    pub fn new_reg_downloader(
+    pub fn new_reg(
         url: String, auth: Option<HttpAuth>, client: Client, blob_down_config: BlobConfig, layer_size: Option<u64>,
     ) -> Result<RegDownloader> {
         let blob_down_config_arc = Arc::new(blob_down_config);
@@ -47,7 +47,7 @@ impl RegDownloader {
         })
     }
 
-    pub fn new_finished_downloader(blob_down_config: BlobConfig, file_size: u64) -> Result<RegDownloader> {
+    pub fn new_finished(blob_down_config: BlobConfig, file_size: u64) -> Result<RegDownloader> {
         let blob_down_config_arc = Arc::new(blob_down_config);
         let temp = RegDownloaderStatus {
             status_core: Arc::new(Mutex::new(RegDownloaderStatusCore {

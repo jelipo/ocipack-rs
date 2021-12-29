@@ -44,6 +44,7 @@ fn build_auth(image_host: Option<&String>, base_auth: Option<&BaseAuth>) -> RegA
 
 fn handle(source_info: SourceInfo, source_auth: RegAuthType, build_args: &BuildArgs) -> Result<()> {
     let home_dir = GLOBAL_CONFIG.home_dir.clone();
-    let t = pull(&source_info, source_auth, !build_args.allow_insecure)?;
+    let pull = pull(&source_info, source_auth, !build_args.allow_insecure)?;
+
     Ok(())
 }
