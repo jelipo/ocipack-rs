@@ -9,7 +9,7 @@ use dockerfile_parser::{BreakableStringComponent, Dockerfile, Instruction, Shell
 use log::warn;
 use regex::Regex;
 
-use crate::adapter::{CopyFile, ImageInfo, SourceImageAdapter, SourceInfo};
+use crate::adapter::{BuildInfo, CopyFile, ImageInfo, SourceImageAdapter, SourceInfo};
 use crate::config::{BaseImage, RegAuthType};
 use crate::config::cmd::BaseAuth;
 
@@ -19,7 +19,7 @@ pub struct DockerfileAdapter {
 }
 
 impl DockerfileAdapter {
-    pub fn parse(path: &str) -> Result<SourceInfo> {
+    pub fn parse(path: &str) -> Result<(SourceInfo, BuildInfo)> {
         let mut dockerfile_file = File::open(path)?;
         let mut str_body = String::new();
         let _read_size = dockerfile_file.read_to_string(&mut str_body)?;
@@ -105,8 +105,10 @@ impl DockerfileAdapter {
                 }
             }
         }
-        Ok(SourceInfo {
+        let source_info = SourceInfo {
             image_info: from_image.ok_or(Error::msg("dockerfile must has a 'From'"))?,
+        };
+        Ok((source_info, BuildInfo {
             labels: label_map,
             envs: envs_map,
             user,
@@ -114,7 +116,7 @@ impl DockerfileAdapter {
             cmd,
             copy_files,
             ports,
-        })
+        }))
     }
 }
 

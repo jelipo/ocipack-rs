@@ -17,6 +17,10 @@ pub struct ImageInfo {
 
 pub struct SourceInfo {
     pub image_info: ImageInfo,
+
+}
+
+pub struct BuildInfo{
     pub labels: HashMap<String, String>,
     pub envs: HashMap<String, String>,
     pub user: Option<String>,
