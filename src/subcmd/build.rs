@@ -1,12 +1,16 @@
-use anyhow::Result;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use anyhow::{Error, Result};
+use tar::{Builder, Header};
 
 use crate::adapter::{BuildInfo, CopyFile, SourceImageAdapter, SourceInfo, TargetImageAdapter};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
 use crate::config::cmd::{BaseAuth, BuildCmdArgs, SourceType, TargetType};
 use crate::config::RegAuthType;
-use crate::GLOBAL_CONFIG;
+use crate::{GLOBAL_CONFIG, HomeDir};
 use crate::subcmd::pull::pull;
+use crate::util::random;
 
 pub struct BuildCommand {}
 
@@ -58,12 +62,36 @@ fn handle(
     Ok(())
 }
 
-fn build_top_tar(copyfiles: &Vec<CopyFile>) -> Option<()> {
+fn build_top_tar(copyfiles: &Vec<CopyFile>, home_dir: &HomeDir) -> Result<Option<()>> {
     if copyfiles.len() == 0 {
-        return None;
+        return Ok(None);
     }
+    let tar_file_name = random::random_str(10) + ".tar";
+    let tar_temp_file_path = home_dir.cache.temp_dir.join(tar_file_name);
+    let tar_temp_file = File::create(tar_temp_file_path.as_path())?;
+    let mut tar_builder = Builder::new(tar_temp_file);
+    let header = Header::new_gnu();
     for copyfile in copyfiles {
+        for source_path_str in copyfile.source_path {
+            let source_pathbuf = PathBuf::from(&source_path_str);
+            if !source_pathbuf.exists() {
+                return Err(Error::msg(format!("path not found:{}", source_path_str)));
+            }
+            let dest_path = if copyfile.dest_path.ends_with("/") {
+                &copyfile.dest_path[1..]
+            } else {
+                &copyfile.dest_path
+            };
+            if source_pathbuf.is_file() {
+                tar_builder.append_file(dest_path, &mut File::open(source_pathbuf)?)?;
+            } else if source_pathbuf.is_dir() {
+                tar_builder.append_dir(dest_path, source_path_str)?;
+            } else {
+                return Err(Error::msg(format!("copy only support file and dir")));
+            }
+        }
 
+        let _tar_file = tar_builder.into_inner()?;
     }
-    Some(())
+    Ok(Some(()))
 }
