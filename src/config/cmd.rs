@@ -6,12 +6,12 @@ use clap::Parser;
 #[derive(Parser)]
 #[clap(about = "An image tool", version, author = "jelipo <me@jelipo.com>")]
 pub enum CmdArgs {
-    Build(BuildArgs),
+    Build(BuildCmdArgs),
     Transform,
 }
 
 #[derive(clap::Args)]
-pub struct BuildArgs {
+pub struct BuildCmdArgs {
     /// Allow insecure registry
     #[clap(long, short, parse(from_flag))]
     pub allow_insecure: bool,

@@ -42,7 +42,8 @@ pub fn pull(
     let mut reg_downloader_vec = Vec::<Box<dyn Processor<DownloadResult>>>::new();
     for layer in &layers {
         let digest = RegDigest::new_with_digest(layer.digest.to_string());
-        let downloader = from_registry.image_manager.layer_blob_download(&from_image_reference.image_name, &digest, Some(layer.size))?;
+        let downloader = from_registry.image_manager
+            .layer_blob_download(&from_image_reference.image_name, &digest, Some(layer.size))?;
         reg_downloader_vec.push(Box::new(downloader))
     }
 

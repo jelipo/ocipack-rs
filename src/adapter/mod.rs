@@ -47,6 +47,6 @@ pub trait TargetImageAdapter {
 }
 
 pub struct CopyFile {
-    source_path: Vec<String>,
-    dest_path: String,
+    pub source_path: Vec<String>,
+    pub dest_path: String,
 }
