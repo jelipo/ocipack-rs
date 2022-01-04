@@ -1,14 +1,15 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
+
 use anyhow::{Error, Result};
 use tar::{Builder, Header};
 
+use crate::{GLOBAL_CONFIG, HomeDir};
 use crate::adapter::{BuildInfo, CopyFile, SourceImageAdapter, SourceInfo, TargetImageAdapter};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
 use crate::config::cmd::{BaseAuth, BuildCmdArgs, SourceType, TargetType};
 use crate::config::RegAuthType;
-use crate::{GLOBAL_CONFIG, HomeDir};
 use crate::subcmd::pull::pull;
 use crate::util::random;
 
@@ -53,7 +54,7 @@ fn handle(
     build_cmds: &BuildCmdArgs,
 ) -> Result<()> {
     let home_dir = GLOBAL_CONFIG.home_dir.clone();
-    let pull = pull(&source_info, source_auth, !build_args.allow_insecure)?;
+    let pull = pull(&source_info, source_auth, !build_cmds.allow_insecure)?;
 
     for copyfile in build_info.copy_files {
         // TODO
@@ -70,9 +71,8 @@ fn build_top_tar(copyfiles: &Vec<CopyFile>, home_dir: &HomeDir) -> Result<Option
     let tar_temp_file_path = home_dir.cache.temp_dir.join(tar_file_name);
     let tar_temp_file = File::create(tar_temp_file_path.as_path())?;
     let mut tar_builder = Builder::new(tar_temp_file);
-    let header = Header::new_gnu();
     for copyfile in copyfiles {
-        for source_path_str in copyfile.source_path {
+        for source_path_str in &copyfile.source_path {
             let source_pathbuf = PathBuf::from(&source_path_str);
             if !source_pathbuf.exists() {
                 return Err(Error::msg(format!("path not found:{}", source_path_str)));
@@ -90,8 +90,7 @@ fn build_top_tar(copyfiles: &Vec<CopyFile>, home_dir: &HomeDir) -> Result<Option
                 return Err(Error::msg(format!("copy only support file and dir")));
             }
         }
-
-        let _tar_file = tar_builder.into_inner()?;
     }
+    tar_builder.finish()?;
     Ok(Some(()))
 }
