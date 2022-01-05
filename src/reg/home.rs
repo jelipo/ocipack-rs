@@ -46,7 +46,7 @@ pub struct CacheDir {
 }
 
 impl CacheDir {
-    pub fn gz_layer_file(&self, tar_file_path: &Path) -> Result<LayerInfo> {
+    pub fn gz_layer_file(&self, tar_file_path: &Path) -> Result<TempLayerInfo> {
         let tar_file = File::open(tar_file_path)?;
         let mut sha256_reader = Sha256Reader::new(tar_file);
         let tgz_file_name = random::random_str(10) + ".tgz";
@@ -56,7 +56,7 @@ impl CacheDir {
         compress::gz_file(&mut sha256_reader, &mut sha256_writer)?;
         let tar_sha256 = sha256_reader.sha256()?;
         let tgz_sha256 = sha256_writer.sha256()?;
-        Ok(LayerInfo {
+        Ok(TempLayerInfo {
             gz_sha256: tgz_sha256,
             tar_sha256,
             gz_temp_file_path: tgz_file_path.into_boxed_path(),
@@ -152,7 +152,7 @@ impl BlobsDir {
     }
 }
 
-pub struct LayerInfo {
+pub struct TempLayerInfo {
     pub gz_sha256: String,
     pub tar_sha256: String,
     pub gz_temp_file_path: Box<Path>,

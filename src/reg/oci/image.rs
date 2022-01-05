@@ -38,7 +38,7 @@ pub struct Config {
     #[serde(rename = "WorkingDir")]
     pub working_dir: Option<String>,
     #[serde(rename = "Labels")]
-    pub labels: Option<Vec<HashMap<String, String>>>,
+    pub labels: Option<HashMap<String, String>>,
     #[serde(rename = "Memory")]
     pub memory: Option<u64>,
     #[serde(rename = "MemorySwap")]

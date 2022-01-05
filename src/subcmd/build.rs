@@ -10,8 +10,12 @@ use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
 use crate::config::cmd::{BaseAuth, BuildCmdArgs, SourceType, TargetType};
 use crate::config::RegAuthType;
+use crate::reg::ConfigBlobEnum;
+use crate::reg::home::TempLayerInfo;
 use crate::subcmd::pull::pull;
-use crate::util::random;
+use crate::tempconfig::TempConfig;
+use crate::util::{compress, random};
+use crate::util::sha::{Sha256Reader, Sha256Writer};
 
 pub struct BuildCommand {}
 
@@ -56,14 +60,22 @@ fn handle(
     let home_dir = GLOBAL_CONFIG.home_dir.clone();
     let pull = pull(&source_info, source_auth, !build_cmds.allow_insecure)?;
 
-    for copyfile in build_info.copy_files {
-        // TODO
+    let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| {
+        gz_layer_file(&tar_path, &home_dir)?
+    });
+
+    match &build_cmds.target {
+        TargetType::Registry(image) => {
+            let registry_adapter = RegistryTargetAdapter::new(
+                image, build_cmds.format.clone(), !build_cmds.allow_insecure)?;
+        }
     }
+
 
     Ok(())
 }
 
-fn build_top_tar(copyfiles: &Vec<CopyFile>, home_dir: &HomeDir) -> Result<Option<()>> {
+fn build_top_tar(copyfiles: &Vec<CopyFile>, home_dir: &HomeDir) -> Result<Option<PathBuf>> {
     if copyfiles.len() == 0 {
         return Ok(None);
     }
@@ -92,5 +104,41 @@ fn build_top_tar(copyfiles: &Vec<CopyFile>, home_dir: &HomeDir) -> Result<Option
         }
     }
     tar_builder.finish()?;
-    Ok(Some(()))
+    Ok(Some(tar_temp_file_path))
+}
+
+fn gz_layer_file(tar_file_path: &Path, home_dir: &HomeDir) -> Result<TempLayerInfo> {
+    let tar_file = File::open(tar_file_path)?;
+    let mut sha256_reader = Sha256Reader::new(tar_file);
+    let tgz_file_name = random::random_str(10) + ".tgz";
+    let tgz_file_path = home_dir.cache.temp_dir.join(tgz_file_name);
+    let tgz_file = File::create(&tgz_file_path)?;
+    let mut sha256_writer = Sha256Writer::new(tgz_file);
+    compress::gz_file(&mut sha256_reader, &mut sha256_writer)?;
+    let tar_sha256 = sha256_reader.sha256()?;
+    let tgz_sha256 = sha256_writer.sha256()?;
+    Ok(LayerInfo {
+        gz_sha256: tgz_sha256,
+        tar_sha256,
+        gz_temp_file_path: tgz_file_path.into_boxed_path(),
+    })
+}
+
+fn build_config_blob(
+    build_info: BuildInfo,
+    source_config_blob: &ConfigBlobEnum,
+    temp_layer: &TempLayerInfo
+) {
+    let target_config_blob = source_config_blob.clone();
+    let config_blob_digest = format!("sha256:{}", temp_layer.tar_sha256);
+    let config_blob_str = match target_config_blob {
+        ConfigBlobEnum::OciV1(mut oci_config_blob) => {
+            oci_config_blob.rootfs.diff_ids.insert(0, config_blob_digest);
+            serde_json::to_string(&oci_config_blob)?
+        }
+        ConfigBlobEnum::DockerV2S2(mut docker_config_blob) => {
+            docker_config_blob.rootfs.diff_ids.insert(0, config_blob_digest);
+            serde_json::to_string(&docker_config_blob)?
+        }
+    };
 }

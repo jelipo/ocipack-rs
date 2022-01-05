@@ -15,7 +15,7 @@ use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
 use crate::progress::ProcessResult;
 use crate::reg::{ConfigBlobEnum, Layer, LayerConvert, Reference, RegContentType, RegDigest, Registry};
-use crate::reg::home::{HomeDir, LayerInfo};
+use crate::reg::home::{HomeDir, TempLayerInfo};
 use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::UploadResult;
 use crate::reg::manifest::{CommonManifestLayer, Manifest};
@@ -58,7 +58,7 @@ impl RegistryTargetAdapter {
     }
 }
 
-fn upload(use_https: bool, info: TargetInfo, auth: RegAuthType, source_manifest: &Manifest, new_layers: Vec<LayerInfo>) -> Result<()> {
+fn upload(use_https: bool, info: TargetInfo, auth: RegAuthType, source_manifest: &Manifest, new_layers: Vec<TempLayerInfo>) -> Result<()> {
     let home_dir = GLOBAL_CONFIG.home_dir.clone();
     let reg_auth = auth.get_auth()?;
     let host = info.image_info.image_host.unwrap_or("registry-1.docker.io/v2".to_string());

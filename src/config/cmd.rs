@@ -37,6 +37,7 @@ pub struct BuildCmdArgs {
     pub format: TargetFormat,
 }
 
+#[derive(Clone)]
 pub enum TargetFormat {
     Docker,
     Oci,
