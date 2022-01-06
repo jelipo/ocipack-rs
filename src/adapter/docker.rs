@@ -115,7 +115,7 @@ impl DockerfileAdapter {
             workdir,
             cmd,
             copy_files,
-            ports,
+            ports: if ports.is_empty() { None } else { Some(ports) },
         }))
     }
 }

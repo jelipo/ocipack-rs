@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
@@ -8,7 +9,7 @@ use crate::{GLOBAL_CONFIG, HomeDir};
 use crate::adapter::{BuildInfo, CopyFile, SourceImageAdapter, SourceInfo, TargetImageAdapter};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
-use crate::config::cmd::{BaseAuth, BuildCmdArgs, SourceType, TargetType};
+use crate::config::cmd::{BaseAuth, BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
 use crate::reg::ConfigBlobEnum;
 use crate::reg::home::TempLayerInfo;
@@ -61,7 +62,7 @@ fn handle(
     let pull = pull(&source_info, source_auth, !build_cmds.allow_insecure)?;
 
     let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| {
-        gz_layer_file(&tar_path, &home_dir)?
+        gz_layer_file(&tar_path, &home_dir)
     });
 
     match &build_cmds.target {
@@ -117,28 +118,54 @@ fn gz_layer_file(tar_file_path: &Path, home_dir: &HomeDir) -> Result<TempLayerIn
     compress::gz_file(&mut sha256_reader, &mut sha256_writer)?;
     let tar_sha256 = sha256_reader.sha256()?;
     let tgz_sha256 = sha256_writer.sha256()?;
-    Ok(LayerInfo {
+    Ok(TempLayerInfo {
         gz_sha256: tgz_sha256,
         tar_sha256,
         gz_temp_file_path: tgz_file_path.into_boxed_path(),
     })
 }
 
-fn build_config_blob(
+fn build_target_config_blob(
     build_info: BuildInfo,
     source_config_blob: &ConfigBlobEnum,
-    temp_layer: &TempLayerInfo
-) {
-    let target_config_blob = source_config_blob.clone();
-    let config_blob_digest = format!("sha256:{}", temp_layer.tar_sha256);
-    let config_blob_str = match target_config_blob {
-        ConfigBlobEnum::OciV1(mut oci_config_blob) => {
-            oci_config_blob.rootfs.diff_ids.insert(0, config_blob_digest);
-            serde_json::to_string(&oci_config_blob)?
-        }
-        ConfigBlobEnum::DockerV2S2(mut docker_config_blob) => {
-            docker_config_blob.rootfs.diff_ids.insert(0, config_blob_digest);
-            serde_json::to_string(&docker_config_blob)?
+    temp_layer: &TempLayerInfo,
+    target_format: &TargetFormat,
+) -> ConfigBlobEnum {
+    // TODO change to diff config type
+    let mut target_config_blob = match target_format {
+        TargetFormat::Docker => source_config_blob.clone(),
+        TargetFormat::Oci => source_config_blob.clone(),
+    };
+    let new_tar_digest = format!("sha256:{}", temp_layer.tar_sha256);
+    target_config_blob.add_diff_layer(new_tar_digest);
+    target_config_blob.add_labels(build_info.labels);
+    target_config_blob.add_envs(build_info.envs);
+    if let Some(cmds) = build_info.cmd {
+        target_config_blob.overwrite_cmd(cmds)
+    }
+    if let Some(port_exposes) = build_info.ports {
+        target_config_blob.add_ports(port_exposes);
+    }
+    if let Some(work_dir) = build_info.workdir {
+        target_config_blob.overwrite_work_dir(work_dir);
+    }
+    if let Some(user) = build_info.user {
+        target_config_blob.overwrite_user(user);
+    }
+    target_config_blob
+}
+
+fn build_config_blob_map(
+    source_map: Option<HashMap<String, String>>,
+    add_maps: HashMap<String, String>,
+) -> Option<HashMap<String, String>> {
+    let new_map = match source_map {
+        None => add_maps,
+        Some(mut value) => {
+            value.extend(add_maps.into_iter());
+            value
         }
     };
+    if new_map.is_empty() { None } else { Some(new_map) }
 }
+

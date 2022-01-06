@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -7,6 +8,7 @@ use anyhow::{Error, Result};
 use log::info;
 use reqwest::Method;
 use serde::de::DeserializeOwned;
+use serde_json::{Map, Value};
 use url::Url;
 
 use manifest::Manifest;
@@ -259,6 +261,84 @@ pub trait ConfigBlob {}
 pub enum ConfigBlobEnum {
     OciV1(OciConfigBlob),
     DockerV2S2(DockerConfigBlob),
+}
+
+impl ConfigBlobEnum {
+    pub fn add_diff_layer(&mut self, new_tar_digest: String) {
+        match self {
+            ConfigBlobEnum::OciV1(oci) =>
+                oci.rootfs.diff_ids.insert(0, new_tar_digest),
+            ConfigBlobEnum::DockerV2S2(docker) =>
+                docker.rootfs.diff_ids.insert(0, new_tar_digest),
+        }
+    }
+
+    pub fn add_labels(&mut self, new_labels: HashMap<String, String>) {
+        if new_labels.is_empty() { return; }
+        match self {
+            ConfigBlobEnum::OciV1(oci) => match &mut oci.config.labels {
+                None => oci.config.labels = Some(new_labels),
+                Some(source) => source.extend(new_labels),
+            },
+            ConfigBlobEnum::DockerV2S2(_) => (),
+        };
+    }
+
+    pub fn add_envs(&mut self, envs: HashMap<String, String>) {
+        if envs.is_empty() { return; }
+        let new_envs = envs.into_iter().map(|(k, v)| {
+            format!("{}={}", k, v)
+        }).collect::<Vec<String>>();
+        match self {
+            ConfigBlobEnum::OciV1(oci) => match &mut oci.config.env {
+                None => oci.config.env = Some(new_envs),
+                Some(source) => source.extend(new_envs),
+            },
+            ConfigBlobEnum::DockerV2S2(docker) => match &mut docker.config.env {
+                None => docker.config.env = Some(new_envs),
+                Some(source) => source.extend(new_envs),
+            },
+        };
+    }
+
+    pub fn overwrite_cmd(&mut self, cmds: Vec<String>) {
+        match self {
+            ConfigBlobEnum::OciV1(oci) => oci.config.cmd = Some(cmds),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.config.cmd = Some(cmds),
+        }
+    }
+
+    pub fn add_ports(&mut self, port_exposes: Vec<String>) {
+        if port_exposes.is_empty() { return; }
+        let mut map = HashMap::<String, Value>::with_capacity(port_exposes.len());
+        port_exposes.into_iter().for_each(|expose| {
+            map.insert(expose, Value::Object(Map::new()));
+        });
+        match self {
+            ConfigBlobEnum::OciV1(oci) => match &mut oci.config.exposed_ports {
+                None => oci.config.exposed_ports = Some(map),
+                Some(source) => source.extend(map)
+            },
+            ConfigBlobEnum::DockerV2S2(docker) => match &mut docker.config.exposed_ports {
+                None => docker.config.exposed_ports = Some(map),
+                Some(source) => source.extend(map)
+            },
+        }
+    }
+
+    pub fn overwrite_work_dir(&mut self, work_dir: String) {
+        match self {
+            ConfigBlobEnum::OciV1(oci) => oci.config.working_dir = Some(work_dir),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.config.working_dir = Some(work_dir),
+        }
+    }
+
+    pub fn overwrite_user(&mut self, user: String) {
+        match self {
+            ConfigBlobEnum::OciV1(oci) => oci.config.user = Some(user),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.config.user = Some(user),
+        }
+    }
 }
 
 pub struct RegContentType(&'static str);

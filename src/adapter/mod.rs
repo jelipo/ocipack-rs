@@ -20,14 +20,14 @@ pub struct SourceInfo {
 
 }
 
-pub struct BuildInfo{
+pub struct BuildInfo {
     pub labels: HashMap<String, String>,
     pub envs: HashMap<String, String>,
     pub user: Option<String>,
     pub workdir: Option<String>,
     pub cmd: Option<Vec<String>>,
     pub copy_files: Vec<CopyFile>,
-    pub ports: Vec<String>,
+    pub ports: Option<Vec<String>>,
 }
 
 pub struct TargetInfo {
