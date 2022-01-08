@@ -7,7 +7,7 @@ extern crate derive_builder;
 use std::borrow::Borrow;
 use std::lazy::SyncLazy;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use clap::Parser;

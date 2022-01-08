@@ -1,6 +1,8 @@
+
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use anyhow::{Error, Result};
 use tar::{Builder, Header};
@@ -63,7 +65,7 @@ fn handle(
 
     let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| {
         gz_layer_file(&tar_path, &home_dir)
-    });
+    }).transpose()?;
 
     match &build_cmds.target {
         TargetType::Registry(image) => {
