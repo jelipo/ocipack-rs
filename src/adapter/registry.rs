@@ -27,6 +27,7 @@ use crate::util::sha::file_sha256;
 pub struct RegistryTargetAdapter {
     info: TargetInfo,
     use_https: bool,
+    target_manifest: Manifest,
 }
 
 impl TargetImageAdapter for RegistryTargetAdapter {
@@ -36,7 +37,7 @@ impl TargetImageAdapter for RegistryTargetAdapter {
 }
 
 impl RegistryTargetAdapter {
-    pub fn new(image: &str, format: TargetFormat, use_https: bool) -> Result<RegistryTargetAdapter> {
+    pub fn new(image: &str, format: TargetFormat, use_https: bool, target_manifest: Manifest) -> Result<RegistryTargetAdapter> {
         let temp_from = format!("FROM {}", image);
         let instruction = Dockerfile::parse(&temp_from)?.instructions.remove(0);
         let image_info = match instruction {
@@ -54,46 +55,49 @@ impl RegistryTargetAdapter {
                 format,
             },
             use_https,
+            target_manifest,
         })
     }
+
+    fn upload(self, auth: RegAuthType, source_manifest: &Manifest, new_layers: Vec<TempLayerInfo>) -> Result<()> {
+        let home_dir = GLOBAL_CONFIG.home_dir.clone();
+        let target_info = self.info;
+        let reg_auth = auth.get_auth()?;
+        let host = target_info.image_info.image_host.unwrap_or("registry-1.docker.io/v2".to_string());
+        let mut target_reg = Registry::open(self.use_https, &host, reg_auth)?;
+        let mut manager = target_reg.image_manager;
+        let source_layers = source_manifest.layers();
+
+        let mut reg_uploader_vec = Vec::<Box<dyn Processor<UploadResult>>>::new();
+
+        for layer in source_layers.iter() {
+            let layer_digest = RegDigest::new_with_digest(layer.digest.to_string());
+            let local_layer = home_dir.cache.blobs.local_layer(&layer_digest)
+                .expect("local download file not found");
+            let layer_path = local_layer.layer_path();
+            let reg_uploader = manager.layer_blob_upload(
+                &target_info.image_info.image_name, &layer_digest, &layer_path,
+            )?;
+            reg_uploader_vec.push(Box::new(reg_uploader))
+        }
+        for new_layer in new_layers {
+            let custom_layer_uploader = manager.layer_blob_upload(
+                &target_info.image_info.image_name, &RegDigest::new_with_sha256(new_layer.gz_sha256.clone()),
+                &new_layer.gz_temp_file_path.as_os_str().to_string_lossy().to_string(),
+            )?;
+            reg_uploader_vec.push(Box::new(custom_layer_uploader));
+        }
+
+        let manager = ProcessorManager::new_processor_manager(reg_uploader_vec)?;
+        let upload_results = manager.wait_all_done()?;
+        for upload_result in upload_results {
+            info!("{}", &upload_result.finished_info());
+        }
+
+
+        Ok(())
+    }
 }
 
-fn upload(use_https: bool, info: TargetInfo, auth: RegAuthType, source_manifest: &Manifest, new_layers: Vec<TempLayerInfo>) -> Result<()> {
-    let home_dir = GLOBAL_CONFIG.home_dir.clone();
-    let reg_auth = auth.get_auth()?;
-    let host = info.image_info.image_host.unwrap_or("registry-1.docker.io/v2".to_string());
-    let mut target_reg = Registry::open(use_https, &host, reg_auth)?;
-    let mut manager = target_reg.image_manager;
-    let source_layers = source_manifest.layers();
-
-    let mut reg_uploader_vec = Vec::<Box<dyn Processor<UploadResult>>>::new();
-
-    for layer in source_layers.iter() {
-        let layer_digest = RegDigest::new_with_digest(layer.digest.to_string());
-        let local_layer = home_dir.cache.blobs.local_layer(&layer_digest)
-            .expect("local download file not found");
-        let layer_path = local_layer.layer_path();
-        let reg_uploader = manager.layer_blob_upload(
-            &info.image_info.image_name, &layer_digest, &layer_path,
-        )?;
-        reg_uploader_vec.push(Box::new(reg_uploader))
-    }
-    for new_layer in new_layers {
-        let custom_layer_uploader = manager.layer_blob_upload(
-            &info.image_info.image_name, &RegDigest::new_with_sha256(new_layer.gz_sha256.clone()),
-            &new_layer.gz_temp_file_path.as_os_str().to_string_lossy().to_string(),
-        )?;
-        reg_uploader_vec.push(Box::new(custom_layer_uploader));
-    }
-
-    let manager = ProcessorManager::new_processor_manager(reg_uploader_vec)?;
-    let upload_results = manager.wait_all_done()?;
-    for upload_result in upload_results {
-        info!("{}", &upload_result.finished_info());
-    }
-
-
-    Ok(())
-}
 
 

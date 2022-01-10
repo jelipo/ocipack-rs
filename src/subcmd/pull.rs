@@ -68,7 +68,8 @@ pub fn pull(
             .config_blob::<DockerConfigBlob>(&image_info.image_name, config_digest)?)
     };
     Ok(PullResult {
-        config_blob: config_blob_enum
+        config_blob: config_blob_enum,
+        manifest
     })
 }
 
@@ -83,4 +84,5 @@ fn layer_to_map<'a>(layers: &'a Vec<Layer>) -> HashMap<&'a str, &'a Layer<'a>> {
 
 pub struct PullResult {
     config_blob: ConfigBlobEnum,
+    manifest: Manifest,
 }
