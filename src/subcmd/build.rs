@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -25,12 +24,26 @@ pub struct BuildCommand {}
 impl BuildCommand {
     pub fn build(build_args: &BuildCmdArgs) -> Result<()> {
         let (source_info, build_info, source_auth) = build_source_info(build_args)?;
-
+        build_args.target_auth
+        build_auth(build_args.target.)
         Ok(())
     }
 }
 
 fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
+    let (source_info, build_info) = match &build_args.source {
+        SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
+        SourceType::Cmd { tag: _ } => { todo!() }
+    };
+    let source_reg_auth = build_auth(source_info.image_info.image_host.as_ref(),
+                                     build_args.source_auth.as_ref());
+    Ok((source_info, build_info, source_reg_auth))
+}
+
+fn build_target_info(target_type: TargetType) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
+    match target_type {
+        TargetType::Registry(String) => {}
+    }
     let (source_info, build_info) = match &build_args.source {
         SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
         SourceType::Cmd { tag: _ } => { todo!() }
@@ -61,16 +74,21 @@ fn handle(
     build_cmds: &BuildCmdArgs,
 ) -> Result<()> {
     let home_dir = GLOBAL_CONFIG.home_dir.clone();
-    let pull = pull(&source_info, source_auth, !build_cmds.allow_insecure)?;
+    let pull_result = pull(&source_info, source_auth, !build_cmds.allow_insecure)?;
 
     let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| {
         gz_layer_file(&tar_path, &home_dir)
     }).transpose()?;
 
+    let target_config_blob = build_target_config_blob(
+        build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
+
+
     match &build_cmds.target {
         TargetType::Registry(image) => {
             let registry_adapter = RegistryTargetAdapter::new(
                 image, build_cmds.format.clone(), !build_cmds.allow_insecure)?;
+
         }
     }
 
@@ -130,7 +148,7 @@ fn gz_layer_file(tar_file_path: &Path, home_dir: &HomeDir) -> Result<TempLayerIn
 fn build_target_config_blob(
     build_info: BuildInfo,
     source_config_blob: &ConfigBlobEnum,
-    temp_layer: &TempLayerInfo,
+    temp_layer_opt: Option<&TempLayerInfo>,
     target_format: &TargetFormat,
 ) -> ConfigBlobEnum {
     // TODO change to diff config type
@@ -138,8 +156,10 @@ fn build_target_config_blob(
         TargetFormat::Docker => source_config_blob.clone(),
         TargetFormat::Oci => source_config_blob.clone(),
     };
-    let new_tar_digest = format!("sha256:{}", temp_layer.tar_sha256);
-    target_config_blob.add_diff_layer(new_tar_digest);
+    if let Some(temp_layer) = temp_layer_opt {
+        let new_tar_digest = format!("sha256:{}", temp_layer.tar_sha256);
+        target_config_blob.add_diff_layer(new_tar_digest);
+    }
     target_config_blob.add_labels(build_info.labels);
     target_config_blob.add_envs(build_info.envs);
     if let Some(cmds) = build_info.cmd {
@@ -170,4 +190,3 @@ fn build_config_blob_map(
     };
     if new_map.is_empty() { None } else { Some(new_map) }
 }
-

@@ -83,6 +83,6 @@ fn layer_to_map<'a>(layers: &'a Vec<Layer>) -> HashMap<&'a str, &'a Layer<'a>> {
 }
 
 pub struct PullResult {
-    config_blob: ConfigBlobEnum,
+    pub config_blob: ConfigBlobEnum,
     manifest: Manifest,
 }
