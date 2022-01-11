@@ -14,6 +14,7 @@ use crate::config::cmd::{BaseAuth, BuildCmdArgs, SourceType, TargetFormat, Targe
 use crate::config::RegAuthType;
 use crate::reg::ConfigBlobEnum;
 use crate::reg::home::TempLayerInfo;
+use crate::reg::manifest::Manifest;
 use crate::subcmd::pull::pull;
 use crate::tempconfig::TempConfig;
 use crate::util::{compress, random};
@@ -24,8 +25,7 @@ pub struct BuildCommand {}
 impl BuildCommand {
     pub fn build(build_args: &BuildCmdArgs) -> Result<()> {
         let (source_info, build_info, source_auth) = build_source_info(build_args)?;
-        build_args.target_auth
-        build_auth(build_args.target.)
+        handle(source_info, build_info, source_auth, build_args)?;
         Ok(())
     }
 }
@@ -82,13 +82,12 @@ fn handle(
 
     let target_config_blob = build_target_config_blob(
         build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
-
+    pull_result.manifest.
 
     match &build_cmds.target {
         TargetType::Registry(image) => {
             let registry_adapter = RegistryTargetAdapter::new(
                 image, build_cmds.format.clone(), !build_cmds.allow_insecure)?;
-
         }
     }
 
@@ -177,16 +176,9 @@ fn build_target_config_blob(
     target_config_blob
 }
 
-fn build_config_blob_map(
-    source_map: Option<HashMap<String, String>>,
-    add_maps: HashMap<String, String>,
-) -> Option<HashMap<String, String>> {
-    let new_map = match source_map {
-        None => add_maps,
-        Some(mut value) => {
-            value.extend(add_maps.into_iter());
-            value
-        }
+fn build_target_manifest(source_manifest: Manifest, target_format: &TargetFormat) -> Result<Manifest> {
+    let target_manifest = match target_format {
+        TargetFormat::Docker => Manifest::DockerV2S2(source_manifest.to_docker_v2_s2()?),
+        TargetFormat::Oci => Manifest::OciV1(source_manifest.to_oci_v1()?)
     };
-    if new_map.is_empty() { None } else { Some(new_map) }
 }
