@@ -3,9 +3,9 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::reg::{Layer, LayerConvert, RegContentType, RegDigest};
 use crate::reg::docker::DockerManifest;
 use crate::reg::oci::OciManifest;
-use crate::reg::{Layer, LayerConvert, RegContentType};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -70,6 +70,22 @@ impl Manifest {
         match &self {
             Manifest::OciV1(oci) => oci.get_layers(),
             Manifest::DockerV2S2(docker) => docker.get_layers(),
+        }
+    }
+
+    pub fn add_top_gz_layer(&mut self, size: u64, tgz_sha256: String) {
+        let reg_digest = RegDigest::new_with_sha256(tgz_sha256);
+        match self {
+            Manifest::OciV1(oci) => oci.layers.insert(0, CommonManifestLayer {
+                media_type: RegContentType::DOCKER_FOREIGN_LAYER_TGZ.val().to_string(),
+                size,
+                digest: reg_digest.digest,
+            }),
+            Manifest::DockerV2S2(docker) => docker.layers.insert(0, CommonManifestLayer {
+                media_type: RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.val().to_string(),
+                size,
+                digest: reg_digest.digest,
+            }),
         }
     }
 }

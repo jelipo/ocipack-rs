@@ -12,9 +12,9 @@ use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
 use crate::config::cmd::{BaseAuth, BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::ConfigBlobEnum;
+use crate::reg::{ConfigBlobEnum, Layer};
 use crate::reg::home::TempLayerInfo;
-use crate::reg::manifest::Manifest;
+use crate::reg::manifest::{CommonManifestLayer, Manifest};
 use crate::subcmd::pull::pull;
 use crate::tempconfig::TempConfig;
 use crate::util::{compress, random};
@@ -82,12 +82,14 @@ fn handle(
 
     let target_config_blob = build_target_config_blob(
         build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
-    pull_result.manifest.
+    let source_manifest = pull_result.manifest;
+    let target_manifest = build_target_manifest(
+        source_manifest, &build_cmds.format, temp_layer.as_ref())?;
 
     match &build_cmds.target {
         TargetType::Registry(image) => {
             let registry_adapter = RegistryTargetAdapter::new(
-                image, build_cmds.format.clone(), !build_cmds.allow_insecure)?;
+                image, build_cmds.format.clone(), !build_cmds.allow_insecure,target_manifest)?;
         }
     }
 
@@ -176,9 +178,18 @@ fn build_target_config_blob(
     target_config_blob
 }
 
-fn build_target_manifest(source_manifest: Manifest, target_format: &TargetFormat) -> Result<Manifest> {
-    let target_manifest = match target_format {
+fn build_target_manifest(
+    source_manifest: Manifest,
+    target_format: &TargetFormat,
+    temp_layer_opt: Option<&TempLayerInfo>,
+) -> Result<Manifest> {
+    let mut target_manifest = match target_format {
         TargetFormat::Docker => Manifest::DockerV2S2(source_manifest.to_docker_v2_s2()?),
         TargetFormat::Oci => Manifest::OciV1(source_manifest.to_oci_v1()?)
     };
+    if let Some(temp_layer) = temp_layer_opt {
+        let metadata = (&temp_layer).gz_temp_file_path.metadata()?;
+        target_manifest.add_top_gz_layer(metadata.len(), temp_layer.gz_sha256.to_string())
+    }
+    Ok(target_manifest)
 }
