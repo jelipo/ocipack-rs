@@ -6,8 +6,7 @@ extern crate derive_builder;
 
 use std::borrow::Borrow;
 use std::lazy::SyncLazy;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use anyhow::Result;
 use clap::Parser;
@@ -44,7 +43,7 @@ fn main() -> Result<()> {
     let global_config: &GlobalAppConfig = GLOBAL_CONFIG.borrow();
     match &global_config.cmd_args {
         CmdArgs::Build(build_args) => {
-            let command = BuildCommand::build(build_args)?;
+            let _command = BuildCommand::build(build_args)?;
         }
         CmdArgs::Transform => {}
     }

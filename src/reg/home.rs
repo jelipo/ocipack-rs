@@ -1,6 +1,5 @@
-use std::cell::{RefCell, RefMut};
 use std::fs::{create_dir_all, File, read_to_string};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -93,7 +92,7 @@ impl BlobsDir {
         &self, digest: &RegDigest, compress_type: CompressType,
     ) -> Result<()> {
         let download_path = self.download_dir.join(&digest.sha256);
-        let download_file = File::open(&download_path)?;
+        let _download_file = File::open(&download_path)?;
         match compress_type {
             CompressType::TAR => {}
             CompressType::TGZ => {}
@@ -133,7 +132,7 @@ impl BlobsDir {
         layer_dir.join("diff_layer")
     }
 
-    pub fn local_file(&self, layer_sha: RegDigest) {}
+    pub fn local_file(&self, _layer_sha: RegDigest) {}
 
     pub fn diff_layer_path(&self, digest: &RegDigest) -> Option<PathBuf> {
         let layer_file_parent = self.layers_path.join(&digest.sha256);

@@ -1,18 +1,14 @@
 use std::collections::HashMap;
-use std::path::Path;
-use std::rc::Rc;
 
 use anyhow::Result;
-use log::info;
 
-use crate::adapter::{SourceImageAdapter, SourceInfo};
+use crate::adapter::SourceInfo;
 use crate::config::RegAuthType;
 use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
-use crate::reg::{ConfigBlob, ConfigBlobEnum, Layer, LayerConvert, Reference, RegDigest, Registry};
+use crate::reg::{ConfigBlobEnum, Layer, LayerConvert, Reference, RegDigest, Registry};
 use crate::reg::docker::image::DockerConfigBlob;
-use crate::reg::home::HomeDir;
 use crate::reg::http::download::DownloadResult;
 use crate::reg::manifest::Manifest;
 use crate::reg::oci::image::OciConfigBlob;
@@ -69,7 +65,7 @@ pub fn pull(
     };
     Ok(PullResult {
         config_blob: config_blob_enum,
-        manifest
+        manifest,
     })
 }
 

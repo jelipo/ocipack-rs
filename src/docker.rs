@@ -88,7 +88,7 @@ fn upload(
     let tar_temp_file_path = home_dir.cache.temp_dir.join(random::random_str(10) + ".tar");
     let tar_temp_file = File::create(tar_temp_file_path.as_path())?;
     let mut tar_builder = Builder::new(tar_temp_file);
-    let header = Header::new_gnu();
+    let _header = Header::new_gnu();
     tar_builder.append_file("root/a.txt", &mut File::open(&temp_config.test_file)?)?;
     let _tar_file = tar_builder.into_inner()?;
     let layer_info = home_dir.cache.gz_layer_file(tar_temp_file_path.as_path())?;

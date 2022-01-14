@@ -1,7 +1,5 @@
 use std::collections::HashMap;
-use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::str::FromStr;
 
 use anyhow::{Error, Result};
@@ -16,7 +14,6 @@ use manifest::Manifest;
 use crate::GLOBAL_CONFIG;
 use crate::reg::docker::DockerManifest;
 use crate::reg::docker::image::DockerConfigBlob;
-use crate::reg::home::HomeDir;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
@@ -338,6 +335,13 @@ impl ConfigBlobEnum {
             ConfigBlobEnum::OciV1(oci) => oci.config.user = Some(user),
             ConfigBlobEnum::DockerV2S2(docker) => docker.config.user = Some(user),
         }
+    }
+
+    pub fn to_json_string(&self) -> Result<String> {
+        Ok(match self {
+            ConfigBlobEnum::OciV1(oci) => serde_json::to_string(oci),
+            ConfigBlobEnum::DockerV2S2(docker) => serde_json::to_string(docker)
+        }?)
     }
 }
 

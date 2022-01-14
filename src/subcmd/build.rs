@@ -1,22 +1,22 @@
-use std::collections::HashMap;
+
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+
 
 use anyhow::{Error, Result};
-use tar::{Builder, Header};
+use tar::{Builder};
 
 use crate::{GLOBAL_CONFIG, HomeDir};
-use crate::adapter::{BuildInfo, CopyFile, SourceImageAdapter, SourceInfo, TargetImageAdapter};
+use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
 use crate::config::cmd::{BaseAuth, BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::{ConfigBlobEnum, Layer};
+use crate::reg::{ConfigBlobEnum};
 use crate::reg::home::TempLayerInfo;
-use crate::reg::manifest::{CommonManifestLayer, Manifest};
+use crate::reg::manifest::{Manifest};
 use crate::subcmd::pull::pull;
-use crate::tempconfig::TempConfig;
+
 use crate::util::{compress, random};
 use crate::util::sha::{Sha256Reader, Sha256Writer};
 
@@ -40,18 +40,18 @@ fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo
     Ok((source_info, build_info, source_reg_auth))
 }
 
-fn build_target_info(target_type: TargetType) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
-    match target_type {
-        TargetType::Registry(String) => {}
-    }
-    let (source_info, build_info) = match &build_args.source {
-        SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
-        SourceType::Cmd { tag: _ } => { todo!() }
-    };
-    let source_reg_auth = build_auth(source_info.image_info.image_host.as_ref(),
-                                     build_args.source_auth.as_ref());
-    Ok((source_info, build_info, source_reg_auth))
-}
+// fn build_target_info(target_type: TargetType) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
+//     match target_type {
+//         TargetType::Registry(String) => {}
+//     }
+//     let (source_info, build_info) = match &build_args.source {
+//         SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
+//         SourceType::Cmd { tag: _ } => { todo!() }
+//     };
+//     let source_reg_auth = build_auth(source_info.image_info.image_host.as_ref(),
+//                                      build_args.source_auth.as_ref());
+//     Ok((source_info, build_info, source_reg_auth))
+// }
 
 
 fn build_auth(image_host: Option<&String>, base_auth: Option<&BaseAuth>) -> RegAuthType {
@@ -79,6 +79,7 @@ fn handle(
     let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| {
         gz_layer_file(&tar_path, &home_dir)
     }).transpose()?;
+    // TODO move tgz temp file to cache dir
 
     let target_config_blob = build_target_config_blob(
         build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
@@ -88,11 +89,11 @@ fn handle(
 
     match &build_cmds.target {
         TargetType::Registry(image) => {
-            let registry_adapter = RegistryTargetAdapter::new(
-                image, build_cmds.format.clone(), !build_cmds.allow_insecure,target_manifest)?;
+            let _registry_adapter = RegistryTargetAdapter::new(
+                image, build_cmds.format.clone(), !build_cmds.allow_insecure,
+                target_manifest, target_config_blob)?;
         }
     }
-
 
     Ok(())
 }

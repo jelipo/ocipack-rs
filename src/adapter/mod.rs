@@ -1,9 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
 
-use anyhow::Result;
-
-use crate::config::BaseImage;
 use crate::config::cmd::TargetFormat;
 
 pub mod docker;
