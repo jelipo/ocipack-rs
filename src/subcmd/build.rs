@@ -1,10 +1,8 @@
-
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-
 use anyhow::{Error, Result};
-use tar::{Builder};
+use tar::Builder;
 
 use crate::{GLOBAL_CONFIG, HomeDir};
 use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
@@ -12,11 +10,10 @@ use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
 use crate::config::cmd::{BaseAuth, BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::{ConfigBlobEnum};
+use crate::reg::ConfigBlobEnum;
 use crate::reg::home::TempLayerInfo;
-use crate::reg::manifest::{Manifest};
+use crate::reg::manifest::Manifest;
 use crate::subcmd::pull::pull;
-
 use crate::util::{compress, random};
 use crate::util::sha::{Sha256Reader, Sha256Writer};
 
@@ -35,36 +32,9 @@ fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo
         SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
         SourceType::Cmd { tag: _ } => { todo!() }
     };
-    let source_reg_auth = build_auth(source_info.image_info.image_host.as_ref(),
-                                     build_args.source_auth.as_ref());
+    let source_reg_auth = RegAuthType::build_auth(
+        source_info.image_info.image_host.as_ref(), build_args.source_auth.as_ref());
     Ok((source_info, build_info, source_reg_auth))
-}
-
-// fn build_target_info(target_type: TargetType) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
-//     match target_type {
-//         TargetType::Registry(String) => {}
-//     }
-//     let (source_info, build_info) = match &build_args.source {
-//         SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
-//         SourceType::Cmd { tag: _ } => { todo!() }
-//     };
-//     let source_reg_auth = build_auth(source_info.image_info.image_host.as_ref(),
-//                                      build_args.source_auth.as_ref());
-//     Ok((source_info, build_info, source_reg_auth))
-// }
-
-
-fn build_auth(image_host: Option<&String>, base_auth: Option<&BaseAuth>) -> RegAuthType {
-    match base_auth.as_ref() {
-        None => RegAuthType::LocalDockerAuth {
-            reg_host: image_host.map(|s| s.as_str())
-                .unwrap_or("https://index.docker.io/v1/").to_string()
-        },
-        Some(auth) => RegAuthType::CustomPassword {
-            username: auth.username.clone(),
-            password: auth.password.clone(),
-        }
-    }
 }
 
 fn handle(
@@ -80,7 +50,10 @@ fn handle(
         gz_layer_file(&tar_path, &home_dir)
     }).transpose()?;
     // TODO move tgz temp file to cache dir
-
+    if let Some(temp_layer) = &temp_layer {
+        let filename = temp_layer.gz_temp_file_path.file_name().expect("not found").to_string_lossy();
+        home_dir.cache.move_temp_to_blob(&filename, &temp_layer.tgz_sha256, &temp_layer.tar_sha256);
+    }
     let target_config_blob = build_target_config_blob(
         build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
     let source_manifest = pull_result.manifest;
@@ -89,9 +62,10 @@ fn handle(
 
     match &build_cmds.target {
         TargetType::Registry(image) => {
-            let _registry_adapter = RegistryTargetAdapter::new(
+            let registry_adapter = RegistryTargetAdapter::new(
                 image, build_cmds.format.clone(), !build_cmds.allow_insecure,
-                target_manifest, target_config_blob)?;
+                target_manifest, target_config_blob, build_cmds.target_auth.as_ref())?;
+            registry_adapter.upload()?
         }
     }
 
@@ -114,9 +88,7 @@ fn build_top_tar(copyfiles: &Vec<CopyFile>, home_dir: &HomeDir) -> Result<Option
             }
             let dest_path = if copyfile.dest_path.ends_with("/") {
                 &copyfile.dest_path[1..]
-            } else {
-                &copyfile.dest_path
-            };
+            } else { &copyfile.dest_path };
             if source_pathbuf.is_file() {
                 tar_builder.append_file(dest_path, &mut File::open(source_pathbuf)?)?;
             } else if source_pathbuf.is_dir() {
@@ -141,7 +113,7 @@ fn gz_layer_file(tar_file_path: &Path, home_dir: &HomeDir) -> Result<TempLayerIn
     let tar_sha256 = sha256_reader.sha256()?;
     let tgz_sha256 = sha256_writer.sha256()?;
     Ok(TempLayerInfo {
-        gz_sha256: tgz_sha256,
+        tgz_sha256,
         tar_sha256,
         gz_temp_file_path: tgz_file_path.into_boxed_path(),
     })
@@ -190,7 +162,7 @@ fn build_target_manifest(
     };
     if let Some(temp_layer) = temp_layer_opt {
         let metadata = (&temp_layer).gz_temp_file_path.metadata()?;
-        target_manifest.add_top_gz_layer(metadata.len(), temp_layer.gz_sha256.to_string())
+        target_manifest.add_top_gz_layer(metadata.len(), temp_layer.tgz_sha256.to_string())
     }
     Ok(target_manifest)
 }

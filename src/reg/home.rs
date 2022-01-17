@@ -56,7 +56,7 @@ impl CacheDir {
         let tar_sha256 = sha256_reader.sha256()?;
         let tgz_sha256 = sha256_writer.sha256()?;
         Ok(TempLayerInfo {
-            gz_sha256: tgz_sha256,
+            tgz_sha256,
             tar_sha256,
             gz_temp_file_path: tgz_file_path.into_boxed_path(),
         })
@@ -69,6 +69,11 @@ impl CacheDir {
         temp_file.write_all(file_str.as_bytes())?;
         temp_file.flush()?;
         Ok(temp_file_path.into_boxed_path())
+    }
+
+    pub fn move_temp_to_blob(&self, file_name: &str, manifest_sha: &str, diff_layer_sha: &str) {
+        let temp_file = self.temp_dir.join(file_name);
+        // TODO
     }
 }
 
@@ -117,13 +122,14 @@ impl BlobsDir {
         Ok((tar_sha256, tar_file_path.into_boxed_path()))
     }
 
-    pub fn create_layer_config(&self, sha256: &str, tar_file_path: &Path) -> Result<()> {
+    pub fn create_layer_config(&self, tar_sha256: &str, tar_file_path: &Path) -> Result<()> {
+        // TODO use LocalLayer
         let layer_config_parent = tar_file_path.parent()
             .ok_or(Error::msg("illegal layer config path"))?;
         let tar_sha_file_path = self.diff_layer_config_path(layer_config_parent);
         tar_sha_file_path.remove()?;
         let mut tar_sha_file = File::create(tar_sha_file_path)?;
-        tar_sha_file.write(sha256.as_bytes())?;
+        tar_sha_file.write(tar_sha256.as_bytes())?;
         tar_sha_file.flush()?;
         Ok(())
     }
@@ -131,8 +137,6 @@ impl BlobsDir {
     pub fn diff_layer_config_path(&self, layer_dir: &Path) -> PathBuf {
         layer_dir.join("diff_layer")
     }
-
-    pub fn local_file(&self, _layer_sha: RegDigest) {}
 
     pub fn diff_layer_path(&self, digest: &RegDigest) -> Option<PathBuf> {
         let layer_file_parent = self.layers_path.join(&digest.sha256);
@@ -143,6 +147,7 @@ impl BlobsDir {
         }
     }
 
+    /// Find layer in local
     pub fn local_layer(&self, manifest_layer_digest: &RegDigest) -> Option<LocalLayer> {
         match LocalLayer::try_pares(&self.layers_path, &manifest_layer_digest.sha256) {
             Ok(local) => Some(local),
@@ -152,7 +157,7 @@ impl BlobsDir {
 }
 
 pub struct TempLayerInfo {
-    pub gz_sha256: String,
+    pub tgz_sha256: String,
     pub tar_sha256: String,
     pub gz_temp_file_path: Box<Path>,
 }

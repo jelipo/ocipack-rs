@@ -3,7 +3,7 @@ use dockerfile_parser::{Dockerfile, Instruction};
 use log::info;
 
 use crate::adapter::{ImageInfo, TargetImageAdapter, TargetInfo};
-use crate::config::cmd::TargetFormat;
+use crate::config::cmd::{BaseAuth, TargetFormat};
 use crate::config::RegAuthType;
 use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
@@ -19,6 +19,7 @@ pub struct RegistryTargetAdapter {
     use_https: bool,
     target_manifest: Manifest,
     target_config_blob: ConfigBlobEnum,
+    target_auth: RegAuthType,
 }
 
 impl TargetImageAdapter for RegistryTargetAdapter {
@@ -34,6 +35,7 @@ impl RegistryTargetAdapter {
         use_https: bool,
         target_manifest: Manifest,
         target_config_blob: ConfigBlobEnum,
+        base_auth: Option<&BaseAuth>,
     ) -> Result<RegistryTargetAdapter> {
         let temp_from = format!("FROM {}", image);
         let instruction = Dockerfile::parse(&temp_from)?.instructions.remove(0);
@@ -45,7 +47,8 @@ impl RegistryTargetAdapter {
                     .ok_or(Error::msg("can not found hash or tag"))?,
             },
             _ => return Err(Error::msg("")),
-        };
+        }    build_auth();
+        let auth = RegAuthType::build_auth(image_info.image_host.as_ref(), base_auth);
         Ok(RegistryTargetAdapter {
             info: TargetInfo {
                 image_info,
@@ -54,13 +57,14 @@ impl RegistryTargetAdapter {
             use_https,
             target_manifest,
             target_config_blob,
+            target_auth: auth,
         })
     }
 
-    fn upload(self, auth: RegAuthType) -> Result<()> {
+    pub fn upload(self) -> Result<()> {
         let home_dir = GLOBAL_CONFIG.home_dir.clone();
         let target_info = self.info;
-        let reg_auth = auth.get_auth()?;
+        let reg_auth = self.target_auth.get_auth()?;
         let host = target_info.image_info.image_host.unwrap_or("registry-1.docker.io/v2".to_string());
         let target_reg = Registry::open(self.use_https, &host, reg_auth)?;
         let mut manager = target_reg.image_manager;

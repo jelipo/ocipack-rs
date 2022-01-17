@@ -28,7 +28,7 @@ fn upload(
     tar_builder.append_file("root/a.txt", &mut File::open(&temp_config.test_file)?)?;
     let _tar_file = tar_builder.into_inner()?;
     let layer_info = home_dir.cache.gz_layer_file(tar_temp_file_path.as_path())?;
-    info!("tgz sha256:{}", &layer_info.gz_sha256);
+    info!("tgz sha256:{}", &layer_info.tgz_sha256);
     info!("tar sha256:{}", &layer_info.tar_sha256);
     info!("tgz file path:{:?}", &layer_info.gz_temp_file_path);
 
@@ -60,7 +60,7 @@ fn upload(
     }
     //
     let custom_layer_uploader = to_registry.image_manager.layer_blob_upload(
-        &to_config.image_name, &RegDigest::new_with_sha256(layer_info.gz_sha256.clone()),
+        &to_config.image_name, &RegDigest::new_with_sha256(layer_info.tgz_sha256.clone()),
         &layer_info.gz_temp_file_path.as_os_str().to_string_lossy().to_string(),
     )?;
     reg_uploader_vec.push(Box::new(custom_layer_uploader));
@@ -104,7 +104,7 @@ fn upload(
             oci_manifest.layers.insert(0, CommonManifestLayer {
                 media_type: RegContentType::OCI_LAYER_TGZ.val().to_string(),
                 size: layer_info.gz_temp_file_path.metadata()?.len(),
-                digest: format!("sha256:{}", &layer_info.gz_sha256),
+                digest: format!("sha256:{}", &layer_info.tgz_sha256),
             });
             Manifest::OciV1(oci_manifest)
         }
@@ -116,7 +116,7 @@ fn upload(
             docker_manifest.layers.insert(0, CommonManifestLayer {
                 media_type: RegContentType::DOCKER_LAYER_TGZ.val().to_string(),
                 size: layer_info.gz_temp_file_path.metadata()?.len(),
-                digest: format!("sha256:{}", &layer_info.gz_sha256),
+                digest: format!("sha256:{}", &layer_info.tgz_sha256),
             });
             Manifest::DockerV2S2(docker_manifest)
         }
