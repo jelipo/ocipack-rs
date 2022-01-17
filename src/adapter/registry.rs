@@ -47,7 +47,7 @@ impl RegistryTargetAdapter {
                     .ok_or(Error::msg("can not found hash or tag"))?,
             },
             _ => return Err(Error::msg("")),
-        }    build_auth();
+        };
         let auth = RegAuthType::build_auth(image_info.image_host.as_ref(), base_auth);
         Ok(RegistryTargetAdapter {
             info: TargetInfo {

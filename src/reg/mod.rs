@@ -165,8 +165,8 @@ impl MyImageManager {
         let file_name = blob_digest.sha256.clone();
         let mut blob_config = BlobConfig::new(file_path, file_name, blob_digest.clone());
         if let Some(local) = GLOBAL_CONFIG.home_dir.cache.blobs.local_layer(blob_digest) {
-            let layer_len = local.layer_path.metadata()?.len();
-            blob_config.file_path = local.layer_path.into_boxed_path();
+            let layer_len = local.layer_file_path.metadata()?.len();
+            blob_config.file_path = local.layer_file_path.into_boxed_path();
             let finished = RegDownloader::new_finished(blob_config, layer_len)?;
             return Ok(finished);
         }
@@ -345,7 +345,7 @@ impl ConfigBlobEnum {
     }
 }
 
-pub struct RegContentType(&'static str);
+pub struct RegContentType(pub &'static str);
 
 impl RegContentType {
     /// Docker content-type
@@ -395,6 +395,16 @@ pub enum CompressType {
     TAR,
     TGZ,
     ZSTD,
+}
+
+impl ToString for CompressType {
+    fn to_string(&self) -> String {
+        match self {
+            CompressType::TAR => "TAR",
+            CompressType::TGZ => "TGZ",
+            CompressType::ZSTD => "ZSTD",
+        }.to_string()
+    }
 }
 
 impl FromStr for CompressType {

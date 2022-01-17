@@ -47,5 +47,6 @@ fn main() -> Result<()> {
         }
         CmdArgs::Transform => {}
     }
-    docker::run()
+    Ok(())
+    //docker::run()
 }

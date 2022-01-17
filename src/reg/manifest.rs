@@ -88,6 +88,13 @@ impl Manifest {
             }),
         }
     }
+
+    pub fn config_digest(&self) -> &str {
+        match self {
+            Manifest::OciV1(oci) => &oci.config.digest,
+            Manifest::DockerV2S2(docker) => &docker.config.digest
+        }
+    }
 }
 
 pub fn ociv1_to_dockerv2s2(media_type: &str) -> Result<String> {

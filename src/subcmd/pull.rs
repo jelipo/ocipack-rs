@@ -7,7 +7,7 @@ use crate::config::RegAuthType;
 use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
-use crate::reg::{ConfigBlobEnum, Layer, LayerConvert, Reference, RegDigest, Registry};
+use crate::reg::{ConfigBlobEnum, Layer, LayerConvert, Reference, RegContentType, RegDigest, Registry};
 use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::http::download::DownloadResult;
 use crate::reg::manifest::Manifest;
@@ -30,11 +30,8 @@ pub fn pull(
         reference: image_info.reference.as_str(),
     };
     let manifest = from_registry.image_manager.manifests(&from_image_reference)?;
-    let (config_digest, layers) = match &manifest {
-        Manifest::OciV1(oci) => (&oci.config.digest, oci.get_layers()),
-        Manifest::DockerV2S2(docker) => (&docker.config.digest, docker.get_layers()),
-    };
-
+    let config_digest = manifest.config_digest();
+    let layers = manifest.layers();
     let mut reg_downloader_vec = Vec::<Box<dyn Processor<DownloadResult>>>::new();
     for layer in &layers {
         let digest = RegDigest::new_with_digest(layer.digest.to_string());
@@ -52,9 +49,11 @@ pub fn pull(
         }
         let layer = layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str())
             .expect("internal error");
+        let string = layer.media_type.to_string();
+        let layer_compress_type = RegContentType(&string).compress_type()?;
         let digest = RegDigest::new_with_digest(layer.digest.to_string());
         let (tar_sha256, tar_path) = GLOBAL_CONFIG.home_dir.cache.blobs.ungz_download_file(&digest)?;
-        GLOBAL_CONFIG.home_dir.cache.blobs.create_layer_config(&tar_sha256, &tar_path)?;
+        GLOBAL_CONFIG.home_dir.cache.blobs.create_layer_config(&tar_sha256, &digest.sha256, layer_compress_type)?;
     }
 
     let config_blob_enum = match &manifest {
