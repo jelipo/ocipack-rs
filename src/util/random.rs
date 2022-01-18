@@ -1,6 +1,7 @@
 use std::iter;
-use rand::distributions::Alphanumeric;
+
 use rand::{Rng, thread_rng};
+use rand::distributions::Alphanumeric;
 
 pub fn random_str(size: usize) -> String {
     let mut rng = thread_rng();

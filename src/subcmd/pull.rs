@@ -1,17 +1,20 @@
 use std::collections::HashMap;
+use std::fs::File;
 
-use anyhow::Result;
+use anyhow::{Error, Result};
+use sha2::{Digest, Sha256};
 
 use crate::adapter::SourceInfo;
 use crate::config::RegAuthType;
 use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
-use crate::reg::{ConfigBlobEnum, Layer, LayerConvert, Reference, RegContentType, RegDigest, Registry};
+use crate::reg::{ConfigBlobEnum, Layer, Reference, RegContentType, RegDigest, Registry};
 use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::http::download::DownloadResult;
 use crate::reg::manifest::Manifest;
 use crate::reg::oci::image::OciConfigBlob;
+use crate::util::compress::uncompress;
 
 pub fn pull(
     source_info: &SourceInfo,
@@ -20,7 +23,7 @@ pub fn pull(
 ) -> Result<PullResult> {
     let image_info = &source_info.image_info;
     let image_host = image_info.image_host.clone()
-        .unwrap_or("registry-1.docker.io/v2".into());
+        .unwrap_or_else(|| "registry-1.docker.io/v2".into());
 
     let registry_auth = source_auth.get_auth()?;
     let mut from_registry = Registry::open(use_https, &image_host, registry_auth)?;
@@ -36,7 +39,7 @@ pub fn pull(
     for layer in &layers {
         let digest = RegDigest::new_with_digest(layer.digest.to_string());
         let downloader = from_registry.image_manager
-            .layer_blob_download(&from_image_reference.image_name, &digest, Some(layer.size))?;
+            .layer_blob_download(from_image_reference.image_name, &digest, Some(layer.size))?;
         reg_downloader_vec.push(Box::new(downloader))
     }
 
@@ -47,12 +50,18 @@ pub fn pull(
         if download_result.local_existed {
             continue;
         }
-        let layer = layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str())
+        let manifest_layer = layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str())
             .expect("internal error");
-        let string = layer.media_type.to_string();
-        let layer_compress_type = RegContentType(&string).compress_type()?;
-        let digest = RegDigest::new_with_digest(layer.digest.to_string());
-        let (tar_sha256, tar_path) = GLOBAL_CONFIG.home_dir.cache.blobs.ungz_download_file(&digest)?;
+        let layer_compress_type = RegContentType::compress_type(manifest_layer.media_type)?;
+        let digest = RegDigest::new_with_digest(manifest_layer.digest.to_string());
+        let download_path = download_result.file_path.as_ref()
+            .ok_or_else(|| Error::msg("can not found download file"))?;
+        // 计算解压完的tar的sha256值
+        let download_file = File::open(download_path)?;
+        let mut sha256_encode = Sha256::new();
+        uncompress(&layer_compress_type, download_file, &mut sha256_encode)?;
+        let sha256 = &sha256_encode.finalize()[..];
+        let tar_sha256 = hex::encode(sha256);
         GLOBAL_CONFIG.home_dir.cache.blobs.create_layer_config(&tar_sha256, &digest.sha256, layer_compress_type)?;
     }
 
@@ -69,10 +78,10 @@ pub fn pull(
 }
 
 
-fn layer_to_map<'a>(layers: &'a Vec<Layer>) -> HashMap<&'a str, &'a Layer<'a>> {
+fn layer_to_map<'a>(layers: &'a [Layer]) -> HashMap<&'a str, &'a Layer<'a>> {
     let mut map = HashMap::<&str, &Layer>::with_capacity(layers.len());
     for layer in layers {
-        map.insert(&layer.digest, layer);
+        map.insert(layer.digest, layer);
     }
     map
 }

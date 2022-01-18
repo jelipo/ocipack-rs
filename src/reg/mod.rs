@@ -88,7 +88,7 @@ impl Registry {
     ) -> Result<Registry> {
         let reg_addr = format!("{}{}", if use_https { "https" } else { "http" }, host);
         let client = RegistryHttpClient::new(reg_addr.clone(), auth)?;
-        let image = MyImageManager::new(reg_addr.clone(), client);
+        let image = MyImageManager::new(reg_addr, client);
         Ok(Registry {
             image_manager: image,
         })
@@ -119,7 +119,7 @@ impl MyImageManager {
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&path, scope, accepts);
         let response = self.reg_client.simple_request(request)?;
         let content_type = (&response).content_type()
-            .ok_or(Error::msg("manifest content-type header not found"))?;
+            .ok_or_else(|| Error::msg("manifest content-type header not found"))?;
         if RegContentType::DOCKER_MANIFEST.val() == content_type {
             let manifest = serde_json::from_str::<DockerManifest>(&response.string_body())?;
             Ok(Manifest::DockerV2S2(manifest))
@@ -181,7 +181,7 @@ impl MyImageManager {
             .expect("file name error").to_str().unwrap().to_string();
         let blob_config = BlobConfig::new(file_path.clone(), file_name, blob_digest.clone());
         let short_hash = blob_config.short_hash.clone();
-        if self.blobs_exited(name, &blob_digest)? {
+        if self.blobs_exited(name, blob_digest)? {
             return Ok(RegUploader::new_finished_uploader(
                 blob_config, file_path.metadata()?.len(),
                 format!("{} blob exists in registry", short_hash),
@@ -371,20 +371,20 @@ impl RegContentType {
         self.0
     }
 
-    pub fn compress_type(&self) -> Result<CompressType> {
+    pub fn compress_type(media_type: &str) -> Result<CompressType> {
         if [RegContentType::OCI_LAYER_TAR.0, RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0]
-            .contains(&self.0) {
-            Ok(CompressType::TAR)
+            .contains(&media_type) {
+            Ok(CompressType::Tar)
         } else if [
             RegContentType::DOCKER_FOREIGN_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_TGZ.0,
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
-        ].contains(&self.0) {
-            Ok(CompressType::TGZ)
+        ].contains(&media_type) {
+            Ok(CompressType::Tgz)
         } else if [RegContentType::OCI_LAYER_ZSTD.0, RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0]
-            .contains(&self.0) {
-            Ok(CompressType::ZSTD)
+            .contains(&media_type) {
+            Ok(CompressType::Zstd)
         } else {
             Err(Error::msg("not a layer media type"))
         }
@@ -392,17 +392,17 @@ impl RegContentType {
 }
 
 pub enum CompressType {
-    TAR,
-    TGZ,
-    ZSTD,
+    Tar,
+    Tgz,
+    Zstd,
 }
 
 impl ToString for CompressType {
     fn to_string(&self) -> String {
         match self {
-            CompressType::TAR => "TAR",
-            CompressType::TGZ => "TGZ",
-            CompressType::ZSTD => "ZSTD",
+            CompressType::Tar => "TAR",
+            CompressType::Tgz => "TGZ",
+            CompressType::Zstd => "ZSTD",
         }.to_string()
     }
 }
@@ -412,9 +412,9 @@ impl FromStr for CompressType {
 
     fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
         match str {
-            "TAR" => Ok(CompressType::TAR),
-            "TGZ" => Ok(CompressType::TGZ),
-            "ZSTD" => Ok(CompressType::ZSTD),
+            "TAR" => Ok(CompressType::Tar),
+            "TGZ" => Ok(CompressType::Tgz),
+            "ZSTD" => Ok(CompressType::Zstd),
             _ => Err(Error::msg(format!("unknown compress type:{}", str)))
         }
     }

@@ -8,9 +8,9 @@ use crate::{GLOBAL_CONFIG, HomeDir};
 use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
-use crate::config::cmd::{BaseAuth, BuildCmdArgs, SourceType, TargetFormat, TargetType};
+use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::ConfigBlobEnum;
+use crate::reg::{CompressType, ConfigBlobEnum};
 use crate::reg::home::TempLayerInfo;
 use crate::reg::manifest::Manifest;
 use crate::subcmd::pull::pull;
@@ -49,10 +49,11 @@ fn handle(
     let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| {
         gz_layer_file(&tar_path, &home_dir)
     }).transpose()?;
-    // TODO move tgz temp file to cache dir
     if let Some(temp_layer) = &temp_layer {
-        let filename = temp_layer.gz_temp_file_path.file_name().expect("not found").to_string_lossy();
-        home_dir.cache.move_temp_to_blob(&filename, &temp_layer.tgz_sha256, &temp_layer.tar_sha256);
+        home_dir.cache.blobs.move_to_blob(
+            &temp_layer.compress_layer_path, &temp_layer.tgz_sha256, &temp_layer.tar_sha256)?;
+        let _local_layer = home_dir.cache.blobs.create_layer_config(
+            &temp_layer.tar_sha256, &temp_layer.tgz_sha256, CompressType::Tgz)?;
     }
     let target_config_blob = build_target_config_blob(
         build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
@@ -72,8 +73,8 @@ fn handle(
     Ok(())
 }
 
-fn build_top_tar(copyfiles: &Vec<CopyFile>, home_dir: &HomeDir) -> Result<Option<PathBuf>> {
-    if copyfiles.len() == 0 {
+fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<PathBuf>> {
+    if copyfiles.is_empty() {
         return Ok(None);
     }
     let tar_file_name = random::random_str(10) + ".tar";
@@ -82,19 +83,19 @@ fn build_top_tar(copyfiles: &Vec<CopyFile>, home_dir: &HomeDir) -> Result<Option
     let mut tar_builder = Builder::new(tar_temp_file);
     for copyfile in copyfiles {
         for source_path_str in &copyfile.source_path {
-            let source_pathbuf = PathBuf::from(&source_path_str);
-            if !source_pathbuf.exists() {
+            let source_path = PathBuf::from(&source_path_str);
+            if !source_path.exists() {
                 return Err(Error::msg(format!("path not found:{}", source_path_str)));
             }
-            let dest_path = if copyfile.dest_path.ends_with("/") {
+            let dest_path = if copyfile.dest_path.ends_with('/') {
                 &copyfile.dest_path[1..]
             } else { &copyfile.dest_path };
-            if source_pathbuf.is_file() {
-                tar_builder.append_file(dest_path, &mut File::open(source_pathbuf)?)?;
-            } else if source_pathbuf.is_dir() {
+            if source_path.is_file() {
+                tar_builder.append_file(dest_path, &mut File::open(source_path)?)?;
+            } else if source_path.is_dir() {
                 tar_builder.append_dir(dest_path, source_path_str)?;
             } else {
-                return Err(Error::msg(format!("copy only support file and dir")));
+                return Err(Error::msg("copy only support file and dir".to_string()));
             }
         }
     }
@@ -115,7 +116,8 @@ fn gz_layer_file(tar_file_path: &Path, home_dir: &HomeDir) -> Result<TempLayerIn
     Ok(TempLayerInfo {
         tgz_sha256,
         tar_sha256,
-        gz_temp_file_path: tgz_file_path.into_boxed_path(),
+        compress_layer_path: tgz_file_path,
+        compress_type: CompressType::Tgz,
     })
 }
 
@@ -161,7 +163,7 @@ fn build_target_manifest(
         TargetFormat::Oci => Manifest::OciV1(source_manifest.to_oci_v1()?)
     };
     if let Some(temp_layer) = temp_layer_opt {
-        let metadata = (&temp_layer).gz_temp_file_path.metadata()?;
+        let metadata = temp_layer.compress_layer_path.metadata()?;
         target_manifest.add_top_gz_layer(metadata.len(), temp_layer.tgz_sha256.to_string())
     }
     Ok(target_manifest)

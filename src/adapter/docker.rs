@@ -39,7 +39,7 @@ impl DockerfileAdapter {
                     image_host: from.image_parsed.registry,
                     image_name: from.image_parsed.image,
                     reference: from.image_parsed.tag.or(from.image_parsed.hash)
-                        .ok_or(Error::msg("can not found hash or tag"))?,
+                        .ok_or_else(|| Error::msg("can not found hash or tag"))?,
                 }),
                 Instruction::Arg(_) | Instruction::Run(_) => {
                     warn!("un support ARG and RUN")
@@ -62,7 +62,7 @@ impl DockerfileAdapter {
                 }),
                 Instruction::Copy(copy) => {
                     let _i = copy.flags.len();
-                    if copy.flags.len() > 0 { return Err(Error::msg("copy not support flag")); };
+                    if !copy.flags.is_empty() { return Err(Error::msg("copy not support flag")); };
                     copy_files.push(CopyFile {
                         source_path: copy.sources.into_iter().
                             map(|str| str.content).collect::<Vec<String>>(),
@@ -102,7 +102,7 @@ impl DockerfileAdapter {
             }
         }
         let source_info = SourceInfo {
-            image_info: from_image.ok_or(Error::msg("dockerfile must has a 'From'"))?,
+            image_info: from_image.ok_or_else(|| Error::msg("dockerfile must has a 'From'"))?,
         };
         Ok((source_info, BuildInfo {
             labels: label_map,

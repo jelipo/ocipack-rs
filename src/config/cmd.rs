@@ -65,7 +65,7 @@ impl FromStr for SourceType {
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
         let potion = arg.chars().position(|c| c == ':')
-            .ok_or(Error::msg("error source"))?;
+            .ok_or_else(|| Error::msg("error source"))?;
         let source_type = &arg[..potion];
         Ok(match source_type {
             "dockerfile" => SourceType::Dockerfile { path: arg[potion + 1..].to_string() },
@@ -84,7 +84,7 @@ impl FromStr for TargetType {
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
         let potion = arg.chars().position(|c| c == ':')
-            .ok_or(Error::msg("error source"))?;
+            .ok_or_else(|| Error::msg("error source"))?;
         let target_type = &arg[..potion];
         Ok(match target_type {
             "registry" => TargetType::Registry(arg[potion + 1..].to_string()),
@@ -103,7 +103,7 @@ impl FromStr for BaseAuth {
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
         let potion = arg.chars().position(|c| c == ':')
-            .ok_or(Error::msg("error auth input"))?;
-        Ok(BaseAuth { username: (&arg)[..potion].to_string(), password: (&arg)[potion + 1..].to_string() })
+            .ok_or_else(|| Error::msg("error auth input"))?;
+        Ok(BaseAuth { username: arg[..potion].to_string(), password: arg[potion + 1..].to_string() })
     }
 }

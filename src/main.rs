@@ -1,7 +1,6 @@
 #![feature(exclusive_range_pattern)]
 #![feature(once_cell)]
 
-#[macro_use]
 extern crate derive_builder;
 
 use std::borrow::Borrow;
@@ -22,12 +21,10 @@ mod reg;
 mod util;
 mod bar;
 mod config;
-mod docker;
 mod tempconfig;
 mod adapter;
 mod init;
 mod subcmd;
-mod push;
 
 pub static GLOBAL_CONFIG: SyncLazy<GlobalAppConfig> = SyncLazy::new(|| {
     let home_path = home_dir().expect("can not found home dir");
@@ -48,5 +45,4 @@ fn main() -> Result<()> {
         CmdArgs::Transform => {}
     }
     Ok(())
-    //docker::run()
 }

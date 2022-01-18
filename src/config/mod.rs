@@ -71,7 +71,7 @@ fn read_docker_config(config_path: PathBuf, reg_host: &str) -> Result<Option<Reg
                 Some(base64_str) => {
                     let vec = base64::decode(base64_str)?;
                     let decode_str = String::from_utf8(vec)?;
-                    let mut split = decode_str.split(":");
+                    let mut split = decode_str.split(':');
                     let username = split.next().expect("error docker file").to_string();
                     let password = split.next().expect("error docker file").to_string();
                     Some(RegistryAuth {

@@ -44,9 +44,9 @@ impl RegistryTargetAdapter {
                 image_host: from.image_parsed.registry,
                 image_name: from.image_parsed.image,
                 reference: from.image_parsed.tag.or(from.image_parsed.hash)
-                    .ok_or(Error::msg("can not found hash or tag"))?,
+                    .ok_or_else(|| Error::msg("can not found hash or tag"))?,
             },
-            _ => return Err(Error::msg("")),
+            _ => return Err(Error::msg("image info error")),
         };
         let auth = RegAuthType::build_auth(image_info.image_host.as_ref(), base_auth);
         Ok(RegistryTargetAdapter {
@@ -65,7 +65,8 @@ impl RegistryTargetAdapter {
         let home_dir = GLOBAL_CONFIG.home_dir.clone();
         let target_info = self.info;
         let reg_auth = self.target_auth.get_auth()?;
-        let host = target_info.image_info.image_host.unwrap_or("registry-1.docker.io/v2".to_string());
+        let host = target_info.image_info.image_host
+            .unwrap_or_else(|| "registry-1.docker.io/v2".to_string());
         let target_reg = Registry::open(self.use_https, &host, reg_auth)?;
         let mut manager = target_reg.image_manager;
 
@@ -74,7 +75,7 @@ impl RegistryTargetAdapter {
         for manifest_layer in target_manifest.layers() {
             let layer_digest = RegDigest::new_with_digest(manifest_layer.digest.to_string());
             let local_layer = home_dir.cache.blobs.local_layer(&layer_digest)
-                .ok_or(Error::msg("local download file not found"))?;
+                .ok_or_else(|| Error::msg("local download file not found"))?;
             let layer_path = local_layer.layer_path();
             let reg_uploader = manager.layer_blob_upload(
                 &target_info.image_info.image_name, &layer_digest, &layer_path,
@@ -98,7 +99,7 @@ impl RegistryTargetAdapter {
             info!("upload done : {}", &upload_result.finished_info());
         }
 
-        let put_result = manager.put_manifest(&Reference {
+        let _put_result = manager.put_manifest(&Reference {
             image_name: target_info.image_info.image_name.as_str(),
             reference: target_info.image_info.reference.as_str(),
         }, target_manifest)?;
