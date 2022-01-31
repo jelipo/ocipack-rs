@@ -8,7 +8,7 @@ pub struct Bar {
 impl Bar {
     pub fn add_size(&mut self, size: u64) {
         let mut bar_core_mut = self.bar_core.borrow_mut();
-        bar_core_mut.curr_file_size = bar_core_mut.curr_file_size + size;
+        bar_core_mut.curr_file_size += size;
     }
 
     pub fn finish(&mut self, _success: bool, _finished_info: &str) {

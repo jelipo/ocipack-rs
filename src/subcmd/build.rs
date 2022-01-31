@@ -1,22 +1,19 @@
-use std::collections::HashMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 use anyhow::{Error, Result};
-use tar::{Builder, Header};
+use tar::Builder;
 
 use crate::{GLOBAL_CONFIG, HomeDir};
-use crate::adapter::{BuildInfo, CopyFile, SourceImageAdapter, SourceInfo, TargetImageAdapter};
+use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
-use crate::config::cmd::{BaseAuth, BuildCmdArgs, SourceType, TargetFormat, TargetType};
+use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::{ConfigBlobEnum, Layer};
+use crate::reg::{CompressType, ConfigBlobEnum};
 use crate::reg::home::TempLayerInfo;
-use crate::reg::manifest::{CommonManifestLayer, Manifest};
+use crate::reg::manifest::Manifest;
 use crate::subcmd::pull::pull;
-use crate::tempconfig::TempConfig;
 use crate::util::{compress, random};
 use crate::util::sha::{Sha256Reader, Sha256Writer};
 
@@ -35,36 +32,9 @@ fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo
         SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
         SourceType::Cmd { tag: _ } => { todo!() }
     };
-    let source_reg_auth = build_auth(source_info.image_info.image_host.as_ref(),
-                                     build_args.source_auth.as_ref());
+    let source_reg_auth = RegAuthType::build_auth(
+        source_info.image_info.image_host.as_ref(), build_args.source_auth.as_ref());
     Ok((source_info, build_info, source_reg_auth))
-}
-
-fn build_target_info(target_type: TargetType) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
-    match target_type {
-        TargetType::Registry(String) => {}
-    }
-    let (source_info, build_info) = match &build_args.source {
-        SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
-        SourceType::Cmd { tag: _ } => { todo!() }
-    };
-    let source_reg_auth = build_auth(source_info.image_info.image_host.as_ref(),
-                                     build_args.source_auth.as_ref());
-    Ok((source_info, build_info, source_reg_auth))
-}
-
-
-fn build_auth(image_host: Option<&String>, base_auth: Option<&BaseAuth>) -> RegAuthType {
-    match base_auth.as_ref() {
-        None => RegAuthType::LocalDockerAuth {
-            reg_host: image_host.map(|s| s.as_str())
-                .unwrap_or("https://index.docker.io/v1/").to_string()
-        },
-        Some(auth) => RegAuthType::CustomPassword {
-            username: auth.username.clone(),
-            password: auth.password.clone(),
-        }
-    }
 }
 
 fn handle(
@@ -79,7 +49,12 @@ fn handle(
     let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| {
         gz_layer_file(&tar_path, &home_dir)
     }).transpose()?;
-
+    if let Some(temp_layer) = &temp_layer {
+        home_dir.cache.blobs.move_to_blob(
+            &temp_layer.compress_layer_path, &temp_layer.tgz_sha256, &temp_layer.tar_sha256)?;
+        let _local_layer = home_dir.cache.blobs.create_layer_config(
+            &temp_layer.tar_sha256, &temp_layer.tgz_sha256, CompressType::Tgz)?;
+    }
     let target_config_blob = build_target_config_blob(
         build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
     let source_manifest = pull_result.manifest;
@@ -89,16 +64,17 @@ fn handle(
     match &build_cmds.target {
         TargetType::Registry(image) => {
             let registry_adapter = RegistryTargetAdapter::new(
-                image, build_cmds.format.clone(), !build_cmds.allow_insecure,target_manifest)?;
+                image, build_cmds.format.clone(), !build_cmds.allow_insecure,
+                target_manifest, target_config_blob, build_cmds.target_auth.as_ref())?;
+            registry_adapter.upload()?
         }
     }
-
 
     Ok(())
 }
 
-fn build_top_tar(copyfiles: &Vec<CopyFile>, home_dir: &HomeDir) -> Result<Option<PathBuf>> {
-    if copyfiles.len() == 0 {
+fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<PathBuf>> {
+    if copyfiles.is_empty() {
         return Ok(None);
     }
     let tar_file_name = random::random_str(10) + ".tar";
@@ -107,21 +83,19 @@ fn build_top_tar(copyfiles: &Vec<CopyFile>, home_dir: &HomeDir) -> Result<Option
     let mut tar_builder = Builder::new(tar_temp_file);
     for copyfile in copyfiles {
         for source_path_str in &copyfile.source_path {
-            let source_pathbuf = PathBuf::from(&source_path_str);
-            if !source_pathbuf.exists() {
+            let source_path = PathBuf::from(&source_path_str);
+            if !source_path.exists() {
                 return Err(Error::msg(format!("path not found:{}", source_path_str)));
             }
-            let dest_path = if copyfile.dest_path.ends_with("/") {
+            let dest_path = if copyfile.dest_path.ends_with('/') {
                 &copyfile.dest_path[1..]
-            } else {
-                &copyfile.dest_path
-            };
-            if source_pathbuf.is_file() {
-                tar_builder.append_file(dest_path, &mut File::open(source_pathbuf)?)?;
-            } else if source_pathbuf.is_dir() {
+            } else { &copyfile.dest_path };
+            if source_path.is_file() {
+                tar_builder.append_file(dest_path, &mut File::open(source_path)?)?;
+            } else if source_path.is_dir() {
                 tar_builder.append_dir(dest_path, source_path_str)?;
             } else {
-                return Err(Error::msg(format!("copy only support file and dir")));
+                return Err(Error::msg("copy only support file and dir".to_string()));
             }
         }
     }
@@ -140,9 +114,10 @@ fn gz_layer_file(tar_file_path: &Path, home_dir: &HomeDir) -> Result<TempLayerIn
     let tar_sha256 = sha256_reader.sha256()?;
     let tgz_sha256 = sha256_writer.sha256()?;
     Ok(TempLayerInfo {
-        gz_sha256: tgz_sha256,
+        tgz_sha256,
         tar_sha256,
-        gz_temp_file_path: tgz_file_path.into_boxed_path(),
+        compress_layer_path: tgz_file_path,
+        compress_type: CompressType::Tgz,
     })
 }
 
@@ -188,8 +163,8 @@ fn build_target_manifest(
         TargetFormat::Oci => Manifest::OciV1(source_manifest.to_oci_v1()?)
     };
     if let Some(temp_layer) = temp_layer_opt {
-        let metadata = (&temp_layer).gz_temp_file_path.metadata()?;
-        target_manifest.add_top_gz_layer(metadata.len(), temp_layer.gz_sha256.to_string())
+        let metadata = temp_layer.compress_layer_path.metadata()?;
+        target_manifest.add_top_gz_layer(metadata.len(), temp_layer.tgz_sha256.to_string())
     }
     Ok(target_manifest)
 }

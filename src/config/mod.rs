@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use home::home_dir;
+use crate::config::cmd::BaseAuth;
 
 use crate::config::userconfig::UserDockerConfig;
 use crate::reg::http::RegistryAuth;
@@ -44,6 +45,19 @@ impl RegAuthType {
             }))
         }
     }
+
+    pub fn build_auth(image_host: Option<&String>, base_auth: Option<&BaseAuth>) -> RegAuthType {
+        match base_auth.as_ref() {
+            None => RegAuthType::LocalDockerAuth {
+                reg_host: image_host.map(|s| s.as_str())
+                    .unwrap_or("https://index.docker.io/v1/").to_string()
+            },
+            Some(auth) => RegAuthType::CustomPassword {
+                username: auth.username.clone(),
+                password: auth.password.clone(),
+            }
+        }
+    }
 }
 
 fn read_docker_config(config_path: PathBuf, reg_host: &str) -> Result<Option<RegistryAuth>> {
@@ -57,7 +71,7 @@ fn read_docker_config(config_path: PathBuf, reg_host: &str) -> Result<Option<Reg
                 Some(base64_str) => {
                     let vec = base64::decode(base64_str)?;
                     let decode_str = String::from_utf8(vec)?;
-                    let mut split = decode_str.split(":");
+                    let mut split = decode_str.split(':');
                     let username = split.next().expect("error docker file").to_string();
                     let password = split.next().expect("error docker file").to_string();
                     Some(RegistryAuth {

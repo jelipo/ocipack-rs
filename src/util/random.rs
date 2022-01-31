@@ -1,6 +1,7 @@
 use std::iter;
-use rand::distributions::Alphanumeric;
+
 use rand::{Rng, thread_rng};
+use rand::distributions::Alphanumeric;
 
 /// 生成一个一个随机字符串
 pub fn random_str(size: usize) -> String {

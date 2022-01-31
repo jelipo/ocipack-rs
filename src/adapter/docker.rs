@@ -1,17 +1,13 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
-use std::num::ParseIntError;
 use std::str::FromStr;
 
 use anyhow::{Error, Result};
 use dockerfile_parser::{BreakableStringComponent, Dockerfile, Instruction, ShellOrExecExpr};
 use log::warn;
-use regex::Regex;
 
 use crate::adapter::{BuildInfo, CopyFile, ImageInfo, SourceImageAdapter, SourceInfo};
-use crate::config::{BaseImage, RegAuthType};
-use crate::config::cmd::BaseAuth;
 
 pub struct DockerfileAdapter {
     docker_file_path: String,
@@ -43,7 +39,7 @@ impl DockerfileAdapter {
                     image_host: from.image_parsed.registry,
                     image_name: from.image_parsed.image,
                     reference: from.image_parsed.tag.or(from.image_parsed.hash)
-                        .ok_or(Error::msg("can not found hash or tag"))?,
+                        .ok_or_else(|| Error::msg("can not found hash or tag"))?,
                 }),
                 Instruction::Arg(_) | Instruction::Run(_) => {
                     warn!("un support ARG and RUN")
@@ -65,8 +61,8 @@ impl DockerfileAdapter {
                         .map(|str| str.content).collect::<Vec<String>>()
                 }),
                 Instruction::Copy(copy) => {
-                    let i = copy.flags.len();
-                    if copy.flags.len() > 0 { return Err(Error::msg("copy not support flag")); };
+                    let _i = copy.flags.len();
+                    if !copy.flags.is_empty() { return Err(Error::msg("copy not support flag")); };
                     copy_files.push(CopyFile {
                         source_path: copy.sources.into_iter().
                             map(|str| str.content).collect::<Vec<String>>(),
@@ -106,7 +102,7 @@ impl DockerfileAdapter {
             }
         }
         let source_info = SourceInfo {
-            image_info: from_image.ok_or(Error::msg("dockerfile must has a 'From'"))?,
+            image_info: from_image.ok_or_else(|| Error::msg("dockerfile must has a 'From'"))?,
         };
         Ok((source_info, BuildInfo {
             labels: label_map,
