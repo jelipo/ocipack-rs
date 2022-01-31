@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 
 use crate::reg::{CompressType, RegDigest};
 use crate::util::{compress, random};
-use crate::util::compress::ungz_file;
+use crate::util::compress::un_gz_file;
 use crate::util::file::PathExt;
 use crate::util::sha::{Sha256Reader, Sha256Writer};
 
@@ -106,13 +106,13 @@ impl BlobsDir {
         let tgz_download_file_path = self.download_ready(digest);
         let download_file = File::open(&tgz_download_file_path)?;
         let mut sha256_encode = Sha256::new();
-        ungz_file(&download_file, &mut sha256_encode)?;
+        un_gz_file(&download_file, &mut sha256_encode)?;
         drop(download_file);
         let sha256 = &sha256_encode.finalize()[..];
         let tar_sha256 = hex::encode(sha256);
         let layer_dir = self.layers_path.join(&digest.sha256);
         let tar_file_path = layer_dir.join(&tar_sha256);
-        tar_file_path.remove()?;
+        tar_file_path.clean_path()?;
         create_dir_all(&layer_dir)?;
         std::fs::rename(tgz_download_file_path, &tar_file_path)?;
         Ok((tar_sha256, tar_file_path.into_boxed_path()))
@@ -122,7 +122,7 @@ impl BlobsDir {
         let layer_config_parent = tar_file_path.parent()
             .ok_or(Error::msg("illegal layer config path"))?;
         let tar_sha_file_path = self.diff_layer_config_path(layer_config_parent);
-        tar_sha_file_path.remove()?;
+        tar_sha_file_path.clean_path()?;
         let mut tar_sha_file = File::create(tar_sha_file_path)?;
         tar_sha_file.write(sha256.as_bytes())?;
         tar_sha_file.flush()?;

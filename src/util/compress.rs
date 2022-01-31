@@ -1,13 +1,13 @@
 use std::fs::File;
 use std::io::{Read, Write};
 
-
-use anyhow::{Result};
+use anyhow::Result;
 use flate2::Compression;
-use flate2::read::{GzDecoder};
+use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 
-pub fn ungz_file<W: ?Sized + Write>(gzip_file: &File, output_writer: &mut W) -> Result<()> {
+/// 解压gz文件
+pub fn un_gz_file<W: ?Sized + Write>(gzip_file: &File, output_writer: &mut W) -> Result<()> {
     let mut decoder = GzDecoder::new(gzip_file);
 
     let mut buffer = vec![0u8; 1024 * 4].into_boxed_slice();
@@ -20,6 +20,7 @@ pub fn ungz_file<W: ?Sized + Write>(gzip_file: &File, output_writer: &mut W) -> 
     Ok(())
 }
 
+/// 使用gz压缩
 pub fn gz_file<R: Read, W: ?Sized + Write>(input_reader: &mut R, output_writer: &mut W) -> Result<()> {
     let mut encoder = GzEncoder::new(output_writer, Compression::fast());
     let mut buffer = vec![0u8; 1024 * 4].into_boxed_slice();

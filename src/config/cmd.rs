@@ -15,11 +15,13 @@ pub struct BuildCmdArgs {
     /// Allow insecure registry
     #[clap(long, short, parse(from_flag))]
     pub allow_insecure: bool,
+
     /// Source type.
     /// Support dockerfile,cmd type
     /// Example:'dockerfile:/path/to/.Dockerfile','cmd:my.reg.com/source/image:1.0'
     #[clap(long, short)]
     pub source: SourceType,
+
     /// [OPTION] Auth of pull source image. Example:'myname:mypass','myname:${MY_PASSWORD_ENV}'
     #[clap(long)]
     pub source_auth: Option<BaseAuth>,
@@ -29,9 +31,11 @@ pub struct BuildCmdArgs {
     /// Example:'registry:my.reg.com/target/image:1.1'
     #[clap(long, short)]
     pub target: TargetType,
+
     /// [OPTION] Auth of push target image. Example:'myname:mypass','myname:${MY_PASSWORD_ENV}'
     #[clap(long)]
     pub target_auth: Option<BaseAuth>,
+
     /// [OPTION] Target format type. Support 'docker' and 'oci'.
     #[clap(long, short, default_value = "docker")]
     pub format: TargetFormat,
