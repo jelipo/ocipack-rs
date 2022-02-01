@@ -73,6 +73,7 @@ fn handle(
     Ok(())
 }
 
+/// 构建一个tar layer
 fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<PathBuf>> {
     if copyfiles.is_empty() {
         return Ok(None);
@@ -103,6 +104,7 @@ fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<Pa
     Ok(Some(tar_temp_file_path))
 }
 
+/// 压缩tar layer文件为gz格式
 fn gz_layer_file(tar_file_path: &Path, home_dir: &HomeDir) -> Result<TempLayerInfo> {
     let tar_file = File::open(tar_file_path)?;
     let mut sha256_reader = Sha256Reader::new(tar_file);
