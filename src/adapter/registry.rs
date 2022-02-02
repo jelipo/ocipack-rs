@@ -30,21 +30,26 @@ impl TargetImageAdapter for RegistryTargetAdapter {
 
 impl RegistryTargetAdapter {
     pub fn new(
-        image: &str,
+        image_raw: &str,
         format: TargetFormat,
         use_https: bool,
         target_manifest: Manifest,
         target_config_blob: ConfigBlobEnum,
         base_auth: Option<&BaseAuth>,
     ) -> Result<RegistryTargetAdapter> {
-        let temp_from = format!("FROM {}", image);
+        let temp_from = format!("FROM {}", image_raw);
         let instruction = Dockerfile::parse(&temp_from)?.instructions.remove(0);
         let image_info = match instruction {
             Instruction::From(from) => ImageInfo {
-                image_host: from.image_parsed.registry,
-                image_name: from.image_parsed.image,
+                // TODO "registry-1.docker.io" static str
+                image_host: from.image_parsed.registry.or_else(|| Some("registry-1.docker.io".to_string())),
+                image_name: if from.image_parsed.image.contains('/') {
+                    from.image_parsed.image
+                } else {
+                    format!("library/{}", from.image_parsed.image)
+                },
                 reference: from.image_parsed.tag.or(from.image_parsed.hash)
-                    .ok_or_else(|| Error::msg("can not found hash or tag"))?,
+                    .unwrap_or_else(|| "latest".to_string()),
             },
             _ => return Err(Error::msg("image info error")),
         };

@@ -24,13 +24,8 @@ pub fn pull(
     let image_info = &source_info.image_info;
     let image_host = image_info.image_host.clone()
         .unwrap_or_else(|| "registry-1.docker.io".into());
-    let image_name = if image_info.image_name.contains('/') {
-        image_info.image_name.clone()
-    } else {
-        format!("library/{}", image_info.image_name)
-    };
     let from_image_reference = Reference {
-        image_name: &image_name,
+        image_name: &image_info.image_name,
         reference: image_info.reference.as_str(),
     };
 

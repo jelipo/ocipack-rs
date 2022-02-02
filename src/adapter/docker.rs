@@ -39,6 +39,7 @@ impl DockerfileAdapter {
                     image_host: from.image_parsed.registry,
                     image_name: from.image_parsed.image,
                     reference: from.image_parsed.tag.or(from.image_parsed.hash)
+                        .or_else(|| Some(String::from("latest")))
                         .ok_or_else(|| Error::msg("can not found hash or tag"))?,
                 }),
                 Instruction::Arg(_) | Instruction::Run(_) => {

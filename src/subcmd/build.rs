@@ -28,10 +28,15 @@ impl BuildCommand {
 }
 
 fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
-    let (source_info, build_info) = match &build_args.source {
+    let (mut source_info, build_info) = match &build_args.source {
         SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
         SourceType::Cmd { tag: _ } => { todo!() }
     };
+    // add library
+    let image_name = &source_info.image_info.image_name;
+    if !image_name.contains('/') {
+        source_info.image_info.image_name = format!("library/{}", image_name)
+    }
     let source_reg_auth = RegAuthType::build_auth(
         source_info.image_info.image_host.as_ref(), build_args.source_auth.as_ref());
     Ok((source_info, build_info, source_reg_auth))
