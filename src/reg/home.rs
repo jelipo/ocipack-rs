@@ -1,3 +1,4 @@
+use std::fs;
 use std::fs::{create_dir_all, File, read_to_string, rename};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -91,11 +92,12 @@ impl BlobsDir {
     }
 
     pub fn move_to_blob(&self, file_path: &Path, manifest_sha: &str, diff_layer_sha: &str) -> Result<()> {
-        let diff_layer_dir = self.blob_path.join(manifest_sha);
+        let diff_layer_dir = self.layers_path.join(manifest_sha);
         let diff_layer = diff_layer_dir.join(diff_layer_sha);
         if diff_layer.exists() {
             std::fs::remove_file(&diff_layer)?;
         }
+        println!("path {}", file_path.to_string_lossy());
         rename(file_path, diff_layer)?;
         Ok(())
     }
@@ -107,7 +109,6 @@ pub struct TempLayerInfo {
     pub compress_layer_path: PathBuf,
     pub compress_type: CompressType,
 }
-
 
 pub struct LocalLayer {
     pub diff_layer_sha: String,
@@ -121,7 +122,7 @@ impl LocalLayer {
         let diff_layer_dir = layer_cache_dir.join(manifest_sha);
         let config_name = Self::diff_layer_config_name();
         let diff_layer_config_path = diff_layer_dir.join(config_name);
-        let config_str = read_to_string(diff_layer_dir.clone())?;
+        let config_str = read_to_string(diff_layer_config_path.clone())?;
         let (compress_type, diff_layer_sha) = LocalLayer::pares_config(&config_str)?;
         let layer_file_path = diff_layer_dir.join(diff_layer_sha);
         if !layer_file_path.exists() { return Err(Error::msg("diff layer not found")); }
@@ -137,7 +138,7 @@ impl LocalLayer {
         let split = config_str.split('\n').collect::<Vec<&str>>();
         if split.len() < 2 { return Err(Error::msg("error diff layer config file")); }
         let compress_type = CompressType::from_str(split[0])?;
-        let diff_layer_sha = split[2];
+        let diff_layer_sha = split[1];
         Ok((compress_type, diff_layer_sha))
     }
 
@@ -173,6 +174,8 @@ impl LocalLayer {
             std::fs::remove_file(&self.diff_layer_config_path)?;
         }
         let config_data = self.config_string();
+        let parent = self.diff_layer_config_path.parent().unwrap();
+        fs::create_dir_all(parent)?;
         let mut diff_layer_config = File::create(&self.diff_layer_config_path)?;
         diff_layer_config.write_all(config_data.as_bytes())?;
         diff_layer_config.flush()?;

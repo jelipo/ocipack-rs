@@ -23,15 +23,20 @@ pub fn pull(
 ) -> Result<PullResult> {
     let image_info = &source_info.image_info;
     let image_host = image_info.image_host.clone()
-        .unwrap_or_else(|| "registry-1.docker.io/v2".into());
+        .unwrap_or_else(|| "registry-1.docker.io".into());
+    let image_name = if image_info.image_name.contains('/') {
+        image_info.image_name.clone()
+    } else {
+        format!("library/{}", image_info.image_name)
+    };
+    let from_image_reference = Reference {
+        image_name: &image_name,
+        reference: image_info.reference.as_str(),
+    };
 
     let registry_auth = source_auth.get_auth()?;
     let mut from_registry = Registry::open(use_https, &image_host, registry_auth)?;
 
-    let from_image_reference = Reference {
-        image_name: image_info.image_name.as_str(),
-        reference: image_info.reference.as_str(),
-    };
     let manifest = from_registry.image_manager.manifests(&from_image_reference)?;
     let config_digest = manifest.config_digest();
     let layers = manifest.layers();
@@ -63,6 +68,7 @@ pub fn pull(
         let sha256 = &sha256_encode.finalize()[..];
         let tar_sha256 = hex::encode(sha256);
         GLOBAL_CONFIG.home_dir.cache.blobs.create_layer_config(&tar_sha256, &digest.sha256, layer_compress_type)?;
+        GLOBAL_CONFIG.home_dir.cache.blobs.move_to_blob(download_path, &digest.sha256, &tar_sha256)?;
     }
 
     let config_blob_enum = match &manifest {

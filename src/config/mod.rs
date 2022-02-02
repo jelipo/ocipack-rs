@@ -1,11 +1,12 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::path::PathBuf;
 
 use anyhow::Result;
 use home::home_dir;
-use crate::config::cmd::BaseAuth;
 
-use crate::config::userconfig::UserDockerConfig;
+use crate::config::cmd::BaseAuth;
+use crate::config::userconfig::{UserDockerConfig, UserDockerConfigAuth};
 use crate::reg::http::RegistryAuth;
 
 pub mod userconfig;
@@ -64,24 +65,27 @@ fn read_docker_config(config_path: PathBuf, reg_host: &str) -> Result<Option<Reg
     if config_path.is_file() {
         let config_file = File::open(config_path)?;
         let user_docker_config = serde_json::from_reader::<_, UserDockerConfig>(config_file)?;
-        Ok(match user_docker_config.auths.get(reg_host) {
-            None => None,
-            Some(auth) => match &auth.auth {
-                None => None,
-                Some(base64_str) => {
-                    let vec = base64::decode(base64_str)?;
-                    let decode_str = String::from_utf8(vec)?;
-                    let mut split = decode_str.split(':');
-                    let username = split.next().expect("error docker file").to_string();
-                    let password = split.next().expect("error docker file").to_string();
-                    Some(RegistryAuth {
-                        username,
-                        password,
-                    })
-                }
-            }
-        })
+        get_auth_from_dockerconfig(user_docker_config, reg_host)
     } else {
         Ok(None)
     }
+}
+
+fn get_auth_from_dockerconfig(user_docker_config: UserDockerConfig, reg_host: &str) -> Result<Option<RegistryAuth>> {
+    if let Some(auth_map) = user_docker_config.auths {
+        if let Some(auth) = auth_map.get(reg_host) {
+            if let Some(base64_str) = &auth.auth {
+                let vec = base64::decode(base64_str)?;
+                let decode_str = String::from_utf8(vec)?;
+                let mut split = decode_str.split(':');
+                let username = split.next().expect("error docker file").to_string();
+                let password = split.next().expect("error docker file").to_string();
+                return Ok(Some(RegistryAuth {
+                    username,
+                    password,
+                }));
+            }
+        }
+    }
+    return Ok(None);
 }

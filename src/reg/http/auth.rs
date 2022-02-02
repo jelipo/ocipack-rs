@@ -82,9 +82,9 @@ impl AuthenticateAdapter {
         let www_authenticate = get_header(http_response.headers(), "Www-Authenticate")
             .expect("Www-Authenticate header not found");
         let regex = Regex::new("^Bearer realm=\"(?P<realm>.*)\",service=\"(?P<service>.*)\".*")?;
-        let captures = regex.captures(www_authenticate.as_str()).expect(
-            &format!("www_authenticate header not support:{}", www_authenticate.as_str())
-        );
+        let captures = regex.captures(www_authenticate.as_str()).ok_or_else(||
+            Error::msg(format!("www_authenticate header not support:{}", www_authenticate.as_str()))
+        )?;
         let realm = &captures["realm"];
         let service = &captures["service"];
         Ok(AuthenticateAdapter {

@@ -86,7 +86,7 @@ impl Registry {
         host: &str,
         auth: Option<RegistryAuth>,
     ) -> Result<Registry> {
-        let reg_addr = format!("{}{}", if use_https { "https" } else { "http" }, host);
+        let reg_addr = format!("{}{}", if use_https { "https://" } else { "http://" }, host);
         let client = RegistryHttpClient::new(reg_addr.clone(), auth)?;
         let image = MyImageManager::new(reg_addr, client);
         Ok(Registry {
@@ -118,7 +118,7 @@ impl MyImageManager {
         let accepts = &[RegContentType::OCI_MANIFEST, RegContentType::DOCKER_MANIFEST];
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&path, scope, accepts);
         let response = self.reg_client.simple_request(request)?;
-        let content_type = (&response).content_type()
+        let content_type = response.content_type()
             .ok_or_else(|| Error::msg("manifest content-type header not found"))?;
         if RegContentType::DOCKER_MANIFEST.val() == content_type {
             let manifest = serde_json::from_str::<DockerManifest>(&response.string_body())?;
@@ -154,9 +154,11 @@ impl MyImageManager {
         &mut self, name: &str, blob_digest: &str,
     ) -> Result<T> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
-        let request: ClientRequest<u8> = ClientRequest::new_get_request(&url_path, Some(name), &[]);
+        let accepts = &[RegContentType::OCI_IMAGE_CONFIG, RegContentType::DOCKER_CONTAINER_IMAGE];
+        let request: ClientRequest<u8> = ClientRequest::new_get_request(&url_path, Some(name), accepts);
         let response = self.reg_client.simple_request(request)?;
-        Ok(serde_json::from_str::<T>(&response.string_body())?)
+        let str_body = response.string_body();
+        Ok(serde_json::from_str::<T>(&str_body)?)
     }
 
     pub fn layer_blob_download(&mut self, name: &str, blob_digest: &RegDigest, layer_size: Option<u64>) -> Result<RegDownloader> {

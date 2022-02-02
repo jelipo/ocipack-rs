@@ -77,8 +77,8 @@ impl Processor<DownloadResult> for RegDownloader {
             return Box::new(RegFinishedDownloader {
                 result: DownloadResult {
                     file_path: Some(file_path.clone()),
-                    file_size: (&file_path).metadata().unwrap().len(),
-                    blob_config: blob_config.clone(),
+                    file_size: file_path.metadata().unwrap().len(),
+                    blob_config,
                     local_existed: true,
                     result_str: "exists".to_string(),
                 }

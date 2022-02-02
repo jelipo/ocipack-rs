@@ -28,9 +28,10 @@ mod subcmd;
 
 pub static GLOBAL_CONFIG: SyncLazy<GlobalAppConfig> = SyncLazy::new(|| {
     let home_path = home_dir().expect("can not found home dir");
+    let cache_dir = home_path.join("pack_temp");
     GlobalAppConfig {
         cmd_args: CmdArgs::parse(),
-        home_dir: Arc::new(HomeDir::new_home_dir(&home_path).expect("")),
+        home_dir: Arc::new(HomeDir::new_home_dir(&cache_dir).expect("")),
     }
 });
 

@@ -11,7 +11,7 @@ use crate::reg::ConfigBlob;
 pub struct DockerConfigBlob {
     pub created: Option<String>,
     pub author: Option<String>,
-    pub architecture: String,
+    pub architecture: Option<String>,
     pub os: Option<String>,
     pub config: Config,
     pub rootfs: Rootfs,

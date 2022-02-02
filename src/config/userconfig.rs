@@ -5,7 +5,7 @@ use serde::Serialize;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UserDockerConfig {
-    pub auths: HashMap<String, UserDockerConfigAuth>,
+    pub auths: Option<HashMap<String, UserDockerConfigAuth>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
