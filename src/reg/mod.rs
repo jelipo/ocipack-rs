@@ -21,6 +21,7 @@ use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::RegUploader;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
+use crate::util::sha::{bytes_sha256, str_sha256};
 
 pub mod home;
 pub mod docker;
@@ -345,6 +346,22 @@ impl ConfigBlobEnum {
             ConfigBlobEnum::DockerV2S2(docker) => serde_json::to_string(docker)
         }?)
     }
+
+    pub fn serialize(&self) -> Result<ConfigBlobSerialize> {
+        let json = self.to_json_string()?;
+        let json_bytes = json.as_bytes();
+        Ok(ConfigBlobSerialize {
+            json_str: json,
+            sha256_hex: RegDigest::new_with_sha256(bytes_sha256(json_bytes)),
+            size: json_bytes.len() as u64,
+        })
+    }
+}
+
+pub struct ConfigBlobSerialize {
+    json_str: String,
+    sha256_hex: RegDigest,
+    size: u64,
 }
 
 pub struct RegContentType(pub &'static str);

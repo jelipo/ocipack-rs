@@ -71,7 +71,7 @@ impl RegistryTargetAdapter {
         let target_info = self.info;
         let reg_auth = self.target_auth.get_auth()?;
         let host = target_info.image_info.image_host
-            .unwrap_or_else(|| "registry-1.docker.io/v2".to_string());
+            .unwrap_or_else(|| "registry-1.docker.io".to_string());
         let target_reg = Registry::open(self.use_https, &host, reg_auth)?;
         let mut manager = target_reg.image_manager;
 
@@ -104,11 +104,11 @@ impl RegistryTargetAdapter {
             info!("upload done : {}", &upload_result.finished_info());
         }
 
-        let _put_result = manager.put_manifest(&Reference {
+        let put_result = manager.put_manifest(&Reference {
             image_name: target_info.image_info.image_name.as_str(),
             reference: target_info.image_info.reference.as_str(),
         }, target_manifest)?;
-
+        info!("put manifest result {}",put_result);
         Ok(())
     }
 }

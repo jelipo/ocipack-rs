@@ -3,7 +3,7 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::{Layer, LayerConvert, RegContentType, RegDigest};
+use crate::reg::{ConfigBlobEnum, Layer, LayerConvert, Reference, RegContentType, RegDigest};
 use crate::reg::docker::DockerManifest;
 use crate::reg::oci::OciManifest;
 
@@ -48,13 +48,17 @@ impl Manifest {
         })
     }
 
-    pub fn to_docker_v2_s2(self) -> anyhow::Result<DockerManifest> {
+    pub fn to_docker_v2_s2(self, config_blob: &ConfigBlobEnum) -> anyhow::Result<DockerManifest> {
         Ok(match self {
             Manifest::OciV1(mut oci) => DockerManifest {
                 schema_version: 2,
                 media_type: RegContentType::DOCKER_MANIFEST.val().to_string(),
                 config: {
                     oci.config.media_type = RegContentType::DOCKER_CONTAINER_IMAGE.val().to_string();
+                    let sha_data = config_blob.sha256()?;
+                    let digest = RegDigest::new_with_sha256(sha_data.sha256_hex);
+                    oci.config.digest = digest.digest;
+                    oci.config.size = sha_data.size;
                     oci.config
                 },
                 layers: oci.layers.into_iter().map(|mut common_layer| {

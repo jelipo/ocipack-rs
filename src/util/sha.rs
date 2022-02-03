@@ -23,6 +23,13 @@ pub fn file_sha256(file_path: &Path) -> Result<String> {
     Ok(hex::encode(sha256))
 }
 
+pub fn bytes_sha256(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    DynDigest::update(&mut hasher, bytes);
+    let sha256 = &hasher.finalize()[..];
+    hex::encode(sha256)
+}
+
 pub struct Sha256Reader<R: Read> {
     read: R,
     hasher: Sha256,
