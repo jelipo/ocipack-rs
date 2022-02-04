@@ -9,10 +9,9 @@ use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
 use crate::progress::ProcessResult;
-use crate::reg::{ConfigBlobEnum, ConfigBlobSerialize, Reference, RegDigest, Registry};
+use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry};
 use crate::reg::http::upload::UploadResult;
 use crate::reg::manifest::Manifest;
-use crate::util::sha::file_sha256;
 
 pub struct RegistryTargetAdapter {
     info: TargetInfo,

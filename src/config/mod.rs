@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -6,7 +5,7 @@ use anyhow::Result;
 use home::home_dir;
 
 use crate::config::cmd::BaseAuth;
-use crate::config::userconfig::{UserDockerConfig, UserDockerConfigAuth};
+use crate::config::userconfig::UserDockerConfig;
 use crate::reg::http::RegistryAuth;
 
 pub mod userconfig;

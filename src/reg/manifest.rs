@@ -3,7 +3,7 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::{ConfigBlobEnum, ConfigBlobSerialize, Layer, LayerConvert, Reference, RegContentType, RegDigest};
+use crate::reg::{ConfigBlobSerialize, Layer, LayerConvert, RegContentType, RegDigest};
 use crate::reg::docker::DockerManifest;
 use crate::reg::oci::OciManifest;
 
@@ -68,7 +68,7 @@ impl Manifest {
             Manifest::DockerV2S2(mut docker) => {
                 set_config_blob(&mut docker.config, config_blob_serialize);
                 docker
-            },
+            }
         })
     }
 
