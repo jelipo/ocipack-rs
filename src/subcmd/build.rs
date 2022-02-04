@@ -10,7 +10,7 @@ use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
 use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::{CompressType, ConfigBlobEnum};
+use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::reg::home::TempLayerInfo;
 use crate::reg::manifest::Manifest;
 use crate::subcmd::pull::pull;
@@ -63,14 +63,16 @@ fn handle(
     let target_config_blob = build_target_config_blob(
         build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
     let source_manifest = pull_result.manifest;
+
+    let target_config_blob_serialize = target_config_blob.serialize()?;
     let target_manifest = build_target_manifest(
-        source_manifest, &build_cmds.format, temp_layer.as_ref())?;
+        source_manifest, &build_cmds.format, temp_layer.as_ref(), &target_config_blob_serialize)?;
 
     match &build_cmds.target {
         TargetType::Registry(image) => {
             let registry_adapter = RegistryTargetAdapter::new(
                 image, build_cmds.format.clone(), !build_cmds.allow_insecure,
-                target_manifest, target_config_blob, build_cmds.target_auth.as_ref())?;
+                target_manifest, target_config_blob_serialize, build_cmds.target_auth.as_ref())?;
             registry_adapter.upload()?
         }
     }
@@ -164,10 +166,11 @@ fn build_target_manifest(
     source_manifest: Manifest,
     target_format: &TargetFormat,
     temp_layer_opt: Option<&TempLayerInfo>,
+    target_config_blob_serialize: &ConfigBlobSerialize,
 ) -> Result<Manifest> {
     let mut target_manifest = match target_format {
-        TargetFormat::Docker => Manifest::DockerV2S2(source_manifest.to_docker_v2_s2()?),
-        TargetFormat::Oci => Manifest::OciV1(source_manifest.to_oci_v1()?)
+        TargetFormat::Docker => Manifest::DockerV2S2(source_manifest.to_docker_v2_s2(target_config_blob_serialize)?),
+        TargetFormat::Oci => Manifest::OciV1(source_manifest.to_oci_v1(target_config_blob_serialize)?)
     };
     if let Some(temp_layer) = temp_layer_opt {
         let metadata = temp_layer.compress_layer_path.metadata()?;

@@ -9,7 +9,7 @@ use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
 use crate::progress::ProcessResult;
-use crate::reg::{ConfigBlobEnum, Reference, RegDigest, Registry};
+use crate::reg::{ConfigBlobEnum, ConfigBlobSerialize, Reference, RegDigest, Registry};
 use crate::reg::http::upload::UploadResult;
 use crate::reg::manifest::Manifest;
 use crate::util::sha::file_sha256;
@@ -18,7 +18,7 @@ pub struct RegistryTargetAdapter {
     info: TargetInfo,
     use_https: bool,
     target_manifest: Manifest,
-    target_config_blob: ConfigBlobEnum,
+    target_config_blob_serialize: ConfigBlobSerialize,
     target_auth: RegAuthType,
 }
 
@@ -34,7 +34,7 @@ impl RegistryTargetAdapter {
         format: TargetFormat,
         use_https: bool,
         target_manifest: Manifest,
-        target_config_blob: ConfigBlobEnum,
+        target_config_blob_serialize: ConfigBlobSerialize,
         base_auth: Option<&BaseAuth>,
     ) -> Result<RegistryTargetAdapter> {
         let temp_from = format!("FROM {}", image_raw);
@@ -61,7 +61,7 @@ impl RegistryTargetAdapter {
             },
             use_https,
             target_manifest,
-            target_config_blob,
+            target_config_blob_serialize,
             target_auth: auth,
         })
     }
@@ -87,14 +87,13 @@ impl RegistryTargetAdapter {
             )?;
             reg_uploader_vec.push(Box::new(reg_uploader))
         }
-
-        let config_blob_str = self.target_config_blob.to_json_string()?;
+        let serialize = self.target_config_blob_serialize;
+        let config_blob_str = serialize.json_str;
 
         let config_blob_path = home_dir.cache.write_temp_file(config_blob_str)?;
         let config_blob_path_str = config_blob_path.to_string_lossy().to_string();
-        let config_blob_digest = RegDigest::new_with_sha256(file_sha256(&config_blob_path)?);
         let config_blob_uploader = manager.layer_blob_upload(
-            &target_info.image_info.image_name, &config_blob_digest, &config_blob_path_str,
+            &target_info.image_info.image_name, &serialize.digest, &config_blob_path_str,
         )?;
         reg_uploader_vec.push(Box::new(config_blob_uploader));
         //

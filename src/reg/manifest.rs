@@ -3,7 +3,7 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::{ConfigBlobEnum, Layer, LayerConvert, Reference, RegContentType, RegDigest};
+use crate::reg::{ConfigBlobEnum, ConfigBlobSerialize, Layer, LayerConvert, Reference, RegContentType, RegDigest};
 use crate::reg::docker::DockerManifest;
 use crate::reg::oci::OciManifest;
 
@@ -30,14 +30,17 @@ pub enum Manifest {
 }
 
 impl Manifest {
-    pub fn to_oci_v1(self) -> anyhow::Result<OciManifest> {
+    pub fn to_oci_v1(self, config_blob_serialize: &ConfigBlobSerialize) -> anyhow::Result<OciManifest> {
         Ok(match self {
-            Manifest::OciV1(oci) => oci,
+            Manifest::OciV1(mut oci) => {
+                set_config_blob(&mut oci.config, config_blob_serialize);
+                oci
+            }
             Manifest::DockerV2S2(mut docker) => OciManifest {
                 schema_version: 2,
                 media_type: Some(RegContentType::OCI_MANIFEST.val().to_string()),
                 config: {
-                    docker.config.media_type = RegContentType::OCI_IMAGE_CONFIG.val().to_string();
+                    set_config_blob(&mut docker.config, config_blob_serialize);
                     docker.config
                 },
                 layers: docker.layers.into_iter().map(|mut common_layer| {
@@ -48,17 +51,13 @@ impl Manifest {
         })
     }
 
-    pub fn to_docker_v2_s2(self, config_blob: &ConfigBlobEnum) -> anyhow::Result<DockerManifest> {
+    pub fn to_docker_v2_s2(self, config_blob_serialize: &ConfigBlobSerialize) -> anyhow::Result<DockerManifest> {
         Ok(match self {
             Manifest::OciV1(mut oci) => DockerManifest {
                 schema_version: 2,
                 media_type: RegContentType::DOCKER_MANIFEST.val().to_string(),
                 config: {
-                    oci.config.media_type = RegContentType::DOCKER_CONTAINER_IMAGE.val().to_string();
-                    let sha_data = config_blob.sha256()?;
-                    let digest = RegDigest::new_with_sha256(sha_data.sha256_hex);
-                    oci.config.digest = digest.digest;
-                    oci.config.size = sha_data.size;
+                    set_config_blob(&mut oci.config, config_blob_serialize);
                     oci.config
                 },
                 layers: oci.layers.into_iter().map(|mut common_layer| {
@@ -66,7 +65,10 @@ impl Manifest {
                     Ok(common_layer)
                 }).collect::<anyhow::Result<Vec<CommonManifestLayer>>>()?,
             },
-            Manifest::DockerV2S2(docker) => docker,
+            Manifest::DockerV2S2(mut docker) => {
+                set_config_blob(&mut docker.config, config_blob_serialize);
+                docker
+            },
         })
     }
 
@@ -124,4 +126,11 @@ pub fn dockerv2s2_to_ociv1(media_type: &str) -> Result<String> {
         return Err(Error::msg(format!("error docker layer type:{}", media_type)));
     };
     Ok(new_media_type.val().to_string())
+}
+
+
+fn set_config_blob(common_config: &mut CommonManifestConfig, config_blob_serialize: &ConfigBlobSerialize) {
+    common_config.media_type = RegContentType::DOCKER_CONTAINER_IMAGE.val().to_string();
+    common_config.digest = config_blob_serialize.digest.digest.clone();
+    common_config.size = config_blob_serialize.size;
 }
