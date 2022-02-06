@@ -6,7 +6,7 @@ pub mod docker;
 pub mod registry;
 
 pub struct ImageInfo {
-    pub image_host: Option<String>,
+    pub image_host: String,
     pub image_name: String,
     pub reference: String,
 }

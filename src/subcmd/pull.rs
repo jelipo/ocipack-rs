@@ -22,15 +22,14 @@ pub fn pull(
     use_https: bool,
 ) -> Result<PullResult> {
     let image_info = &source_info.image_info;
-    let image_host = image_info.image_host.clone()
-        .unwrap_or_else(|| "registry-1.docker.io".into());
+    let image_host = &image_info.image_host;
     let from_image_reference = Reference {
         image_name: &image_info.image_name,
         reference: image_info.reference.as_str(),
     };
 
     let registry_auth = source_auth.get_auth()?;
-    let mut from_registry = Registry::open(use_https, &image_host, registry_auth)?;
+    let mut from_registry = Registry::open(use_https, image_host, registry_auth)?;
 
     let manifest = from_registry.image_manager.manifests(&from_image_reference)?;
     let config_digest = manifest.config_digest();

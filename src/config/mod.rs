@@ -6,6 +6,7 @@ use home::home_dir;
 
 use crate::config::cmd::BaseAuth;
 use crate::config::userconfig::UserDockerConfig;
+use crate::const_data::{DEFAULT_IMAGE_HOST, DEFAULT_IMAGE_HUB_URI};
 use crate::reg::http::RegistryAuth;
 
 pub mod userconfig;
@@ -46,11 +47,10 @@ impl RegAuthType {
         }
     }
 
-    pub fn build_auth(image_host: Option<&String>, base_auth: Option<&BaseAuth>) -> RegAuthType {
+    pub fn build_auth(image_host: String, base_auth: Option<&BaseAuth>) -> RegAuthType {
         match base_auth.as_ref() {
             None => RegAuthType::LocalDockerAuth {
-                reg_host: image_host.map(|s| s.as_str())
-                    .unwrap_or("https://index.docker.io/v1/").to_string()
+                reg_host: if image_host.eq(DEFAULT_IMAGE_HOST) { image_host } else { DEFAULT_IMAGE_HUB_URI.to_string() }
             },
             Some(auth) => RegAuthType::CustomPassword {
                 username: auth.username.clone(),

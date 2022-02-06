@@ -8,6 +8,7 @@ use dockerfile_parser::{BreakableStringComponent, Dockerfile, Instruction, Shell
 use log::warn;
 
 use crate::adapter::{BuildInfo, CopyFile, ImageInfo, SourceImageAdapter, SourceInfo};
+use crate::const_data::DEFAULT_IMAGE_HOST;
 
 pub struct DockerfileAdapter {
     docker_file_path: String,
@@ -36,7 +37,7 @@ impl DockerfileAdapter {
             println!("{:?}", instruction);
             match instruction {
                 Instruction::From(from) => from_image = Some(ImageInfo {
-                    image_host: from.image_parsed.registry,
+                    image_host: from.image_parsed.registry.unwrap_or_else(|| DEFAULT_IMAGE_HOST.to_string()),
                     image_name: from.image_parsed.image,
                     reference: from.image_parsed.tag.or(from.image_parsed.hash)
                         .or_else(|| Some(String::from("latest")))

@@ -21,10 +21,10 @@ mod reg;
 mod util;
 mod bar;
 mod config;
-mod tempconfig;
 mod adapter;
 mod init;
 mod subcmd;
+mod const_data;
 
 pub static GLOBAL_CONFIG: SyncLazy<GlobalAppConfig> = SyncLazy::new(|| {
     let home_path = home_dir().expect("can not found home dir");

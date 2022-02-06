@@ -5,6 +5,7 @@ use log::info;
 use crate::adapter::{ImageInfo, TargetImageAdapter, TargetInfo};
 use crate::config::cmd::{BaseAuth, TargetFormat};
 use crate::config::RegAuthType;
+use crate::const_data::DEFAULT_IMAGE_HOST;
 use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
@@ -41,7 +42,7 @@ impl RegistryTargetAdapter {
         let image_info = match instruction {
             Instruction::From(from) => ImageInfo {
                 // TODO "registry-1.docker.io" static str
-                image_host: from.image_parsed.registry.or_else(|| Some("registry-1.docker.io".to_string())),
+                image_host: from.image_parsed.registry.unwrap_or_else(|| DEFAULT_IMAGE_HOST.to_string()),
                 image_name: if from.image_parsed.image.contains('/') {
                     from.image_parsed.image
                 } else {
@@ -52,7 +53,7 @@ impl RegistryTargetAdapter {
             },
             _ => return Err(Error::msg("image info error")),
         };
-        let auth = RegAuthType::build_auth(image_info.image_host.as_ref(), base_auth);
+        let auth = RegAuthType::build_auth(image_info.image_host.clone(), base_auth);
         Ok(RegistryTargetAdapter {
             info: TargetInfo {
                 image_info,
@@ -69,8 +70,7 @@ impl RegistryTargetAdapter {
         let home_dir = GLOBAL_CONFIG.home_dir.clone();
         let target_info = self.info;
         let reg_auth = self.target_auth.get_auth()?;
-        let host = target_info.image_info.image_host
-            .unwrap_or_else(|| "registry-1.docker.io".to_string());
+        let host = target_info.image_info.image_host;
         let target_reg = Registry::open(self.use_https, &host, reg_auth)?;
         let mut manager = target_reg.image_manager;
 
