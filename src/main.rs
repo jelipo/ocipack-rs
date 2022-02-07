@@ -26,6 +26,7 @@ mod init;
 mod subcmd;
 mod const_data;
 
+/// 全局共享的Config
 pub static GLOBAL_CONFIG: SyncLazy<GlobalAppConfig> = SyncLazy::new(|| {
     let home_path = home_dir().expect("can not found home dir");
     let cache_dir = home_path.join("pack_temp");

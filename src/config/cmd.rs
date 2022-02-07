@@ -6,7 +6,9 @@ use clap::Parser;
 #[derive(Parser)]
 #[clap(about = "An image tool", version, author = "jelipo <me@jelipo.com>")]
 pub enum CmdArgs {
+    /// 构建一个新的Image
     Build(BuildCmdArgs),
+    /// 转换Image的格式，目前支持 Docker(V2S2) 和 OCI 的互相转换
     Transform,
 }
 
