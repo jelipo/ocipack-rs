@@ -34,7 +34,6 @@ impl DockerfileAdapter {
         let mut copy_files = Vec::new();
         let mut ports: Vec<String> = Vec::new();
         for instruction in dockerfile.instructions {
-            println!("{:?}", instruction);
             match instruction {
                 Instruction::From(from) => from_image = Some(ImageInfo {
                     image_host: from.image_parsed.registry.unwrap_or_else(|| DEFAULT_IMAGE_HOST.to_string()),

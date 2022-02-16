@@ -97,8 +97,10 @@ impl BlobsDir {
         if diff_layer.exists() {
             std::fs::remove_file(&diff_layer)?;
         }
-        println!("path {}", file_path.to_string_lossy());
-        rename(file_path, diff_layer)?;
+        let diff_layer_parent = diff_layer.parent()
+            .ok_or_else(|| Error::msg("diff_layer must have a parent dir"))?;
+        fs::create_dir_all(diff_layer_parent)?;
+        fs::rename(file_path, diff_layer)?;
         Ok(())
     }
 }
@@ -111,6 +113,7 @@ pub struct TempLayerInfo {
 }
 
 pub struct LocalLayer {
+    pub manifest_sha: String,
     pub diff_layer_sha: String,
     pub compress_type: CompressType,
     pub diff_layer_config_path: PathBuf,
@@ -127,6 +130,7 @@ impl LocalLayer {
         let layer_file_path = diff_layer_dir.join(diff_layer_sha);
         if !layer_file_path.exists() { return Err(Error::msg("diff layer not found")); }
         Ok(LocalLayer {
+            manifest_sha: manifest_sha.to_string(),
             diff_layer_sha: diff_layer_sha.to_string(),
             compress_type,
             diff_layer_config_path,
@@ -152,11 +156,12 @@ impl LocalLayer {
         compress_type: CompressType,
         layer_cache_dir: &Path,
     ) -> LocalLayer {
-        let diff_layer_dir = layer_cache_dir.join(manifest_sha);
+        let diff_layer_dir = layer_cache_dir.join(&manifest_sha);
         let config_name = Self::diff_layer_config_name();
         let diff_layer_config_path = diff_layer_dir.join(config_name);
         let layer_file_path = diff_layer_dir.join(&diff_layer_sha);
         LocalLayer {
+            manifest_sha,
             diff_layer_sha,
             compress_type,
             diff_layer_config_path,

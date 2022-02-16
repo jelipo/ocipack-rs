@@ -1,2 +1,4 @@
 FROM ubuntu:20.04
-CMD echo "Hello World"
+COPY Dockerfile /root/
+CMD cat /root/Dockerfile
+

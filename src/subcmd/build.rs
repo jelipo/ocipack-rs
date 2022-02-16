@@ -11,7 +11,7 @@ use crate::adapter::registry::RegistryTargetAdapter;
 use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
 use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
-use crate::reg::home::TempLayerInfo;
+use crate::reg::home::{LocalLayer, TempLayerInfo};
 use crate::reg::manifest::Manifest;
 use crate::subcmd::pull::pull;
 use crate::util::{compress, random};
@@ -54,19 +54,22 @@ fn handle(
     let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| {
         gz_layer_file(&tar_path, &home_dir)
     }).transpose()?;
-    if let Some(temp_layer) = &temp_layer {
+    let temp_local_layer = if let Some(temp_layer) = &temp_layer {
         home_dir.cache.blobs.move_to_blob(
             &temp_layer.compress_layer_path, &temp_layer.tgz_sha256, &temp_layer.tar_sha256)?;
-        let _local_layer = home_dir.cache.blobs.create_layer_config(
+        let temp_local_layer = home_dir.cache.blobs.create_layer_config(
             &temp_layer.tar_sha256, &temp_layer.tgz_sha256, CompressType::Tgz)?;
-    }
+        Some(temp_local_layer)
+    } else {
+        None
+    };
     let target_config_blob = build_target_config_blob(
         build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
     let source_manifest = pull_result.manifest;
 
     let target_config_blob_serialize = target_config_blob.serialize()?;
     let target_manifest = build_target_manifest(
-        source_manifest, &build_cmds.format, temp_layer.as_ref(), &target_config_blob_serialize)?;
+        source_manifest, &build_cmds.format, temp_local_layer, &target_config_blob_serialize)?;
 
     match &build_cmds.target {
         TargetType::Registry(image) => {
@@ -165,16 +168,16 @@ fn build_target_config_blob(
 fn build_target_manifest(
     source_manifest: Manifest,
     target_format: &TargetFormat,
-    temp_layer_opt: Option<&TempLayerInfo>,
+    temp_local_layer: Option<LocalLayer>,
     target_config_blob_serialize: &ConfigBlobSerialize,
 ) -> Result<Manifest> {
     let mut target_manifest = match target_format {
         TargetFormat::Docker => Manifest::DockerV2S2(source_manifest.to_docker_v2_s2(target_config_blob_serialize)?),
         TargetFormat::Oci => Manifest::OciV1(source_manifest.to_oci_v1(target_config_blob_serialize)?)
     };
-    if let Some(temp_layer) = temp_layer_opt {
-        let metadata = temp_layer.compress_layer_path.metadata()?;
-        target_manifest.add_top_gz_layer(metadata.len(), temp_layer.tgz_sha256.to_string())
+    if let Some(temp_layer) = temp_local_layer {
+        let metadata = temp_layer.layer_file_path.metadata()?;
+        target_manifest.add_top_gz_layer(metadata.len(), temp_layer.manifest_sha)
     }
     Ok(target_manifest)
 }
