@@ -77,10 +77,8 @@ impl DockerfileAdapter {
                     });
                 }
                 Instruction::Misc(mut misc) => match misc.instruction.content.as_str() {
-                    "USER" => match misc.arguments.components.remove(0) {
-                        BreakableStringComponent::String(str) => user = Some(str.content.trim().to_string()),
-                        _ => {}
-                    }
+                    "USER" => if let BreakableStringComponent::String(str) =
+                    misc.arguments.components.remove(0) { user = Some(str.content.trim().to_string()) }
                     "WORKDIR" => if let BreakableStringComponent::String(str) = misc.arguments.components.remove(0) {
                         workdir = Some(str.content.trim().to_string());
                     }
