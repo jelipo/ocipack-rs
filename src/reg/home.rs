@@ -1,5 +1,5 @@
 use std::fs;
-use std::fs::{create_dir_all, File, read_to_string, rename};
+use std::fs::{create_dir_all, File, read_to_string};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;

@@ -27,7 +27,7 @@ pub enum HttpAuth {
 }
 
 pub enum RequestBody<'a, T: Serialize + ?Sized> {
-    JSON(&'a T),
+    Json(&'a T),
     Read(Body),
 }
 
@@ -35,7 +35,7 @@ fn do_request_raw<T: Serialize + ?Sized>(
     client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
     accepts: &[RegContentType], body: Option<&T>, content_type: Option<&RegContentType>,
 ) -> Result<Response> {
-    let request_body = body.map(|json| RequestBody::JSON(json));
+    let request_body = body.map(|json| RequestBody::Json(json));
     let request = build_request::<T>(client, url, method, http_auth_opt, accepts, request_body, content_type)?;
     let http_response = client.execute(request)?;
     Ok(http_response)
@@ -69,7 +69,7 @@ fn build_request<T: Serialize + ?Sized>(
     for accept in accepts {
         accepts_str.push(accept.val())
     }
-    if accepts.len() > 0 {
+    if !accepts.is_empty() {
         builder = builder.header("Accept", accepts_str.join(","));
     }
     if let Some(content_type) = content_type {
@@ -77,7 +77,7 @@ fn build_request<T: Serialize + ?Sized>(
     }
     match body {
         None => {}
-        Some(RequestBody::JSON(json_body)) => {
+        Some(RequestBody::Json(json_body)) => {
             let json_str = serde_json::to_string(json_body)?;
             builder = builder.body(json_str)
         }

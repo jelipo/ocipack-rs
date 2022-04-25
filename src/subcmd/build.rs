@@ -1,3 +1,5 @@
+use std::ffi::OsStr;
+use std::fmt::format;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
@@ -102,7 +104,11 @@ fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<Pa
                 &copyfile.dest_path[1..]
             } else { &copyfile.dest_path };
             if source_path.is_file() {
-                tar_builder.append_file(dest_path, &mut File::open(source_path)?)?;
+                let file_name = source_path.file_name()
+                    .ok_or_else(|| Error::msg("error file name"))?
+                    .to_string_lossy();
+                let dest_file_path = format!("{}/{}", dest_path, file_name);
+                tar_builder.append_file(dest_file_path, &mut File::open(source_path)?)?;
             } else if source_path.is_dir() {
                 tar_builder.append_dir(dest_path, source_path_str)?;
             } else {

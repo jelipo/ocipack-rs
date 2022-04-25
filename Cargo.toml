@@ -29,7 +29,7 @@ rand = "0.8"
 url = "2.2"
 home = "0.5"
 base64 = "0.13"
-clap = { version = "3.0.13", features = ["derive"] }
+clap = { version = "3.1.12", features = ["derive"] }
 dockerfile-parser = "0.8.0"
-derive_builder = "0.10"
-zstd = "0.10"
+derive_builder = "0.11"
+zstd = "0.11"
