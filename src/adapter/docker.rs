@@ -53,11 +53,16 @@ impl DockerfileAdapter {
                     ShellOrExecExpr::Exec(_exec) => {}
                 },
                 Instruction::Cmd(cmd_i) => cmd = Some(match cmd_i.expr {
-                    ShellOrExecExpr::Shell(shell) => shell.components.into_iter()
-                        .map(|component| match component {
-                            BreakableStringComponent::String(str) => str.content,
-                            BreakableStringComponent::Comment(comment) => comment.content
-                        }).collect::<Vec<String>>(),
+                    ShellOrExecExpr::Shell(shell) => {
+                        let mut shells = shell.components.into_iter()
+                            .map(|component| match component {
+                                BreakableStringComponent::String(str) => str.content,
+                                BreakableStringComponent::Comment(comment) => comment.content
+                            }).collect::<Vec<String>>();
+                        shells.insert(0, "/bin/sh".to_string());
+                        shells.insert(1, "-c".to_string());
+                        shells
+                    }
                     ShellOrExecExpr::Exec(exec) => exec.elements.into_iter()
                         .map(|str| str.content).collect::<Vec<String>>()
                 }),
