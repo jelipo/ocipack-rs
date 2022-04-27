@@ -19,9 +19,7 @@ pub struct RegTokenHandler {
 }
 
 impl RegTokenHandler {
-    pub fn new_reg_token_handler(
-        registry_addr: String, basic_auth: Option<HttpAuth>, client: Client,
-    ) -> RegTokenHandler {
+    pub fn new_reg_token_handler(registry_addr: String, basic_auth: Option<HttpAuth>, client: Client) -> RegTokenHandler {
         RegTokenHandler {
             registry_addr,
             basic_auth,
@@ -42,17 +40,14 @@ impl RegTokenHandler {
                 self.token_cache.put_token(scope, token_type, expire_second_time, &token);
                 Ok(token)
             }
-            Some(token) => Ok(token)
+            Some(token) => Ok(token),
         }
     }
 
     fn get_remote_token(&mut self, scope_opt: Option<&str>, token_type: TokenType) -> Result<(String, u64)> {
         let adapter = match &self.authenticate_adapter {
             None => {
-                let new_adapter = AuthenticateAdapter::new_authenticate_adapter(
-                    &self.registry_addr,
-                    &self.client,
-                )?;
+                let new_adapter = AuthenticateAdapter::new_authenticate_adapter(&self.registry_addr, &self.client)?;
                 self.authenticate_adapter = Some(new_adapter);
                 self.authenticate_adapter.as_ref().unwrap()
             }
@@ -72,19 +67,15 @@ pub struct AuthenticateAdapter {
 }
 
 impl AuthenticateAdapter {
-    pub fn new_authenticate_adapter(
-        registry_addr: &str,
-        client: &Client,
-    ) -> Result<AuthenticateAdapter> {
+    pub fn new_authenticate_adapter(registry_addr: &str, client: &Client) -> Result<AuthenticateAdapter> {
         let bearer_url = format!("{}/v2/", registry_addr);
-        let http_response =
-            do_request_raw::<u8>(client, bearer_url.as_str(), Method::GET, None, &[], None, None)?;
-        let www_authenticate = get_header(http_response.headers(), "Www-Authenticate")
-            .expect("Www-Authenticate header not found");
+        let http_response = do_request_raw::<u8>(client, bearer_url.as_str(), Method::GET, None, &[], None, None)?;
+        let www_authenticate =
+            get_header(http_response.headers(), "Www-Authenticate").expect("Www-Authenticate header not found");
         let regex = Regex::new("^Bearer realm=\"(?P<realm>.*)\",service=\"(?P<service>.*)\".*")?;
-        let captures = regex.captures(www_authenticate.as_str()).ok_or_else(||
-            Error::msg(format!("www_authenticate header not support:{}", www_authenticate.as_str()))
-        )?;
+        let captures = regex
+            .captures(www_authenticate.as_str())
+            .ok_or_else(|| Error::msg(format!("www_authenticate header not support:{}", www_authenticate.as_str())))?;
         let realm = &captures["realm"];
         let service = &captures["service"];
         Ok(AuthenticateAdapter {
@@ -94,17 +85,20 @@ impl AuthenticateAdapter {
     }
 
     pub fn new_token(
-        &self, scope: Option<&str>, basic_auth: Option<&HttpAuth>, client: &Client, token_type: TokenType,
+        &self,
+        scope: Option<&str>,
+        basic_auth: Option<&HttpAuth>,
+        client: &Client,
+        token_type: TokenType,
     ) -> Result<TokenResponse> {
         let mut url = format!("{}?service={}", &self.realm, &self.service);
         if let Some(scope_raw) = scope {
             match token_type {
                 TokenType::PushAndPull => url = url + "&scope=repository:" + scope_raw + ":pull,push",
-                TokenType::Pull => url = url + "&scope=repository:" + scope_raw + ":pull"
+                TokenType::Pull => url = url + "&scope=repository:" + scope_raw + ":pull",
             }
         }
-        let http_response =
-            do_request_raw::<u8>(client, url.as_str(), Method::GET, basic_auth, &[], None, None)?;
+        let http_response = do_request_raw::<u8>(client, url.as_str(), Method::GET, basic_auth, &[], None, None)?;
         let status = http_response.status();
         if !status.is_success() {
             return Err(Error::msg(format!("get token failed,code:{}", status.as_str())));
@@ -141,9 +135,9 @@ impl TokenCache {
         match self.get_token_with_type(scope, TokenType::PushAndPull) {
             None => match token_type {
                 TokenType::PushAndPull => None,
-                TokenType::Pull => self.get_token_with_type(scope, TokenType::Pull)
+                TokenType::Pull => self.get_token_with_type(scope, TokenType::Pull),
             },
-            Some(token) => Some(token)
+            Some(token) => Some(token),
         }
     }
 

@@ -9,9 +9,9 @@ use crate::config::userconfig::UserDockerConfig;
 use crate::const_data::{DEFAULT_IMAGE_HOST, DEFAULT_IMAGE_HUB_URI};
 use crate::reg::http::RegistryAuth;
 
-pub mod userconfig;
-pub mod global;
 pub mod cmd;
+pub mod global;
+pub mod userconfig;
 
 pub struct BaseImage {
     pub use_https: bool,
@@ -34,28 +34,27 @@ pub enum RegAuthType {
 impl RegAuthType {
     pub fn get_auth(self) -> Result<Option<RegistryAuth>> {
         match self {
-            RegAuthType::LocalDockerAuth { reg_host } => {
-                Ok(match home_dir() {
-                    None => None,
-                    Some(dir) => read_docker_config(dir.join(".docker/config.json"), &reg_host)?
-                })
-            }
-            RegAuthType::CustomPassword { username, password } => Ok(Some(RegistryAuth {
-                username,
-                password,
-            }))
+            RegAuthType::LocalDockerAuth { reg_host } => Ok(match home_dir() {
+                None => None,
+                Some(dir) => read_docker_config(dir.join(".docker/config.json"), &reg_host)?,
+            }),
+            RegAuthType::CustomPassword { username, password } => Ok(Some(RegistryAuth { username, password })),
         }
     }
 
     pub fn build_auth(image_host: String, base_auth: Option<&BaseAuth>) -> RegAuthType {
         match base_auth.as_ref() {
             None => RegAuthType::LocalDockerAuth {
-                reg_host: if image_host.eq(DEFAULT_IMAGE_HOST) { image_host } else { DEFAULT_IMAGE_HUB_URI.to_string() }
+                reg_host: if image_host.eq(DEFAULT_IMAGE_HOST) {
+                    image_host
+                } else {
+                    DEFAULT_IMAGE_HUB_URI.to_string()
+                },
             },
             Some(auth) => RegAuthType::CustomPassword {
                 username: auth.username.clone(),
                 password: auth.password.clone(),
-            }
+            },
         }
     }
 }
@@ -79,12 +78,9 @@ fn get_auth_from_dockerconfig(user_docker_config: UserDockerConfig, reg_host: &s
                 let mut split = decode_str.split(':');
                 let username = split.next().expect("error docker file").to_string();
                 let password = split.next().expect("error docker file").to_string();
-                return Ok(Some(RegistryAuth {
-                    username,
-                    password,
-                }));
+                return Ok(Some(RegistryAuth { username, password }));
             }
         }
     }
-    return Ok(None);
+    Ok(None)
 }

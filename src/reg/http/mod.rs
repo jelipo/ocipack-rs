@@ -2,9 +2,9 @@ use std::io::Read;
 use std::str::FromStr;
 
 use anyhow::Result;
-use reqwest::{Method, Url};
 use reqwest::blocking::{Body, Client, Request, Response};
 use reqwest::header::HeaderMap;
+use reqwest::{Method, Url};
 use serde::Serialize;
 
 use crate::reg::RegContentType;
@@ -32,8 +32,13 @@ pub enum RequestBody<'a, T: Serialize + ?Sized> {
 }
 
 fn do_request_raw<T: Serialize + ?Sized>(
-    client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
-    accepts: &[RegContentType], body: Option<&T>, content_type: Option<&RegContentType>,
+    client: &Client,
+    url: &str,
+    method: Method,
+    http_auth_opt: Option<&HttpAuth>,
+    accepts: &[RegContentType],
+    body: Option<&T>,
+    content_type: Option<&RegContentType>,
 ) -> Result<Response> {
     let request_body = body.map(|json| RequestBody::Json(json));
     let request = build_request::<T>(client, url, method, http_auth_opt, accepts, request_body, content_type)?;
@@ -42,8 +47,13 @@ fn do_request_raw<T: Serialize + ?Sized>(
 }
 
 fn do_request_raw_read<R: Read + Send + 'static>(
-    client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
-    _accept: Option<&RegContentType>, body: Option<R>, size: u64,
+    client: &Client,
+    url: &str,
+    method: Method,
+    http_auth_opt: Option<&HttpAuth>,
+    _accept: Option<&RegContentType>,
+    body: Option<R>,
+    size: u64,
 ) -> Result<Response> {
     let request_body = body.map(|read| RequestBody::Read(Body::sized(read, size)));
     let request = build_request::<String>(client, url, method, http_auth_opt, &[], request_body, None)?;
@@ -52,8 +62,13 @@ fn do_request_raw_read<R: Read + Send + 'static>(
 }
 
 fn build_request<T: Serialize + ?Sized>(
-    client: &Client, url: &str, method: Method, http_auth_opt: Option<&HttpAuth>,
-    accepts: &[RegContentType], body: Option<RequestBody<T>>, content_type: Option<&RegContentType>,
+    client: &Client,
+    url: &str,
+    method: Method,
+    http_auth_opt: Option<&HttpAuth>,
+    accepts: &[RegContentType],
+    body: Option<RequestBody<T>>,
+    content_type: Option<&RegContentType>,
 ) -> Result<Request> {
     let url = Url::from_str(url)?;
     let mut builder = client.request(method, url);
@@ -62,7 +77,7 @@ fn build_request<T: Serialize + ?Sized>(
         Some(HttpAuth::BasicAuth { username, password }) => {
             builder = builder.basic_auth(username, Some(password));
         }
-        Some(HttpAuth::BearerToken { token }) => builder = builder.bearer_auth(token)
+        Some(HttpAuth::BearerToken { token }) => builder = builder.bearer_auth(token),
     }
     // Set accept header
     let mut accepts_str = Vec::with_capacity(accepts.len());
@@ -81,7 +96,7 @@ fn build_request<T: Serialize + ?Sized>(
             let json_str = serde_json::to_string(json_body)?;
             builder = builder.body(json_str)
         }
-        Some(RequestBody::Read(read)) => builder = builder.body(read)
+        Some(RequestBody::Read(read)) => builder = builder.body(read),
     }
     Ok(builder.build()?)
 }

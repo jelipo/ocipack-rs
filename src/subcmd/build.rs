@@ -1,23 +1,21 @@
-use std::ffi::OsStr;
-use std::fmt::format;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Error, Result};
 use tar::Builder;
 
-use crate::{GLOBAL_CONFIG, HomeDir};
-use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
+use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::reg::home::{LocalLayer, TempLayerInfo};
 use crate::reg::manifest::Manifest;
+use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
-use crate::util::{compress, random};
 use crate::util::sha::{Sha256Reader, Sha256Writer};
+use crate::util::{compress, random};
+use crate::{HomeDir, GLOBAL_CONFIG};
 
 pub struct BuildCommand {}
 
@@ -32,52 +30,59 @@ impl BuildCommand {
 fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
     let (mut source_info, build_info) = match &build_args.source {
         SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
-        SourceType::Cmd { tag: _ } => { todo!() }
+        SourceType::Cmd { tag: _ } => {
+            todo!()
+        }
     };
     // add library
     let image_name = &source_info.image_info.image_name;
     if !image_name.contains('/') {
         source_info.image_info.image_name = format!("library/{}", image_name)
     }
-    let source_reg_auth = RegAuthType::build_auth(
-        source_info.image_info.image_host.clone(), build_args.source_auth.as_ref());
+    let source_reg_auth = RegAuthType::build_auth(source_info.image_info.image_host.clone(), build_args.source_auth.as_ref());
     Ok((source_info, build_info, source_reg_auth))
 }
 
-fn handle(
-    source_info: SourceInfo,
-    build_info: BuildInfo,
-    source_auth: RegAuthType,
-    build_cmds: &BuildCmdArgs,
-) -> Result<()> {
+fn handle(source_info: SourceInfo, build_info: BuildInfo, source_auth: RegAuthType, build_cmds: &BuildCmdArgs) -> Result<()> {
     let home_dir = GLOBAL_CONFIG.home_dir.clone();
     let pull_result = pull(&source_info, source_auth, !build_cmds.allow_insecure)?;
 
-    let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| {
-        gz_layer_file(&tar_path, &home_dir)
-    }).transpose()?;
+    let temp_layer =
+        build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| gz_layer_file(&tar_path, &home_dir)).transpose()?;
     let temp_local_layer = if let Some(temp_layer) = &temp_layer {
         home_dir.cache.blobs.move_to_blob(
-            &temp_layer.compress_layer_path, &temp_layer.tgz_sha256, &temp_layer.tar_sha256)?;
-        let temp_local_layer = home_dir.cache.blobs.create_layer_config(
-            &temp_layer.tar_sha256, &temp_layer.tgz_sha256, CompressType::Tgz)?;
+            &temp_layer.compress_layer_path,
+            &temp_layer.tgz_sha256,
+            &temp_layer.tar_sha256,
+        )?;
+        let temp_local_layer =
+            home_dir.cache.blobs.create_layer_config(&temp_layer.tar_sha256, &temp_layer.tgz_sha256, CompressType::Tgz)?;
         Some(temp_local_layer)
     } else {
         None
     };
-    let target_config_blob = build_target_config_blob(
-        build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
+    let target_config_blob =
+        build_target_config_blob(build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
     let source_manifest = pull_result.manifest;
 
     let target_config_blob_serialize = target_config_blob.serialize()?;
     let target_manifest = build_target_manifest(
-        source_manifest, &build_cmds.format, temp_local_layer, &target_config_blob_serialize)?;
+        source_manifest,
+        &build_cmds.format,
+        temp_local_layer,
+        &target_config_blob_serialize,
+    )?;
 
     match &build_cmds.target {
         TargetType::Registry(image) => {
             let registry_adapter = RegistryTargetAdapter::new(
-                image, build_cmds.format.clone(), !build_cmds.allow_insecure,
-                target_manifest, target_config_blob_serialize, build_cmds.target_auth.as_ref())?;
+                image,
+                build_cmds.format.clone(),
+                !build_cmds.allow_insecure,
+                target_manifest,
+                target_config_blob_serialize,
+                build_cmds.target_auth.as_ref(),
+            )?;
             registry_adapter.upload()?
         }
     }
@@ -102,11 +107,11 @@ fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<Pa
             }
             let dest_path = if copyfile.dest_path.ends_with('/') {
                 &copyfile.dest_path[1..]
-            } else { &copyfile.dest_path };
+            } else {
+                &copyfile.dest_path
+            };
             if source_path.is_file() {
-                let file_name = source_path.file_name()
-                    .ok_or_else(|| Error::msg("error file name"))?
-                    .to_string_lossy();
+                let file_name = source_path.file_name().ok_or_else(|| Error::msg("error file name"))?.to_string_lossy();
                 let dest_file_path = format!("{}/{}", dest_path, file_name);
                 tar_builder.append_file(dest_file_path, &mut File::open(source_path)?)?;
             } else if source_path.is_dir() {
@@ -179,7 +184,7 @@ fn build_target_manifest(
 ) -> Result<Manifest> {
     let mut target_manifest = match target_format {
         TargetFormat::Docker => Manifest::DockerV2S2(source_manifest.to_docker_v2_s2(target_config_blob_serialize)?),
-        TargetFormat::Oci => Manifest::OciV1(source_manifest.to_oci_v1(target_config_blob_serialize)?)
+        TargetFormat::Oci => Manifest::OciV1(source_manifest.to_oci_v1(target_config_blob_serialize)?),
     };
     if let Some(temp_layer) = temp_local_layer {
         let metadata = temp_layer.layer_file_path.metadata()?;

@@ -16,15 +16,15 @@ use crate::config::global::GlobalAppConfig;
 use crate::reg::home::HomeDir;
 use crate::subcmd::build::BuildCommand;
 
-mod progress;
-mod reg;
-mod util;
+mod adapter;
 mod bar;
 mod config;
-mod adapter;
-mod init;
-mod subcmd;
 mod const_data;
+mod init;
+mod progress;
+mod reg;
+mod subcmd;
+mod util;
 
 /// 全局共享的Config
 pub static GLOBAL_CONFIG: SyncLazy<GlobalAppConfig> = SyncLazy::new(|| {
@@ -35,7 +35,6 @@ pub static GLOBAL_CONFIG: SyncLazy<GlobalAppConfig> = SyncLazy::new(|| {
         home_dir: Arc::new(HomeDir::new_home_dir(&cache_dir).expect("")),
     }
 });
-
 
 fn main() -> Result<()> {
     init::init()?;

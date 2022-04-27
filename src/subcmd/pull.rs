@@ -6,21 +6,17 @@ use sha2::{Digest, Sha256};
 
 use crate::adapter::SourceInfo;
 use crate::config::RegAuthType;
-use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
-use crate::reg::{ConfigBlobEnum, Layer, Reference, RegContentType, RegDigest, Registry};
 use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::http::download::DownloadResult;
 use crate::reg::manifest::Manifest;
 use crate::reg::oci::image::OciConfigBlob;
+use crate::reg::{ConfigBlobEnum, Layer, Reference, RegContentType, RegDigest, Registry};
 use crate::util::compress::uncompress;
+use crate::GLOBAL_CONFIG;
 
-pub fn pull(
-    source_info: &SourceInfo,
-    source_auth: RegAuthType,
-    use_https: bool,
-) -> Result<PullResult> {
+pub fn pull(source_info: &SourceInfo, source_auth: RegAuthType, use_https: bool) -> Result<PullResult> {
     let image_info = &source_info.image_info;
     let image_host = &image_info.image_host;
     let from_image_reference = Reference {
@@ -37,8 +33,8 @@ pub fn pull(
     let mut reg_downloader_vec = Vec::<Box<dyn Processor<DownloadResult>>>::new();
     for layer in &layers {
         let digest = RegDigest::new_with_digest(layer.digest.to_string());
-        let downloader = from_registry.image_manager
-            .layer_blob_download(from_image_reference.image_name, &digest, Some(layer.size))?;
+        let downloader =
+            from_registry.image_manager.layer_blob_download(from_image_reference.image_name, &digest, Some(layer.size))?;
         reg_downloader_vec.push(Box::new(downloader))
     }
 
@@ -49,12 +45,11 @@ pub fn pull(
         if download_result.local_existed {
             continue;
         }
-        let manifest_layer = layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str())
-            .expect("internal error");
+        let manifest_layer =
+            layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str()).expect("internal error");
         let layer_compress_type = RegContentType::compress_type(manifest_layer.media_type)?;
         let digest = RegDigest::new_with_digest(manifest_layer.digest.to_string());
-        let download_path = download_result.file_path.as_ref()
-            .ok_or_else(|| Error::msg("can not found download file"))?;
+        let download_path = download_result.file_path.as_ref().ok_or_else(|| Error::msg("can not found download file"))?;
         // 计算解压完的tar的sha256值
         let download_file = File::open(download_path)?;
         let mut sha256_encode = Sha256::new();
@@ -66,17 +61,18 @@ pub fn pull(
     }
 
     let config_blob_enum = match &manifest {
-        Manifest::OciV1(_) => ConfigBlobEnum::OciV1(from_registry.image_manager
-            .config_blob::<OciConfigBlob>(&image_info.image_name, config_digest)?),
-        Manifest::DockerV2S2(_) => ConfigBlobEnum::DockerV2S2(from_registry.image_manager
-            .config_blob::<DockerConfigBlob>(&image_info.image_name, config_digest)?)
+        Manifest::OciV1(_) => ConfigBlobEnum::OciV1(
+            from_registry.image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, config_digest)?,
+        ),
+        Manifest::DockerV2S2(_) => ConfigBlobEnum::DockerV2S2(
+            from_registry.image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, config_digest)?,
+        ),
     };
     Ok(PullResult {
         config_blob: config_blob_enum,
         manifest,
     })
 }
-
 
 fn layer_to_map<'a>(layers: &'a [Layer]) -> HashMap<&'a str, &'a Layer<'a>> {
     let mut map = HashMap::<&str, &Layer>::with_capacity(layers.len());

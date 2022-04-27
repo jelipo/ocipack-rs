@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::{Layer, LayerConvert};
 use crate::reg::manifest::{CommonManifestConfig, CommonManifestLayer};
+use crate::reg::{Layer, LayerConvert};
 
 pub mod image;
 
@@ -25,10 +25,13 @@ pub struct OciManifestConfig {
 
 impl LayerConvert for OciManifest {
     fn get_layers(&self) -> Vec<Layer> {
-        self.layers.iter().map(|oci| Layer {
-            media_type: &oci.media_type,
-            size: oci.size,
-            digest: &oci.digest,
-        }).collect::<Vec<Layer>>()
+        self.layers
+            .iter()
+            .map(|oci| Layer {
+                media_type: &oci.media_type,
+                size: oci.size,
+                digest: &oci.digest,
+            })
+            .collect::<Vec<Layer>>()
     }
 }

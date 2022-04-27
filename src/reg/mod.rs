@@ -11,24 +11,23 @@ use url::Url;
 
 use manifest::Manifest;
 
-use crate::GLOBAL_CONFIG;
-use crate::reg::docker::DockerManifest;
 use crate::reg::docker::image::DockerConfigBlob;
+use crate::reg::docker::DockerManifest;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::RegUploader;
+use crate::reg::http::RegistryAuth;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
 use crate::util::sha::bytes_sha256;
+use crate::GLOBAL_CONFIG;
 
-pub mod home;
 pub mod docker;
-pub mod oci;
+pub mod home;
 pub mod http;
 pub mod manifest;
-
+pub mod oci;
 
 pub struct Reference<'a> {
     /// Image的名称
@@ -82,17 +81,11 @@ pub struct Registry {
 }
 
 impl Registry {
-    pub fn open(
-        use_https: bool,
-        host: &str,
-        auth: Option<RegistryAuth>,
-    ) -> Result<Registry> {
+    pub fn open(use_https: bool, host: &str, auth: Option<RegistryAuth>) -> Result<Registry> {
         let reg_addr = format!("{}{}", if use_https { "https://" } else { "http://" }, host);
         let client = RegistryHttpClient::new(reg_addr.clone(), auth)?;
         let image = MyImageManager::new(reg_addr, client);
-        Ok(Registry {
-            image_manager: image,
-        })
+        Ok(Registry { image_manager: image })
     }
 }
 
@@ -102,10 +95,7 @@ pub struct MyImageManager {
 }
 
 impl MyImageManager {
-    pub fn new(
-        registry_addr: String,
-        client: RegistryHttpClient,
-    ) -> MyImageManager {
+    pub fn new(registry_addr: String, client: RegistryHttpClient) -> MyImageManager {
         MyImageManager {
             registry_addr,
             reg_client: client,
@@ -119,8 +109,7 @@ impl MyImageManager {
         let accepts = &[RegContentType::OCI_MANIFEST, RegContentType::DOCKER_MANIFEST];
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&path, scope, accepts);
         let response = self.reg_client.simple_request(request)?;
-        let content_type = response.content_type()
-            .ok_or_else(|| Error::msg("manifest content-type header not found"))?;
+        let content_type = response.content_type().ok_or_else(|| Error::msg("manifest content-type header not found"))?;
         if RegContentType::DOCKER_MANIFEST.val() == content_type {
             let manifest = serde_json::from_str::<DockerManifest>(&response.string_body())?;
             Ok(Manifest::DockerV2S2(manifest))
@@ -128,7 +117,11 @@ impl MyImageManager {
             let manifest = serde_json::from_str::<OciManifest>(&response.string_body())?;
             Ok(Manifest::OciV1(manifest))
         } else {
-            let msg = format!("unknown content-type:{},body:{}", content_type.to_string(), response.string_body());
+            let msg = format!(
+                "unknown content-type:{},body:{}",
+                content_type.to_string(),
+                response.string_body()
+            );
             Err(Error::msg(msg))
         }
     }
@@ -151,9 +144,7 @@ impl MyImageManager {
         exited(&response)
     }
 
-    pub fn config_blob<T: ConfigBlob + DeserializeOwned>(
-        &mut self, name: &str, blob_digest: &str,
-    ) -> Result<T> {
+    pub fn config_blob<T: ConfigBlob + DeserializeOwned>(&mut self, name: &str, blob_digest: &str) -> Result<T> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let accepts = &[RegContentType::OCI_IMAGE_CONFIG, RegContentType::DOCKER_CONTAINER_IMAGE];
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&url_path, Some(name), accepts);
@@ -180,23 +171,21 @@ impl MyImageManager {
     /// 上传layer类型的blob文件
     pub fn layer_blob_upload(&mut self, name: &str, blob_digest: &RegDigest, file_local_path: &str) -> Result<RegUploader> {
         let file_path = PathBuf::from(file_local_path).into_boxed_path();
-        let file_name = file_path.file_name()
-            .expect("file name error").to_str().unwrap().to_string();
+        let file_name = file_path.file_name().expect("file name error").to_str().unwrap().to_string();
         let blob_config = BlobConfig::new(file_path.clone(), file_name, blob_digest.clone());
         let short_hash = blob_config.short_hash.clone();
         if self.blobs_exited(name, blob_digest)? {
             return Ok(RegUploader::new_finished_uploader(
-                blob_config, file_path.metadata()?.len(),
+                blob_config,
+                file_path.metadata()?.len(),
                 format!("{} blob exists in registry", short_hash),
             ));
         }
         let mut location_url = self.layer_blob_upload_ready(name)?;
         location_url.query_pairs_mut().append_pair("digest", &blob_digest.digest);
         let blob_upload_url = location_url.as_str();
-        info!("blob_upload_url is {}",blob_upload_url);
-        let reg_uploader = self.reg_client.upload(
-            location_url.to_string(), blob_config, name, &file_path,
-        )?;
+        info!("blob_upload_url is {}", blob_upload_url);
+        let reg_uploader = self.reg_client.upload(location_url.to_string(), blob_config, name, &file_path)?;
         Ok(reg_uploader)
     }
 
@@ -217,15 +206,25 @@ impl MyImageManager {
         let response = match manifest {
             Manifest::OciV1(oci_manifest) => {
                 let request = ClientRequest::new_with_content_type(
-                    &path, scope, Method::PUT, &[], Some(&oci_manifest),
-                    &RegContentType::OCI_MANIFEST, TokenType::PushAndPull,
+                    &path,
+                    scope,
+                    Method::PUT,
+                    &[],
+                    Some(&oci_manifest),
+                    &RegContentType::OCI_MANIFEST,
+                    TokenType::PushAndPull,
                 );
                 self.reg_client.simple_request::<OciManifest>(request)?
             }
             Manifest::DockerV2S2(docker_v2s2_manifest) => {
                 let request = ClientRequest::new_with_content_type(
-                    &path, scope, Method::PUT, &[], Some(&docker_v2s2_manifest),
-                    &RegContentType::DOCKER_MANIFEST, TokenType::PushAndPull,
+                    &path,
+                    scope,
+                    Method::PUT,
+                    &[],
+                    Some(&docker_v2s2_manifest),
+                    &RegContentType::DOCKER_MANIFEST,
+                    TokenType::PushAndPull,
                 );
                 self.reg_client.simple_request::<DockerManifest>(request)?
             }
@@ -266,15 +265,15 @@ pub enum ConfigBlobEnum {
 impl ConfigBlobEnum {
     pub fn add_diff_layer(&mut self, new_tar_digest: String) {
         match self {
-            ConfigBlobEnum::OciV1(oci) =>
-                oci.rootfs.diff_ids.insert(0, new_tar_digest),
-            ConfigBlobEnum::DockerV2S2(docker) =>
-                docker.rootfs.diff_ids.insert(0, new_tar_digest),
+            ConfigBlobEnum::OciV1(oci) => oci.rootfs.diff_ids.insert(0, new_tar_digest),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.rootfs.diff_ids.insert(0, new_tar_digest),
         }
     }
 
     pub fn add_labels(&mut self, new_labels: HashMap<String, String>) {
-        if new_labels.is_empty() { return; }
+        if new_labels.is_empty() {
+            return;
+        }
         match self {
             ConfigBlobEnum::OciV1(oci) => match &mut oci.config.labels {
                 None => oci.config.labels = Some(new_labels),
@@ -285,10 +284,10 @@ impl ConfigBlobEnum {
     }
 
     pub fn add_envs(&mut self, envs: HashMap<String, String>) {
-        if envs.is_empty() { return; }
-        let new_envs = envs.into_iter().map(|(k, v)| {
-            format!("{}={}", k, v)
-        }).collect::<Vec<String>>();
+        if envs.is_empty() {
+            return;
+        }
+        let new_envs = envs.into_iter().map(|(k, v)| format!("{}={}", k, v)).collect::<Vec<String>>();
         match self {
             ConfigBlobEnum::OciV1(oci) => match &mut oci.config.env {
                 None => oci.config.env = Some(new_envs),
@@ -309,7 +308,9 @@ impl ConfigBlobEnum {
     }
 
     pub fn add_ports(&mut self, port_exposes: Vec<String>) {
-        if port_exposes.is_empty() { return; }
+        if port_exposes.is_empty() {
+            return;
+        }
         let mut map = HashMap::<String, Value>::with_capacity(port_exposes.len());
         port_exposes.into_iter().for_each(|expose| {
             map.insert(expose, Value::Object(Map::new()));
@@ -317,11 +318,11 @@ impl ConfigBlobEnum {
         match self {
             ConfigBlobEnum::OciV1(oci) => match &mut oci.config.exposed_ports {
                 None => oci.config.exposed_ports = Some(map),
-                Some(source) => source.extend(map)
+                Some(source) => source.extend(map),
             },
             ConfigBlobEnum::DockerV2S2(docker) => match &mut docker.config.exposed_ports {
                 None => docker.config.exposed_ports = Some(map),
-                Some(source) => source.extend(map)
+                Some(source) => source.extend(map),
             },
         }
     }
@@ -343,7 +344,7 @@ impl ConfigBlobEnum {
     pub fn to_json_string(&self) -> Result<String> {
         Ok(match self {
             ConfigBlobEnum::OciV1(oci) => serde_json::to_string(oci),
-            ConfigBlobEnum::DockerV2S2(docker) => serde_json::to_string(docker)
+            ConfigBlobEnum::DockerV2S2(docker) => serde_json::to_string(docker),
         }?)
     }
 
@@ -393,18 +394,28 @@ impl RegContentType {
     }
 
     pub fn compress_type(media_type: &str) -> Result<CompressType> {
-        if [RegContentType::OCI_LAYER_TAR.0, RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0]
-            .contains(&media_type) {
+        if [
+            RegContentType::OCI_LAYER_TAR.0,
+            RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
+        ]
+        .contains(&media_type)
+        {
             Ok(CompressType::Tar)
         } else if [
             RegContentType::DOCKER_FOREIGN_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_TGZ.0,
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
-        ].contains(&media_type) {
+        ]
+        .contains(&media_type)
+        {
             Ok(CompressType::Tgz)
-        } else if [RegContentType::OCI_LAYER_ZSTD.0, RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0]
-            .contains(&media_type) {
+        } else if [
+            RegContentType::OCI_LAYER_ZSTD.0,
+            RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
+        ]
+        .contains(&media_type)
+        {
             Ok(CompressType::Zstd)
         } else {
             Err(Error::msg("not a layer media type"))
@@ -424,7 +435,8 @@ impl ToString for CompressType {
             CompressType::Tar => "TAR",
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 
@@ -436,8 +448,7 @@ impl FromStr for CompressType {
             "TAR" => Ok(CompressType::Tar),
             "TGZ" => Ok(CompressType::Tgz),
             "ZSTD" => Ok(CompressType::Zstd),
-            _ => Err(Error::msg(format!("unknown compress type:{}", str)))
+            _ => Err(Error::msg(format!("unknown compress type:{}", str))),
         }
     }
 }
-

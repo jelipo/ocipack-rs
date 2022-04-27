@@ -10,9 +10,9 @@ use anyhow::{Error, Result};
 use reqwest::blocking::Client;
 use reqwest::Method;
 
-use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
-use crate::reg::BlobConfig;
+use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
 use crate::reg::http::{do_request_raw_read, HttpAuth};
+use crate::reg::BlobConfig;
 
 pub struct RegUploader {
     reg_uploader_enum: RegUploaderEnum,
@@ -64,7 +64,7 @@ impl RegUploader {
                 file_size,
                 curr_size: file_size,
                 done: true,
-            }))
+            })),
         };
         RegUploader {
             reg_uploader_enum: RegUploaderEnum::Finished {
@@ -84,7 +84,7 @@ impl RegUploader {
                 file_size,
                 curr_size: 0,
                 done: false,
-            }))
+            })),
         };
         RegUploader {
             reg_uploader_enum: RegUploaderEnum::Run {
@@ -93,7 +93,7 @@ impl RegUploader {
                     auth,
                     client,
                     blob_config: blob_config_arc.clone(),
-                }
+                },
             },
             blob_config: blob_config_arc,
             temp,
@@ -104,10 +104,13 @@ impl RegUploader {
 impl Processor<UploadResult> for RegUploader {
     fn start(&self) -> Box<dyn ProcessorAsync<UploadResult>> {
         return match &self.reg_uploader_enum {
-            RegUploaderEnum::Finished { file_size: _, finished_reason } => Box::new(RegFinishedUploader {
+            RegUploaderEnum::Finished {
+                file_size: _,
+                finished_reason,
+            } => Box::new(RegFinishedUploader {
                 upload_result: UploadResult {
-                    result_str: finished_reason.to_string()
-                }
+                    result_str: finished_reason.to_string(),
+                },
             }),
             RegUploaderEnum::Run(info) => {
                 let status = self.temp.clone();
@@ -127,12 +130,10 @@ impl Processor<UploadResult> for RegUploader {
                         println!("{}\n{}", err, err.backtrace());
                     }
                     Ok(UploadResult {
-                        result_str: "succuss".to_string()
+                        result_str: "succuss".to_string(),
                     })
                 });
-                Box::new(RegUploadHandler {
-                    join: handle
-                })
+                Box::new(RegUploadHandler { join: handle })
             }
         };
     }
@@ -143,7 +144,10 @@ impl Processor<UploadResult> for RegUploader {
 }
 
 fn uploading(
-    status: RegUploaderStatus, file_path: &str, reg_http_uploader: RegHttpUploader, blob_config: Arc<BlobConfig>,
+    status: RegUploaderStatus,
+    file_path: &str,
+    reg_http_uploader: RegHttpUploader,
+    blob_config: Arc<BlobConfig>,
 ) -> Result<()> {
     //检查本地是否存在已有
     let file_path = Path::new(file_path);
@@ -154,8 +158,14 @@ fn uploading(
         file: local_file,
     };
     let mut response = do_request_raw_read::<RegUploaderReader>(
-        &reg_http_uploader.client, &reg_http_uploader.url.as_str(), Method::PUT,
-        Some(&reg_http_uploader.auth), None, Some(reader), file_size)?;
+        &reg_http_uploader.client,
+        reg_http_uploader.url.as_str(),
+        Method::PUT,
+        Some(&reg_http_uploader.auth),
+        None,
+        Some(reader),
+        file_size,
+    )?;
     let short_hash = &blob_config.short_hash;
     if response.status().is_success() {
         let mut response_string = String::new();
@@ -165,7 +175,10 @@ fn uploading(
         let _status_code = response.status().as_str();
         let mut response_string = String::new();
         let _read_size = response.read_to_string(&mut response_string)?;
-        Err(Error::msg(format!("{} upload request failed. {}", short_hash, response_string)))
+        Err(Error::msg(format!(
+            "{} upload request failed. {}",
+            short_hash, response_string
+        )))
     }
 }
 
@@ -179,7 +192,7 @@ impl Read for RegUploaderReader {
         let size = self.file.read(buf)?;
         let mut guard = self.status.status_core.lock().unwrap();
         let core = guard.borrow_mut();
-        core.curr_size = core.curr_size + size as u64;
+        core.curr_size += size as u64;
         Ok(size)
     }
 }

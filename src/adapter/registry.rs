@@ -6,13 +6,13 @@ use crate::adapter::{ImageInfo, TargetImageAdapter, TargetInfo};
 use crate::config::cmd::{BaseAuth, TargetFormat};
 use crate::config::RegAuthType;
 use crate::const_data::DEFAULT_IMAGE_HOST;
-use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
-use crate::progress::Processor;
 use crate::progress::ProcessResult;
-use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry};
+use crate::progress::Processor;
 use crate::reg::http::upload::UploadResult;
 use crate::reg::manifest::Manifest;
+use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry};
+use crate::GLOBAL_CONFIG;
 
 pub struct RegistryTargetAdapter {
     info: TargetInfo,
@@ -48,17 +48,13 @@ impl RegistryTargetAdapter {
                 } else {
                     format!("library/{}", from.image_parsed.image)
                 },
-                reference: from.image_parsed.tag.or(from.image_parsed.hash)
-                    .unwrap_or_else(|| "latest".to_string()),
+                reference: from.image_parsed.tag.or(from.image_parsed.hash).unwrap_or_else(|| "latest".to_string()),
             },
             _ => return Err(Error::msg("image info error")),
         };
         let auth = RegAuthType::build_auth(image_info.image_host.clone(), base_auth);
         Ok(RegistryTargetAdapter {
-            info: TargetInfo {
-                image_info,
-                format,
-            },
+            info: TargetInfo { image_info, format },
             use_https,
             target_manifest,
             target_config_blob_serialize,
@@ -78,12 +74,10 @@ impl RegistryTargetAdapter {
         let mut reg_uploader_vec = Vec::<Box<dyn Processor<UploadResult>>>::new();
         for manifest_layer in target_manifest.layers() {
             let layer_digest = RegDigest::new_with_digest(manifest_layer.digest.to_string());
-            let local_layer = home_dir.cache.blobs.local_layer(&layer_digest)
-                .ok_or_else(|| Error::msg("local download file not found"))?;
+            let local_layer =
+                home_dir.cache.blobs.local_layer(&layer_digest).ok_or_else(|| Error::msg("local download file not found"))?;
             let layer_path = local_layer.layer_path();
-            let reg_uploader = manager.layer_blob_upload(
-                &target_info.image_info.image_name, &layer_digest, &layer_path,
-            )?;
+            let reg_uploader = manager.layer_blob_upload(&target_info.image_info.image_name, &layer_digest, &layer_path)?;
             reg_uploader_vec.push(Box::new(reg_uploader))
         }
         let serialize = self.target_config_blob_serialize;
@@ -91,9 +85,8 @@ impl RegistryTargetAdapter {
 
         let config_blob_path = home_dir.cache.write_temp_file(config_blob_str)?;
         let config_blob_path_str = config_blob_path.to_string_lossy().to_string();
-        let config_blob_uploader = manager.layer_blob_upload(
-            &target_info.image_info.image_name, &serialize.digest, &config_blob_path_str,
-        )?;
+        let config_blob_uploader =
+            manager.layer_blob_upload(&target_info.image_info.image_name, &serialize.digest, &config_blob_path_str)?;
         reg_uploader_vec.push(Box::new(config_blob_uploader));
         //
         let process_manager = ProcessorManager::new_processor_manager(reg_uploader_vec)?;
@@ -102,11 +95,14 @@ impl RegistryTargetAdapter {
             info!("upload done : {}", &upload_result.finished_info());
         }
 
-        let put_result = manager.put_manifest(&Reference {
-            image_name: target_info.image_info.image_name.as_str(),
-            reference: target_info.image_info.reference.as_str(),
-        }, target_manifest)?;
-        info!("put manifest result {}",put_result);
+        let put_result = manager.put_manifest(
+            &Reference {
+                image_name: target_info.image_info.image_name.as_str(),
+                reference: target_info.image_info.reference.as_str(),
+            },
+            target_manifest,
+        )?;
+        info!("put manifest result {}", put_result);
         Ok(())
     }
 }

@@ -11,9 +11,9 @@ use anyhow::{Error, Result};
 use reqwest::blocking::{Client, Response};
 use reqwest::Method;
 
-use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
-use crate::reg::BlobConfig;
+use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
 use crate::reg::http::{do_request_raw, get_header, HttpAuth};
+use crate::reg::BlobConfig;
 
 pub struct RegDownloader {
     finished: bool,
@@ -26,7 +26,11 @@ pub struct RegDownloader {
 
 impl RegDownloader {
     pub fn new_reg(
-        url: String, auth: Option<HttpAuth>, client: Client, blob_down_config: BlobConfig, layer_size: Option<u64>,
+        url: String,
+        auth: Option<HttpAuth>,
+        client: Client,
+        blob_down_config: BlobConfig,
+        layer_size: Option<u64>,
     ) -> Result<RegDownloader> {
         let blob_down_config_arc = Arc::new(blob_down_config);
         let temp = RegDownloaderStatus {
@@ -35,7 +39,7 @@ impl RegDownloader {
                 file_size: 0,
                 curr_size: layer_size.unwrap_or(0),
                 done: false,
-            }))
+            })),
         };
         Ok(RegDownloader {
             finished: false,
@@ -55,7 +59,7 @@ impl RegDownloader {
                 file_size,
                 curr_size: 0,
                 done: true,
-            }))
+            })),
         };
         Ok(RegDownloader {
             finished: true,
@@ -81,7 +85,7 @@ impl Processor<DownloadResult> for RegDownloader {
                     blob_config,
                     local_existed: true,
                     result_str: "exists".to_string(),
-                }
+                },
             });
         }
         let reg_http_downloader = RegHttpDownloader {
@@ -105,16 +109,13 @@ impl Processor<DownloadResult> for RegDownloader {
                 result_str: "complete".to_string(),
             })
         });
-        Box::new(RegDownloadHandler {
-            join: handle
-        })
+        Box::new(RegDownloadHandler { join: handle })
     }
 
     fn process_status(&self) -> Box<dyn ProgressStatus> {
         Box::new(self.temp.clone())
     }
 }
-
 
 pub struct RegDownloadHandler {
     join: JoinHandle<Result<DownloadResult>>,
@@ -137,10 +138,7 @@ impl ProcessorAsync<DownloadResult> for RegFinishedDownloader {
     }
 }
 
-
-fn downloading(
-    status: RegDownloaderStatus, file_path: &Path, reg_http_downloader: RegHttpDownloader,
-) -> Result<()> {
+fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloader: RegHttpDownloader) -> Result<()> {
     //检查本地是否存在已有
     let parent_path = file_path.parent().expect("find file parent dir failed");
     if !parent_path.exists() {
@@ -206,7 +204,7 @@ pub struct RegDownloaderWriter {
 impl Write for RegDownloaderWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let status_core = &mut self.status.status_core.lock().unwrap();
-        status_core.curr_size = status_core.curr_size + buf.len() as u64;
+        status_core.curr_size += buf.len() as u64;
         self.file.write(buf)
     }
 
@@ -219,7 +217,6 @@ impl Write for RegDownloaderWriter {
 pub struct RegDownloaderStatus {
     status_core: Arc<Mutex<RegDownloaderStatusCore>>,
 }
-
 
 struct RegDownloaderStatusCore {
     blob_config: Arc<BlobConfig>,

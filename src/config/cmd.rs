@@ -56,7 +56,7 @@ impl FromStr for TargetFormat {
         Ok(match arg {
             "docker" => TargetFormat::Docker,
             "oci" => TargetFormat::Oci,
-            _ => return Err(Error::msg(format!("unknown target format type: {}", arg)))
+            _ => return Err(Error::msg(format!("unknown target format type: {}", arg))),
         })
     }
 }
@@ -70,13 +70,16 @@ impl FromStr for SourceType {
     type Err = anyhow::Error;
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
-        let potion = arg.chars().position(|c| c == ':')
-            .ok_or_else(|| Error::msg("error source"))?;
+        let potion = arg.chars().position(|c| c == ':').ok_or_else(|| Error::msg("error source"))?;
         let source_type = &arg[..potion];
         Ok(match source_type {
-            "dockerfile" => SourceType::Dockerfile { path: arg[potion + 1..].to_string() },
-            "cmd" => SourceType::Cmd { tag: arg[potion + 1..].to_string() },
-            _ => return Err(Error::msg(format!("unknown source type: {}", source_type)))
+            "dockerfile" => SourceType::Dockerfile {
+                path: arg[potion + 1..].to_string(),
+            },
+            "cmd" => SourceType::Cmd {
+                tag: arg[potion + 1..].to_string(),
+            },
+            _ => return Err(Error::msg(format!("unknown source type: {}", source_type))),
         })
     }
 }
@@ -89,12 +92,11 @@ impl FromStr for TargetType {
     type Err = anyhow::Error;
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
-        let potion = arg.chars().position(|c| c == ':')
-            .ok_or_else(|| Error::msg("error source"))?;
+        let potion = arg.chars().position(|c| c == ':').ok_or_else(|| Error::msg("error source"))?;
         let target_type = &arg[..potion];
         Ok(match target_type {
             "registry" => TargetType::Registry(arg[potion + 1..].to_string()),
-            _ => return Err(Error::msg(format!("unknown target type: {}", target_type)))
+            _ => return Err(Error::msg(format!("unknown target type: {}", target_type))),
         })
     }
 }
@@ -108,8 +110,10 @@ impl FromStr for BaseAuth {
     type Err = anyhow::Error;
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
-        let potion = arg.chars().position(|c| c == ':')
-            .ok_or_else(|| Error::msg("error auth input"))?;
-        Ok(BaseAuth { username: arg[..potion].to_string(), password: arg[potion + 1..].to_string() })
+        let potion = arg.chars().position(|c| c == ':').ok_or_else(|| Error::msg("error auth input"))?;
+        Ok(BaseAuth {
+            username: arg[..potion].to_string(),
+            password: arg[potion + 1..].to_string(),
+        })
     }
 }

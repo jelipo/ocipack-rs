@@ -1,5 +1,5 @@
 use std::fs;
-use std::fs::{create_dir_all, File, read_to_string};
+use std::fs::{create_dir_all, read_to_string, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -52,7 +52,6 @@ impl CacheDir {
     }
 }
 
-
 pub struct BlobsDir {
     blob_path: Box<Path>,
     pub config_path: Box<Path>,
@@ -73,8 +72,11 @@ impl BlobsDir {
         compress_type: CompressType,
     ) -> Result<LocalLayer> {
         let local_layer = LocalLayer::new(
-            diff_layer_sha256.to_string(), manifest_layer_sha.to_string(),
-            compress_type, &self.layers_path);
+            diff_layer_sha256.to_string(),
+            manifest_layer_sha.to_string(),
+            compress_type,
+            &self.layers_path,
+        );
         local_layer.update_local_config()?;
         Ok(local_layer)
     }
@@ -97,8 +99,7 @@ impl BlobsDir {
         if diff_layer.exists() {
             std::fs::remove_file(&diff_layer)?;
         }
-        let diff_layer_parent = diff_layer.parent()
-            .ok_or_else(|| Error::msg("diff_layer must have a parent dir"))?;
+        let diff_layer_parent = diff_layer.parent().ok_or_else(|| Error::msg("diff_layer must have a parent dir"))?;
         fs::create_dir_all(diff_layer_parent)?;
         fs::rename(file_path, diff_layer)?;
         Ok(())
@@ -128,7 +129,9 @@ impl LocalLayer {
         let config_str = read_to_string(diff_layer_config_path.clone())?;
         let (compress_type, diff_layer_sha) = LocalLayer::pares_config(&config_str)?;
         let layer_file_path = diff_layer_dir.join(diff_layer_sha);
-        if !layer_file_path.exists() { return Err(Error::msg("diff layer not found")); }
+        if !layer_file_path.exists() {
+            return Err(Error::msg("diff layer not found"));
+        }
         Ok(LocalLayer {
             manifest_sha: manifest_sha.to_string(),
             diff_layer_sha: diff_layer_sha.to_string(),
@@ -140,7 +143,9 @@ impl LocalLayer {
 
     fn pares_config(config_str: &str) -> Result<(CompressType, &str)> {
         let split = config_str.split('\n').collect::<Vec<&str>>();
-        if split.len() < 2 { return Err(Error::msg("error diff layer config file")); }
+        if split.len() < 2 {
+            return Err(Error::msg("error diff layer config file"));
+        }
         let compress_type = CompressType::from_str(split[0])?;
         let diff_layer_sha = split[1];
         Ok((compress_type, diff_layer_sha))
@@ -150,12 +155,7 @@ impl LocalLayer {
         self.layer_file_path.to_string_lossy().to_string()
     }
 
-    pub fn new(
-        diff_layer_sha: String,
-        manifest_sha: String,
-        compress_type: CompressType,
-        layer_cache_dir: &Path,
-    ) -> LocalLayer {
+    pub fn new(diff_layer_sha: String, manifest_sha: String, compress_type: CompressType, layer_cache_dir: &Path) -> LocalLayer {
         let diff_layer_dir = layer_cache_dir.join(&manifest_sha);
         let config_name = Self::diff_layer_config_name();
         let diff_layer_config_path = diff_layer_dir.join(config_name);

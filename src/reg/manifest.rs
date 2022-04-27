@@ -3,9 +3,9 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::{ConfigBlobSerialize, Layer, LayerConvert, RegContentType, RegDigest};
 use crate::reg::docker::DockerManifest;
 use crate::reg::oci::OciManifest;
+use crate::reg::{ConfigBlobSerialize, Layer, LayerConvert, RegContentType, RegDigest};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -43,11 +43,15 @@ impl Manifest {
                     set_config_blob(&mut docker.config, config_blob_serialize);
                     docker.config
                 },
-                layers: docker.layers.into_iter().map(|mut common_layer| {
-                    common_layer.media_type = dockerv2s2_to_ociv1(&common_layer.media_type)?;
-                    Ok(common_layer)
-                }).collect::<anyhow::Result<Vec<CommonManifestLayer>>>()?,
-            }
+                layers: docker
+                    .layers
+                    .into_iter()
+                    .map(|mut common_layer| {
+                        common_layer.media_type = dockerv2s2_to_ociv1(&common_layer.media_type)?;
+                        Ok(common_layer)
+                    })
+                    .collect::<anyhow::Result<Vec<CommonManifestLayer>>>()?,
+            },
         })
     }
 
@@ -60,10 +64,14 @@ impl Manifest {
                     set_config_blob(&mut oci.config, config_blob_serialize);
                     oci.config
                 },
-                layers: oci.layers.into_iter().map(|mut common_layer| {
-                    common_layer.media_type = ociv1_to_dockerv2s2(&common_layer.media_type)?;
-                    Ok(common_layer)
-                }).collect::<anyhow::Result<Vec<CommonManifestLayer>>>()?,
+                layers: oci
+                    .layers
+                    .into_iter()
+                    .map(|mut common_layer| {
+                        common_layer.media_type = ociv1_to_dockerv2s2(&common_layer.media_type)?;
+                        Ok(common_layer)
+                    })
+                    .collect::<anyhow::Result<Vec<CommonManifestLayer>>>()?,
             },
             Manifest::DockerV2S2(mut docker) => {
                 set_config_blob(&mut docker.config, config_blob_serialize);
@@ -82,23 +90,29 @@ impl Manifest {
     pub fn add_top_gz_layer(&mut self, size: u64, tgz_sha256: String) {
         let reg_digest = RegDigest::new_with_sha256(tgz_sha256);
         match self {
-            Manifest::OciV1(oci) => oci.layers.insert(0, CommonManifestLayer {
-                media_type: RegContentType::DOCKER_FOREIGN_LAYER_TGZ.val().to_string(),
-                size,
-                digest: reg_digest.digest,
-            }),
-            Manifest::DockerV2S2(docker) => docker.layers.insert(0, CommonManifestLayer {
-                media_type: RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.val().to_string(),
-                size,
-                digest: reg_digest.digest,
-            }),
+            Manifest::OciV1(oci) => oci.layers.insert(
+                0,
+                CommonManifestLayer {
+                    media_type: RegContentType::DOCKER_FOREIGN_LAYER_TGZ.val().to_string(),
+                    size,
+                    digest: reg_digest.digest,
+                },
+            ),
+            Manifest::DockerV2S2(docker) => docker.layers.insert(
+                0,
+                CommonManifestLayer {
+                    media_type: RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.val().to_string(),
+                    size,
+                    digest: reg_digest.digest,
+                },
+            ),
         }
     }
 
     pub fn config_digest(&self) -> &str {
         match self {
             Manifest::OciV1(oci) => &oci.config.digest,
-            Manifest::DockerV2S2(docker) => &docker.config.digest
+            Manifest::DockerV2S2(docker) => &docker.config.digest,
         }
     }
 }
@@ -109,7 +123,8 @@ pub fn ociv1_to_dockerv2s2(media_type: &str) -> Result<String> {
     } else if media_type == RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.val() {
         RegContentType::DOCKER_FOREIGN_LAYER_TGZ
     } else if media_type == RegContentType::OCI_LAYER_TAR.val()
-        || media_type == RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.val() {
+        || media_type == RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.val()
+    {
         return Err(Error::msg(format!("docker not support tar layer,source type:{}", media_type)));
     } else {
         return Err(Error::msg(format!("error oci layer type:{}", media_type)));
@@ -127,7 +142,6 @@ pub fn dockerv2s2_to_ociv1(media_type: &str) -> Result<String> {
     };
     Ok(new_media_type.val().to_string())
 }
-
 
 fn set_config_blob(common_config: &mut CommonManifestConfig, config_blob_serialize: &ConfigBlobSerialize) {
     common_config.media_type = RegContentType::DOCKER_CONTAINER_IMAGE.val().to_string();

@@ -13,7 +13,6 @@ pub struct ImageInfo {
 
 pub struct SourceInfo {
     pub image_info: ImageInfo,
-
 }
 
 pub struct BuildInfo {
@@ -30,7 +29,6 @@ pub struct TargetInfo {
     pub image_info: ImageInfo,
     pub format: TargetFormat,
 }
-
 
 pub trait SourceImageAdapter {
     fn info(&self) -> &SourceInfo;

@@ -10,7 +10,6 @@ pub fn init() -> Result<()> {
 
 /// 初始化日志
 fn log_init() {
-    let env = Env::default()
-        .default_filter_or("info");
+    let env = Env::default().default_filter_or("info");
     env_logger::init_from_env(env);
 }

@@ -4,8 +4,8 @@ use std::path::Path;
 
 use anyhow::Result;
 use bytes::Bytes;
-use sha2::{Digest, Sha256};
 use sha2::digest::DynDigest;
+use sha2::{Digest, Sha256};
 
 pub fn sha256(bytes: &Bytes) -> String {
     let mut hasher = Sha256::new();
@@ -56,7 +56,6 @@ impl<R: Read> Read for Sha256Reader<R> {
         Ok(read_size)
     }
 }
-
 
 pub struct Sha256Writer<W: Write> {
     write: W,

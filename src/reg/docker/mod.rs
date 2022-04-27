@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::{Layer, LayerConvert};
 use crate::reg::manifest::{CommonManifestConfig, CommonManifestLayer};
+use crate::reg::{Layer, LayerConvert};
 
 pub mod image;
 
@@ -17,11 +17,14 @@ pub struct DockerManifest {
 
 impl LayerConvert for DockerManifest {
     fn get_layers(&self) -> Vec<Layer> {
-        self.layers.iter().map(|docker| Layer {
-            media_type: &docker.media_type,
-            size: docker.size,
-            digest: &docker.digest,
-        }).collect::<Vec<Layer>>()
+        self.layers
+            .iter()
+            .map(|docker| Layer {
+                media_type: &docker.media_type,
+                size: docker.size,
+                digest: &docker.digest,
+            })
+            .collect::<Vec<Layer>>()
     }
 }
 

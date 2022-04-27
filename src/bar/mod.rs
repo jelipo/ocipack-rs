@@ -43,9 +43,7 @@ impl MultiBar {
         }));
         let bar_data = (short_digest, file_count, bar_core.clone());
         self.bar_vec.push(bar_data);
-        Bar {
-            bar_core
-        }
+        Bar { bar_core }
     }
 
     pub fn update(&mut self) {
