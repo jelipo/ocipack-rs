@@ -72,13 +72,12 @@ fn handle(source_info: SourceInfo, build_info: BuildInfo, source_auth: RegAuthTy
         temp_local_layer,
         &target_config_blob_serialize,
     )?;
-
     match &build_cmds.target {
         TargetType::Registry(image) => {
             let registry_adapter = RegistryTargetAdapter::new(
                 image,
                 build_cmds.format.clone(),
-                !build_cmds.allow_insecure,
+                !build_cmds.target_allow_insecure,
                 target_manifest,
                 target_config_blob_serialize,
                 build_cmds.target_auth.as_ref(),
@@ -112,8 +111,10 @@ fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<Pa
             };
             if source_path.is_file() {
                 let file_name = source_path.file_name().ok_or_else(|| Error::msg("error file name"))?.to_string_lossy();
-                let dest_file_path = format!("{}/{}", dest_path, file_name);
-                tar_builder.append_file(dest_file_path, &mut File::open(source_path)?)?;
+                let dest_file_path = PathBuf::from(dest_path).join(file_name.to_string()).to_string_lossy().to_string();
+                dbg!(&dest_file_path);
+                let mut sourcefile = File::open(source_path)?;
+                tar_builder.append_file(dest_file_path, &mut sourcefile)?;
             } else if source_path.is_dir() {
                 tar_builder.append_dir(dest_path, source_path_str)?;
             } else {

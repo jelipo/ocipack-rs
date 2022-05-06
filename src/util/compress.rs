@@ -42,7 +42,7 @@ pub fn gz_file<R: Read, W: ?Sized + Write>(input_reader: &mut R, output_writer: 
         if read_size == 0 {
             break;
         }
-        let _write_size = encoder.write(&buffer[..read_size])?;
+        encoder.write_all(&buffer[..read_size])?;
     }
     Ok(())
 }

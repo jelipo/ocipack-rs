@@ -28,7 +28,7 @@ pub struct RegistryHttpClient {
 impl RegistryHttpClient {
     pub fn new(reg_addr: String, auth: Option<RegistryAuth>) -> Result<RegistryHttpClient> {
         let client = reqwest::blocking::ClientBuilder::new()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(600))
             .gzip(true)
             .connect_timeout(Duration::from_secs(10))
             .danger_accept_invalid_certs(true)

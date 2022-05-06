@@ -18,6 +18,10 @@ pub struct BuildCmdArgs {
     #[clap(long, short, parse(from_flag))]
     pub allow_insecure: bool,
 
+    /// Allow target insecure registry
+    #[clap(long, parse(from_flag))]
+    pub target_allow_insecure: bool,
+
     /// Source type.
     /// Support dockerfile,cmd type
     /// Example:'dockerfile:/path/to/.Dockerfile','cmd:my.reg.com/source/image:1.0'

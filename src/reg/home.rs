@@ -97,10 +97,10 @@ impl BlobsDir {
         let diff_layer_dir = self.layers_path.join(manifest_sha);
         let diff_layer = diff_layer_dir.join(diff_layer_sha);
         if diff_layer.exists() {
-            std::fs::remove_file(&diff_layer)?;
+            fs::remove_file(&diff_layer)?;
         }
         let diff_layer_parent = diff_layer.parent().ok_or_else(|| Error::msg("diff_layer must have a parent dir"))?;
-        fs::create_dir_all(diff_layer_parent)?;
+        create_dir_all(diff_layer_parent)?;
         fs::rename(file_path, diff_layer)?;
         Ok(())
     }
@@ -176,11 +176,11 @@ impl LocalLayer {
 
     pub fn update_local_config(&self) -> Result<()> {
         if self.diff_layer_config_path.exists() {
-            std::fs::remove_file(&self.diff_layer_config_path)?;
+            fs::remove_file(&self.diff_layer_config_path)?;
         }
         let config_data = self.config_string();
         let parent = self.diff_layer_config_path.parent().unwrap();
-        fs::create_dir_all(parent)?;
+        create_dir_all(parent)?;
         let mut diff_layer_config = File::create(&self.diff_layer_config_path)?;
         diff_layer_config.write_all(config_data.as_bytes())?;
         diff_layer_config.flush()?;
