@@ -87,14 +87,12 @@ impl RegUploader {
             })),
         };
         RegUploader {
-            reg_uploader_enum: RegUploaderEnum::Run {
-                0: RegUploaderCore {
-                    url,
-                    auth,
-                    client,
-                    blob_config: blob_config_arc.clone(),
-                },
-            },
+            reg_uploader_enum: RegUploaderEnum::Run(RegUploaderCore {
+                url,
+                auth,
+                client,
+                blob_config: blob_config_arc.clone(),
+            }),
             blob_config: blob_config_arc,
             temp,
         }

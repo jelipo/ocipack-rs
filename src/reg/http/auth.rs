@@ -57,8 +57,6 @@ impl RegTokenHandler {
         let second_time_now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         Ok((token_response.token, second_time_now + token_response.expires_in as u64))
     }
-
-    fn build_adapter(&self, _scope: &Option<String>) {}
 }
 
 pub struct AuthenticateAdapter {
@@ -169,5 +167,5 @@ fn get_token(scope: &str, map: &mut HashMap<String, InnerToken>) -> Option<Strin
             map.remove(scope);
         }
     }
-    return None;
+    None
 }

@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     let global_config: &GlobalAppConfig = GLOBAL_CONFIG.borrow();
     match &global_config.cmd_args {
         CmdArgs::Build(build_args) => {
-            let _command = BuildCommand::build(build_args)?;
+            BuildCommand::build(build_args)?;
         }
         CmdArgs::Transform => {}
     }

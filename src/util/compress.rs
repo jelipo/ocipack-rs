@@ -36,7 +36,7 @@ pub fn uncompress<R: Read, W: Write>(compress_type: &CompressType, mut input: R,
 
 pub fn gz_file<R: Read, W: ?Sized + Write>(input_reader: &mut R, output_writer: &mut W) -> Result<()> {
     let mut encoder = GzEncoder::new(output_writer, Compression::fast());
-    let mut buffer = vec![0u8; 1024 * 4].into_boxed_slice();
+    let mut buffer = vec![0u8; 1024 * 4];
     loop {
         let read_size = input_reader.read(&mut buffer)?;
         if read_size == 0 {

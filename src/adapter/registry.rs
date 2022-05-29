@@ -41,7 +41,6 @@ impl RegistryTargetAdapter {
         let instruction = Dockerfile::parse(&temp_from)?.instructions.remove(0);
         let image_info = match instruction {
             Instruction::From(from) => ImageInfo {
-                // TODO "registry-1.docker.io" static str
                 image_host: from.image_parsed.registry.unwrap_or_else(|| DEFAULT_IMAGE_HOST.to_string()),
                 image_name: if from.image_parsed.image.contains('/') {
                     from.image_parsed.image
