@@ -25,8 +25,8 @@ jobs:
         with:
           command: build
           args: --release
-      - uses: ncipollo/release-action@v1
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          artifacts: "target/release/ocipack-rs"
-          bodyFile: "target/release/ocipack-rs"
-          token: ${{ secrets.GITHUB_TOKEN }}
+          files: target/release/ocipack-rs
