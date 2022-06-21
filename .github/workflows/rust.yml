@@ -13,20 +13,20 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v3
-    - name: Install latest nightly
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: nightly
-        override: true
-        components: rustfmt, clippy
-    - name: Run cargo build
-      uses: actions-rs/cargo@v1
-      with:
-        command: build
-        args: --release
-    - uses: ncipollo/release-action@v1
-      with:
-        artifacts: "target/release/ocipack-rs.exe"
-        bodyFile: "target/release/ocipack-rs.exe"
-        token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v3
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rustfmt, clippy
+      - name: Run cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - uses: ncipollo/release-action@v1
+        with:
+          artifacts: "target/release/ocipack-rs"
+          bodyFile: "target/release/ocipack-rs"
+          token: ${{ secrets.GITHUB_TOKEN }}
