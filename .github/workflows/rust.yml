@@ -20,10 +20,11 @@ jobs:
         toolchain: nightly
         override: true
         components: rustfmt, clippy
-    - name: Run cargo check
+    - name: Run cargo build
       uses: actions-rs/cargo@v1
       with:
-        command: build --release
+        command: build
+        args: --release
     - uses: ncipollo/release-action@v1
       with:
         artifacts: "target/release/ocipack-rs.exe"
