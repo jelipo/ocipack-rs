@@ -25,8 +25,7 @@ jobs:
       - name: Run cargo build
         uses: actions-rs/cargo@v1
         with:
-          command: build
-          args: --release
+          command: clean
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
