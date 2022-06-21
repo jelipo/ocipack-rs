@@ -21,14 +21,13 @@ use crate::util::sha;
 pub struct RegistryHttpClient {
     registry_addr: String,
     client: Client,
-    basic_auth: Option<HttpAuth>,
     reg_token_handler: RegTokenHandler,
 }
 
 impl RegistryHttpClient {
-    pub fn new(reg_addr: String, auth: Option<RegistryAuth>) -> Result<RegistryHttpClient> {
+    pub fn new(reg_addr: String, auth: Option<RegistryAuth>, conn_timeout_second: u64) -> Result<RegistryHttpClient> {
         let client = reqwest::blocking::ClientBuilder::new()
-            .timeout(Duration::from_secs(600))
+            .timeout(Duration::from_secs(conn_timeout_second))
             .gzip(true)
             .connect_timeout(Duration::from_secs(10))
             .danger_accept_invalid_certs(true)
@@ -42,7 +41,6 @@ impl RegistryHttpClient {
         Ok(RegistryHttpClient {
             registry_addr: reg_addr.clone(),
             client: client.clone(),
-            basic_auth: http_auth_opt.clone(),
             reg_token_handler: RegTokenHandler::new_reg_token_handler(reg_addr, http_auth_opt, client),
         })
     }

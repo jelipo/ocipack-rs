@@ -81,9 +81,9 @@ pub struct Registry {
 }
 
 impl Registry {
-    pub fn open(use_https: bool, host: &str, auth: Option<RegistryAuth>) -> Result<Registry> {
+    pub fn open(use_https: bool, host: &str, auth: Option<RegistryAuth>, conn_timeout_second: u64) -> Result<Registry> {
         let reg_addr = format!("{}{}", if use_https { "https://" } else { "http://" }, host);
-        let client = RegistryHttpClient::new(reg_addr.clone(), auth)?;
+        let client = RegistryHttpClient::new(reg_addr.clone(), auth, conn_timeout_second)?;
         let image = MyImageManager::new(reg_addr, client);
         Ok(Registry { image_manager: image })
     }
@@ -398,7 +398,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -407,14 +407,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -436,7 +436,7 @@ impl ToString for CompressType {
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
         }
-        .to_string()
+            .to_string()
     }
 }
 

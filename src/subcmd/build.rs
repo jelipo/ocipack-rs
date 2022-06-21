@@ -4,18 +4,18 @@ use std::path::{Path, PathBuf};
 use anyhow::{Error, Result};
 use tar::Builder;
 
+use crate::{GLOBAL_CONFIG, HomeDir};
+use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
-use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
+use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::reg::home::{LocalLayer, TempLayerInfo};
 use crate::reg::manifest::Manifest;
-use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
-use crate::util::sha::{Sha256Reader, Sha256Writer};
 use crate::util::{compress, random};
-use crate::{HomeDir, GLOBAL_CONFIG};
+use crate::util::sha::{Sha256Reader, Sha256Writer};
 
 pub struct BuildCommand {}
 
@@ -45,7 +45,7 @@ fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo
 
 fn handle(source_info: SourceInfo, build_info: BuildInfo, source_auth: RegAuthType, build_cmds: &BuildCmdArgs) -> Result<()> {
     let home_dir = GLOBAL_CONFIG.home_dir.clone();
-    let pull_result = pull(&source_info, source_auth, !build_cmds.allow_insecure)?;
+    let pull_result = pull(&source_info, source_auth, !build_cmds.allow_insecure, build_cmds.conn_timeout)?;
 
     let temp_layer =
         build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| gz_layer_file(&tar_path, &home_dir)).transpose()?;
@@ -81,6 +81,7 @@ fn handle(source_info: SourceInfo, build_info: BuildInfo, source_auth: RegAuthTy
                 target_manifest,
                 target_config_blob_serialize,
                 build_cmds.target_auth.as_ref(),
+                build_cmds.conn_timeout,
             )?;
             registry_adapter.upload()?
         }

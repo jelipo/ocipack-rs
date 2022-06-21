@@ -45,6 +45,10 @@ pub struct BuildCmdArgs {
     /// [OPTION] Target format type. Support 'docker' and 'oci'.
     #[clap(long, short, default_value = "docker")]
     pub format: TargetFormat,
+
+    /// [OPTION] Connection timeout in seconds.
+    #[clap(long, default_value = "600")]
+    pub conn_timeout: u64,
 }
 
 #[derive(Clone)]

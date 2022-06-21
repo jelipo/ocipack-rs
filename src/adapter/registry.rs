@@ -6,17 +6,18 @@ use crate::adapter::{ImageInfo, TargetImageAdapter, TargetInfo};
 use crate::config::cmd::{BaseAuth, TargetFormat};
 use crate::config::RegAuthType;
 use crate::const_data::DEFAULT_IMAGE_HOST;
+use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
-use crate::progress::ProcessResult;
 use crate::progress::Processor;
+use crate::progress::ProcessResult;
+use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry};
 use crate::reg::http::upload::UploadResult;
 use crate::reg::manifest::Manifest;
-use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry};
-use crate::GLOBAL_CONFIG;
 
 pub struct RegistryTargetAdapter {
     info: TargetInfo,
     use_https: bool,
+    conn_timeout_second: u64,
     target_manifest: Manifest,
     target_config_blob_serialize: ConfigBlobSerialize,
     target_auth: RegAuthType,
@@ -36,6 +37,7 @@ impl RegistryTargetAdapter {
         target_manifest: Manifest,
         target_config_blob_serialize: ConfigBlobSerialize,
         base_auth: Option<&BaseAuth>,
+        conn_timeout_second: u64,
     ) -> Result<RegistryTargetAdapter> {
         let temp_from = format!("FROM {}", image_raw);
         let instruction = Dockerfile::parse(&temp_from)?.instructions.remove(0);
@@ -55,6 +57,7 @@ impl RegistryTargetAdapter {
         Ok(RegistryTargetAdapter {
             info: TargetInfo { image_info, format },
             use_https,
+            conn_timeout_second,
             target_manifest,
             target_config_blob_serialize,
             target_auth: auth,
@@ -66,7 +69,7 @@ impl RegistryTargetAdapter {
         let target_info = self.info;
         let reg_auth = self.target_auth.get_auth()?;
         let host = target_info.image_info.image_host;
-        let target_reg = Registry::open(self.use_https, &host, reg_auth)?;
+        let target_reg = Registry::open(self.use_https, &host, reg_auth, self.conn_timeout_second)?;
         let mut manager = target_reg.image_manager;
 
         let target_manifest = self.target_manifest;
