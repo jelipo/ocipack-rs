@@ -44,6 +44,8 @@ jobs:
       - uses: actions/checkout@v3
       - name: Env
         run: SET RELEASE_VERSION=$($env:GITHUB_REF -replace "refs/tags/")
+      - name: Print Env
+        run: echo %RELEASE_VERSION%
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
         with:
@@ -61,12 +63,12 @@ jobs:
           version: latest
           files: |
             ./target/release/ocipack-rs.exe
-          args: -o ./target/release/ocipack-rs-${{ env.RELEASE_VERSION }}-amd64_windows.exe
+          args: -o ./target/release/ocipack-rs-%RELEASE_VERSION%-amd64_windows.exe
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ./target/release/ocipack-rs-${{ env.RELEASE_VERSION }}-amd64_windows.exe
+          files: ./target/release/ocipack-rs-%RELEASE_VERSION%-amd64_windows.exe
   build-amd64-macos:
     runs-on: macos-latest
     steps:
