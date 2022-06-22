@@ -61,7 +61,7 @@ jobs:
           version: latest
           files: |
             ./target/release/ocipack-rs.exe
-          args: -o ./target/release/ocipack-rs-${{ env.RELEASE_VERSION }}-amd64_windows.exe
+          args: -o ./target/release/ocipack-rs-${GITHUB_REF##*/}-amd64_windows.exe
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
