@@ -42,11 +42,15 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
           asset_path: ./target/release/ocipack-rs
-          asset_name: ocipack-rs-${{ github.ref }}-linux-amd64
+          asset_name: ocipack-rs-${{ github.ref }}-linux-x86_64
           asset_content_type: application/octet-stream
   build-windows-amd64:
     runs-on: windows-latest
     steps:
+      - name: print env
+        env:
+          CONTEXT_JOBS: ${{ toJSON(job) }}
+        run: echo "$CONTEXT_JOBS"
       - uses: actions/checkout@v3
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
@@ -77,5 +81,5 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
           asset_path: ./target/release/ocipack-rs.exe
-          asset_name: ocipack-rs-${{ github.ref }}-windows-amd64.exe
+          asset_name: ocipack-rs-${{ github.ref }}-windows-x86_64.exe
           asset_content_type: application/octet-stream
