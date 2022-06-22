@@ -85,14 +85,9 @@ jobs:
           command: build
           args: --release
       - name: Run UPX
-        uses: crazy-max/ghaction-upx@v2
-        with:
-          version: latest
-          files: |
-            ./target/release/ocipack-rs
-          args: -o ./target/release/ocipack-rs-${{ env.RELEASE_VERSION }}-amd64_macos
+        run: cp ./target/release/ocipack-rs ./target/release/ocipack-rs-${{ env.RELEASE_VERSION }}-amd64_darwin
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ./target/release/ocipack-rs-${{ env.RELEASE_VERSION }}-amd64_macos
+          files: ./target/release/ocipack-rs-${{ env.RELEASE_VERSION }}-amd64_darwin
