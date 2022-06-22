@@ -25,7 +25,11 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release --bin ocipack-rs-${{ env.RELEASE_VERSION }}-linux-x86_64
+          args: --release
+      - name: Install upx
+        run:  apt update -y && apt install -y upx
+      - name: Install upx
+        run: cp ./target/release/ocipack-rs ./target/release/ocipack-rs-${{ env.RELEASE_VERSION }}-linux-x86_64
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
