@@ -4,6 +4,7 @@
 extern crate derive_builder;
 
 use std::borrow::Borrow;
+use std::ops::Deref;
 use std::sync::{Arc, LazyLock};
 
 use anyhow::Result;
@@ -30,7 +31,7 @@ pub static GLOBAL_CONFIG: LazyLock<GlobalAppConfig> = LazyLock::new(init_config)
 
 fn main() -> Result<()> {
     init::init()?;
-    let global_config: &GlobalAppConfig = GLOBAL_CONFIG.borrow();
+    let global_config = GLOBAL_CONFIG.deref();
     match &global_config.cmd_args {
         CmdArgs::Build(build_args) => {
             BuildCommand::build(build_args)?;

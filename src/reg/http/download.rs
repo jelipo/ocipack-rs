@@ -47,7 +47,7 @@ impl RegDownloader {
             auth,
             client: Some(client),
             temp,
-            blob_down_config: blob_down_config_arc.clone(),
+            blob_down_config: blob_down_config_arc,
         })
     }
 
@@ -67,7 +67,7 @@ impl RegDownloader {
             auth: None,
             client: None,
             temp,
-            blob_down_config: blob_down_config_arc.clone(),
+            blob_down_config: blob_down_config_arc,
         })
     }
 }
@@ -155,7 +155,7 @@ fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloade
     }
     let file = File::create(file_path)?;
     let mut writer = RegDownloaderWriter {
-        status: status.clone(),
+        status,
         file,
     };
     let _copy_size = std::io::copy(&mut http_response, &mut writer)?;
@@ -205,7 +205,8 @@ impl Write for RegDownloaderWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let status_core = &mut self.status.status_core.lock().unwrap();
         status_core.curr_size += buf.len() as u64;
-        self.file.write(buf)
+        self.file.write_all(buf)?;
+        Ok(buf.len())
     }
 
     fn flush(&mut self) -> std::io::Result<()> {

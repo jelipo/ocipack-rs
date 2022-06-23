@@ -86,8 +86,8 @@ impl RegistryHttpClient {
             Err(Error::msg(match response.get_content_type() {
                 None => format!("Request to registry failed,status_code:{}", response.status_code().as_str()),
                 Some(content_type) => format!(
-                    "Request to registry failed,status_code:{} ,content-type:{} ,body:{}",
-                    response.status_code().as_str(),
+                    "Request to registry failed,status_code:{:?} ,content-type:{} ,body:{}",
+                    response.status_code(),
                     content_type,
                     response.body_str()
                 ),
@@ -153,7 +153,7 @@ impl FullRegistryResponse {
     }
 
     pub fn get_content_type(&self) -> Option<&str> {
-        self.content_type.as_ref().map(|str| str.as_str())
+        self.content_type.as_deref()
     }
 
     pub fn is_success(&self) -> bool {
@@ -225,10 +225,9 @@ impl RegistryResponse for RawRegistryResponse {
                 let _result = self.response.read_to_string(&mut string);
                 string
             }
-            Some(len) => {
-                if len == 0 {
-                    String::default()
-                } else {
+            Some(len) => match len {
+                0 => String::default(),
+                _ => {
                     let mut string = String::with_capacity(len as usize);
                     let _result = self.response.read_to_string(&mut string);
                     string

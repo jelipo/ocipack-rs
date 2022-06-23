@@ -1,6 +1,7 @@
-use std::borrow::BorrowMut;
+use std::borrow::{Borrow, BorrowMut};
 use std::fs::File;
 use std::io::Read;
+use std::ops::DerefMut;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -10,9 +11,9 @@ use anyhow::{Error, Result};
 use reqwest::blocking::Client;
 use reqwest::Method;
 
-use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
-use crate::reg::http::{do_request_raw_read, HttpAuth};
+use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
 use crate::reg::BlobConfig;
+use crate::reg::http::{do_request_raw_read, HttpAuth};
 
 pub struct RegUploader {
     reg_uploader_enum: RegUploaderEnum,
@@ -189,7 +190,7 @@ impl Read for RegUploaderReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let size = self.file.read(buf)?;
         let mut guard = self.status.status_core.lock().unwrap();
-        let core = guard.borrow_mut();
+        let core = guard.deref_mut();
         core.curr_size += size as u64;
         Ok(size)
     }
@@ -201,8 +202,7 @@ pub struct RegUploadHandler {
 
 impl ProcessorAsync<UploadResult> for RegUploadHandler {
     fn wait_result(self: Box<Self>) -> Result<UploadResult> {
-        let result = self.join.join();
-        result.unwrap()
+        self.join.join().map_err(|_| Error::msg("join failed."))?
     }
 }
 
