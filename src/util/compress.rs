@@ -2,9 +2,9 @@ use std::io;
 use std::io::{Read, Write};
 
 use anyhow::Result;
+use flate2::Compression;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
-use flate2::Compression;
 
 use crate::reg::CompressType;
 
@@ -17,7 +17,7 @@ pub fn uncompress_gz<R: Read, W: ?Sized + Write>(input: R, output_writer: &mut W
         if read_size == 0 {
             break;
         }
-        let _write_size = output_writer.write(&buffer[..read_size])?;
+        output_writer.write_all(&buffer[..read_size])?;
     }
     output_writer.flush()?;
     Ok(())
@@ -25,12 +25,10 @@ pub fn uncompress_gz<R: Read, W: ?Sized + Write>(input: R, output_writer: &mut W
 
 pub fn uncompress<R: Read, W: Write>(compress_type: &CompressType, mut input: R, output_writer: &mut W) -> Result<()> {
     match compress_type {
-        CompressType::Tar => {
-            io::copy(&mut input, output_writer)?;
-        }
+        CompressType::Tar => io::copy(&mut input, output_writer).map(|_| ())?,
         CompressType::Tgz => uncompress_gz(input, output_writer)?,
         CompressType::Zstd => zstd::stream::copy_decode(input, output_writer)?,
-    }
+    };
     Ok(())
 }
 

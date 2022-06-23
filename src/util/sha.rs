@@ -52,7 +52,7 @@ impl<R: Read> Sha256Reader<R> {
 impl<R: Read> Read for Sha256Reader<R> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let read_size = self.read.read(buf)?;
-        let _write_size = self.hasher.write(&buf[..read_size])?;
+        self.hasher.write_all(&buf[..read_size])?;
         Ok(read_size)
     }
 }
@@ -64,8 +64,9 @@ pub struct Sha256Writer<W: Write> {
 
 impl<W: Write> Write for Sha256Writer<W> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let _hasher_write_size = self.hasher.write(buf)?;
-        self.write.write(buf)
+        self.hasher.write_all(buf)?;
+        self.write.write_all(buf)?;
+        Ok(buf.len())
     }
 
     fn flush(&mut self) -> std::io::Result<()> {

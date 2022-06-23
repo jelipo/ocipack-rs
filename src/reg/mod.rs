@@ -11,17 +11,17 @@ use url::Url;
 
 use manifest::Manifest;
 
-use crate::reg::docker::image::DockerConfigBlob;
+use crate::GLOBAL_CONFIG;
 use crate::reg::docker::DockerManifest;
+use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::http::upload::RegUploader;
 use crate::reg::http::RegistryAuth;
+use crate::reg::http::upload::RegUploader;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
 use crate::util::sha::bytes_sha256;
-use crate::GLOBAL_CONFIG;
 
 pub mod docker;
 pub mod home;
@@ -173,12 +173,11 @@ impl MyImageManager {
         let file_path = PathBuf::from(file_local_path).into_boxed_path();
         let file_name = file_path.file_name().expect("file name error").to_str().unwrap().to_string();
         let blob_config = BlobConfig::new(file_path.clone(), file_name, blob_digest.clone());
-        let short_hash = blob_config.short_hash.clone();
         if self.blobs_exited(name, blob_digest)? {
             return Ok(RegUploader::new_finished_uploader(
                 blob_config,
                 file_path.metadata()?.len(),
-                format!("{} blob exists in registry", short_hash),
+                "blob exists in registry".to_string(),
             ));
         }
         let mut location_url = self.layer_blob_upload_ready(name)?;
