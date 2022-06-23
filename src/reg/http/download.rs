@@ -11,9 +11,9 @@ use anyhow::{Error, Result};
 use reqwest::blocking::{Client, Response};
 use reqwest::Method;
 
-use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
-use crate::reg::http::{do_request_raw, get_header, HttpAuth};
+use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
 use crate::reg::BlobConfig;
+use crate::reg::http::{do_request_raw, get_header, HttpAuth};
 
 pub struct RegDownloader {
     finished: bool,
@@ -36,8 +36,8 @@ impl RegDownloader {
         let temp = RegDownloaderStatus {
             status_core: Arc::new(Mutex::new(RegDownloaderStatusCore {
                 blob_config: blob_down_config_arc.clone(),
-                file_size: 0,
-                curr_size: layer_size.unwrap_or(0),
+                file_size: layer_size.unwrap_or(0),
+                curr_size: 0,
                 done: false,
             })),
         };
@@ -84,7 +84,7 @@ impl Processor<DownloadResult> for RegDownloader {
                     file_size: file_path.metadata().unwrap().len(),
                     blob_config,
                     local_existed: true,
-                    result_str: "exists".to_string(),
+                    result_str: "local exists".to_string(),
                 },
             });
         }
@@ -147,11 +147,9 @@ fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloade
     // 请求HTTP下载
     let mut http_response = reg_http_downloader.do_request_raw()?;
     check(&http_response)?;
-    if let Some(value) = http_response.headers().get("content-length") {
-        let content_len_str = value.to_str().expect("content_length to str failed");
-        let content_length = u64::from_str(content_len_str)?;
+    if let Some(len) = http_response.content_length() {
         let mut status_core = status.status_core.lock().expect("lock failed");
-        status_core.borrow_mut().file_size = content_length;
+        status_core.borrow_mut().file_size = len;
     }
     let file = File::create(file_path)?;
     let mut writer = RegDownloaderWriter {
@@ -208,7 +206,6 @@ impl Write for RegDownloaderWriter {
         self.file.write_all(buf)?;
         Ok(buf.len())
     }
-
     fn flush(&mut self) -> std::io::Result<()> {
         self.file.flush()
     }
