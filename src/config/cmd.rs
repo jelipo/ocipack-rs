@@ -1,3 +1,4 @@
+use std::env;
 use std::str::FromStr;
 
 use anyhow::Error;
@@ -115,13 +116,28 @@ pub struct BaseAuth {
 }
 
 impl FromStr for BaseAuth {
-    type Err = anyhow::Error;
+    type Err = Error;
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
         let potion = arg.chars().position(|c| c == ':').ok_or_else(|| Error::msg("error auth input"))?;
         Ok(BaseAuth {
-            username: arg[..potion].to_string(),
-            password: arg[potion + 1..].to_string(),
+            username: value_or_env(&arg[..potion])?,
+            password: value_or_env(&arg[potion + 1..])?,
         })
     }
+}
+
+fn value_or_env(param: &str) -> anyhow::Result<String> {
+    let value = if param.starts_with("${") && param.ends_with('}') {
+        env::var(&param[2..param.len() - 1])?
+    } else {
+        param.to_string()
+    };
+    Ok(value)
+}
+
+#[test]
+fn it_works() -> anyhow::Result<()> {
+    println!("{:?}", value_or_env("${PATH}")?);
+    Ok(())
 }

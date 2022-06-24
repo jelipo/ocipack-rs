@@ -86,7 +86,6 @@ fn handle(source_info: SourceInfo, build_info: BuildInfo, source_auth: RegAuthTy
             registry_adapter.upload()?
         }
     }
-
     Ok(())
 }
 
