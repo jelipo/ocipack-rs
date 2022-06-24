@@ -2,7 +2,6 @@ use std::borrow::BorrowMut;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
-use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
@@ -11,9 +10,9 @@ use anyhow::{Error, Result};
 use reqwest::blocking::{Client, Response};
 use reqwest::Method;
 
-use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
-use crate::reg::BlobConfig;
+use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
 use crate::reg::http::{do_request_raw, get_header, HttpAuth};
+use crate::reg::BlobConfig;
 
 pub struct RegDownloader {
     finished: bool,
@@ -152,10 +151,7 @@ fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloade
         status_core.borrow_mut().file_size = len;
     }
     let file = File::create(file_path)?;
-    let mut writer = RegDownloaderWriter {
-        status,
-        file,
-    };
+    let mut writer = RegDownloaderWriter { status, file };
     let _copy_size = std::io::copy(&mut http_response, &mut writer)?;
     writer.flush()?;
     Ok(())
@@ -176,7 +172,7 @@ impl RegHttpDownloader {
 
 fn check(response: &Response) -> Result<()> {
     let headers = response.headers();
-    let content_type = get_header(headers, "content-type").expect("content_type not found");
+    let content_type = get_header(headers, "content-type").ok_or_else(|| Error::msg("content-type not found"))?;
     if !content_type.contains("application/octet-stream") {
         return Err(Error::msg(format!("Not support the content type:{}", content_type)));
     }

@@ -3,7 +3,6 @@
 
 extern crate derive_builder;
 
-use std::borrow::Borrow;
 use std::ops::Deref;
 use std::sync::{Arc, LazyLock};
 

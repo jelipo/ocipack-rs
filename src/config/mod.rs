@@ -13,18 +13,6 @@ pub mod cmd;
 pub mod global;
 pub mod userconfig;
 
-pub struct BaseImage {
-    pub use_https: bool,
-    /// registry的host地址
-    pub reg_host: String,
-    /// image的名称
-    pub image_name: String,
-    /// 可以是TAG或者digest
-    pub reference: String,
-    /// 验证方式
-    pub auth_type: RegAuthType,
-}
-
 #[derive(Clone)]
 pub enum RegAuthType {
     LocalDockerAuth { reg_host: String },

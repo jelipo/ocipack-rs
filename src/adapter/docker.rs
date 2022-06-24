@@ -11,7 +11,6 @@ use crate::adapter::{BuildInfo, CopyFile, ImageInfo, SourceImageAdapter, SourceI
 use crate::const_data::DEFAULT_IMAGE_HOST;
 
 pub struct DockerfileAdapter {
-    docker_file_path: String,
     info: SourceInfo,
 }
 

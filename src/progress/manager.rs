@@ -4,7 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 
 use crate::bar::{Bar, MultiBar};
-use crate::progress::{Processor, ProcessorAsync, ProcessResult, ProgressStatus};
+use crate::progress::{ProcessResult, Processor, ProcessorAsync, ProgressStatus};
 
 pub struct ProcessorManager<R: ProcessResult> {
     statuses: Vec<(Box<dyn ProcessorAsync<R>>, Box<dyn ProgressStatus>, Bar)>,
@@ -58,13 +58,4 @@ impl<R: ProcessResult> ProcessorManager<R> {
         }
         Ok(result_infos)
     }
-}
-
-fn processors_all_done(done_vec: &[bool]) -> bool {
-    for is_done in done_vec {
-        if !is_done {
-            return false;
-        }
-    }
-    true
 }

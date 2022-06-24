@@ -232,7 +232,7 @@ impl RegistryResponse for RawRegistryResponse {
                     let _result = self.response.read_to_string(&mut string);
                     string
                 }
-            }
+            },
         }
     }
 }

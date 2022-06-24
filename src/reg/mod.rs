@@ -11,17 +11,17 @@ use url::Url;
 
 use manifest::Manifest;
 
-use crate::GLOBAL_CONFIG;
-use crate::reg::docker::DockerManifest;
 use crate::reg::docker::image::DockerConfigBlob;
+use crate::reg::docker::DockerManifest;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::RegUploader;
+use crate::reg::http::RegistryAuth;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
 use crate::util::sha::bytes_sha256;
+use crate::GLOBAL_CONFIG;
 
 pub mod docker;
 pub mod home;
@@ -84,22 +84,18 @@ impl Registry {
     pub fn open(use_https: bool, host: &str, auth: Option<RegistryAuth>, conn_timeout_second: u64) -> Result<Registry> {
         let reg_addr = format!("{}{}", if use_https { "https://" } else { "http://" }, host);
         let client = RegistryHttpClient::new(reg_addr.clone(), auth, conn_timeout_second)?;
-        let image = MyImageManager::new(reg_addr, client);
+        let image = MyImageManager::new(client);
         Ok(Registry { image_manager: image })
     }
 }
 
 pub struct MyImageManager {
-    registry_addr: String,
     reg_client: RegistryHttpClient,
 }
 
 impl MyImageManager {
-    pub fn new(registry_addr: String, client: RegistryHttpClient) -> MyImageManager {
-        MyImageManager {
-            registry_addr,
-            reg_client: client,
-        }
+    pub fn new(client: RegistryHttpClient) -> MyImageManager {
+        MyImageManager { reg_client: client }
     }
 
     /// 获取Image的Manifest
@@ -124,15 +120,6 @@ impl MyImageManager {
             );
             Err(Error::msg(msg))
         }
-    }
-
-    /// Image manifests是否存在
-    pub fn manifests_exited(&mut self, refe: &Reference) -> Result<bool> {
-        let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
-        let scope = Some(refe.image_name);
-        let request = ClientRequest::new_head_request(&path, scope, TokenType::Pull);
-        let response = self.reg_client.simple_request::<u8>(request)?;
-        exited(&response)
     }
 
     /// Image blobs是否存在
@@ -397,7 +384,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -406,14 +393,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -435,7 +422,7 @@ impl ToString for CompressType {
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
         }
-            .to_string()
+        .to_string()
     }
 }
 

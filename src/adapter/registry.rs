@@ -6,13 +6,13 @@ use crate::adapter::{ImageInfo, TargetImageAdapter, TargetInfo};
 use crate::config::cmd::{BaseAuth, TargetFormat};
 use crate::config::RegAuthType;
 use crate::const_data::DEFAULT_IMAGE_HOST;
-use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
-use crate::progress::Processor;
 use crate::progress::ProcessResult;
-use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry};
+use crate::progress::Processor;
 use crate::reg::http::upload::UploadResult;
 use crate::reg::manifest::Manifest;
+use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry};
+use crate::GLOBAL_CONFIG;
 
 pub struct RegistryTargetAdapter {
     info: TargetInfo,

@@ -67,8 +67,17 @@ impl MultiBar {
             let bar_core = bar_core.borrow();
             let curr_size = bar_core.curr_size.bytes().to_string();
             let full_size = bar_core.full_size.bytes().to_string();
-            let done_str = if bar_core.finished & bar_core.success { "√" } else if bar_core.finished & !bar_core.success { "❌" } else { "" };
-            println!("{}{:>12} / {:<12} {:4}{}", name, curr_size, full_size, done_str, bar_core.finished_info);
+            let done_str = if bar_core.finished & bar_core.success {
+                "√"
+            } else if bar_core.finished & !bar_core.success {
+                "❌"
+            } else {
+                ""
+            };
+            println!(
+                "{}{:>12} / {:<12} {:4}{}",
+                name, curr_size, full_size, done_str, bar_core.finished_info
+            );
         }
     }
 }
