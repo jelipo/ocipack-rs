@@ -5,17 +5,18 @@ use std::time::Duration;
 
 use anyhow::{Error, Result};
 use bytes::Bytes;
+use reqwest::{Method, Proxy, StatusCode};
 use reqwest::blocking::{Client, Response};
 use reqwest::redirect::Policy;
-use reqwest::{Method, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::reg::{BlobConfig, RegContentType};
+use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::reg::http::auth::{RegTokenHandler, TokenType};
 use crate::reg::http::download::RegDownloader;
 use crate::reg::http::upload::RegUploader;
-use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
-use crate::reg::{BlobConfig, RegContentType};
+use crate::reg::proxy::ProxyInfo;
 use crate::util::sha;
 
 pub struct RegistryHttpClient {
@@ -25,8 +26,16 @@ pub struct RegistryHttpClient {
 }
 
 impl RegistryHttpClient {
-    pub fn new(reg_addr: String, auth: Option<RegistryAuth>, conn_timeout_second: u64) -> Result<RegistryHttpClient> {
-        let client = reqwest::blocking::ClientBuilder::new()
+    pub fn new(reg_addr: String, auth: Option<RegistryAuth>, conn_timeout_second: u64, proxy_info: Option<ProxyInfo>) -> Result<RegistryHttpClient> {
+        let mut builder = reqwest::blocking::ClientBuilder::new();
+        if let Some(info) = proxy_info {
+            let mut proxy_reqwest = Proxy::all(info.addr)?;
+            if let Some(auth) = info.auth {
+                proxy_reqwest = proxy_reqwest.basic_auth(&auth.username, &auth.password)
+            }
+            builder = builder.proxy(proxy_reqwest);
+        }
+        let client = builder
             .timeout(Duration::from_secs(conn_timeout_second))
             .gzip(true)
             .connect_timeout(Duration::from_secs(10))

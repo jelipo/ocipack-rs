@@ -12,11 +12,12 @@ use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::http::download::DownloadResult;
 use crate::reg::manifest::Manifest;
 use crate::reg::oci::image::OciConfigBlob;
-use crate::reg::{ConfigBlobEnum, Layer, Reference, RegContentType, RegDigest, Registry};
+use crate::reg::{ConfigBlobEnum, Layer, Reference, RegContentType, RegDigest, Registry, RegistryCreateInfo};
 use crate::util::compress::uncompress;
 use crate::GLOBAL_CONFIG;
+use crate::reg::proxy::ProxyInfo;
 
-pub fn pull(source_info: &SourceInfo, source_auth: RegAuthType, use_https: bool, read_timeout_second: u64) -> Result<PullResult> {
+pub fn pull(source_info: &SourceInfo, source_auth: RegAuthType, use_https: bool, read_timeout_second: u64, proxy: Option<ProxyInfo>) -> Result<PullResult> {
     let image_info = &source_info.image_info;
     let image_host = &image_info.image_host;
     let from_image_reference = Reference {
@@ -25,7 +26,12 @@ pub fn pull(source_info: &SourceInfo, source_auth: RegAuthType, use_https: bool,
     };
 
     let registry_auth = source_auth.get_auth()?;
-    let mut from_registry = Registry::open(use_https, image_host, registry_auth, read_timeout_second)?;
+    let info = RegistryCreateInfo {
+        auth: registry_auth,
+        conn_timeout_second: read_timeout_second,
+        proxy,
+    };
+    let mut from_registry = Registry::open(use_https, image_host, info)?;
 
     let manifest = from_registry.image_manager.manifests(&from_image_reference)?;
     let config_digest = manifest.config_digest();

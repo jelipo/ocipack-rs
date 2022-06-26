@@ -11,23 +11,25 @@ use url::Url;
 
 use manifest::Manifest;
 
-use crate::reg::docker::image::DockerConfigBlob;
+use crate::GLOBAL_CONFIG;
 use crate::reg::docker::DockerManifest;
+use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::http::upload::RegUploader;
 use crate::reg::http::RegistryAuth;
+use crate::reg::http::upload::RegUploader;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
+use crate::reg::proxy::ProxyInfo;
 use crate::util::sha::bytes_sha256;
-use crate::GLOBAL_CONFIG;
 
 pub mod docker;
 pub mod home;
 pub mod http;
 pub mod manifest;
 pub mod oci;
+pub mod proxy;
 
 pub struct Reference<'a> {
     /// Image的名称
@@ -80,10 +82,16 @@ pub struct Registry {
     pub image_manager: MyImageManager,
 }
 
+pub struct RegistryCreateInfo {
+    pub auth: Option<RegistryAuth>,
+    pub conn_timeout_second: u64,
+    pub proxy: Option<ProxyInfo>,
+}
+
 impl Registry {
-    pub fn open(use_https: bool, host: &str, auth: Option<RegistryAuth>, conn_timeout_second: u64) -> Result<Registry> {
+    pub fn open(use_https: bool, host: &str, reg_cteate_info: RegistryCreateInfo) -> Result<Registry> {
         let reg_addr = format!("{}{}", if use_https { "https://" } else { "http://" }, host);
-        let client = RegistryHttpClient::new(reg_addr.clone(), auth, conn_timeout_second)?;
+        let client = RegistryHttpClient::new(reg_addr, reg_cteate_info.auth, reg_cteate_info.conn_timeout_second, reg_cteate_info.proxy)?;
         let image = MyImageManager::new(client);
         Ok(Registry { image_manager: image })
     }
@@ -384,7 +392,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -393,14 +401,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -422,7 +430,7 @@ impl ToString for CompressType {
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
         }
-        .to_string()
+            .to_string()
     }
 }
 

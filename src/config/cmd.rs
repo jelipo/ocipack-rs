@@ -1,8 +1,14 @@
+use std::borrow::Cow;
+use std::collections::HashMap;
 use std::env;
 use std::str::FromStr;
 
 use anyhow::Error;
 use clap::Parser;
+use url::Url;
+
+use crate::adapter::SourceInfo;
+use crate::reg::proxy::{ProxyAuth, ProxyInfo};
 
 #[derive(Parser)]
 #[clap(about = "An image tool", version, author = "jelipo <me@jelipo.com>")]
@@ -32,6 +38,10 @@ pub struct BuildCmdArgs {
     /// [OPTION] Auth of pull source image. Example:'myname:mypass','myname:${MY_PASSWORD_ENV}'
     #[clap(long)]
     pub source_auth: Option<BaseAuth>,
+
+    /// [OPTION] Proxy of pull source image. Example:'socks5://127.0.0.1:1080','http://name:pass@example:8080'
+    #[clap(long)]
+    pub source_proxy: Option<ProxyInfo>,
 
     /// Target type.
     /// Support 'registry'
@@ -90,6 +100,22 @@ impl FromStr for SourceType {
             },
             _ => return Err(Error::msg(format!("unknown source type: {}", source_type))),
         })
+    }
+}
+
+impl FromStr for ProxyInfo {
+    type Err = anyhow::Error;
+
+    fn from_str(arg: &str) -> Result<Self, Self::Err> {
+        let url = Url::parse(arg)?;
+        let auth_opt = match url.username() {
+            username => {
+                let password = url.password().unwrap_or_else(|| "");
+                Some(ProxyAuth::new(username.to_string(), password.to_string()))
+            }
+        };
+        let addr = format!("{}://{}:{}", url.scheme(), url.host_str().unwrap_or_else(|| "127.0.0.1"), url.port().unwrap_or_else(|| 80));
+        Ok(ProxyInfo::new(addr, auth_opt))
     }
 }
 

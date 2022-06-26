@@ -11,7 +11,7 @@ use crate::progress::ProcessResult;
 use crate::progress::Processor;
 use crate::reg::http::upload::UploadResult;
 use crate::reg::manifest::Manifest;
-use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry};
+use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry, RegistryCreateInfo};
 use crate::GLOBAL_CONFIG;
 
 pub struct RegistryTargetAdapter {
@@ -69,7 +69,12 @@ impl RegistryTargetAdapter {
         let target_info = self.info;
         let reg_auth = self.target_auth.get_auth()?;
         let host = target_info.image_info.image_host;
-        let target_reg = Registry::open(self.use_https, &host, reg_auth, self.conn_timeout_second)?;
+        let create_info = RegistryCreateInfo {
+            auth: reg_auth,
+            conn_timeout_second: self.conn_timeout_second,
+            proxy: None, // TODO
+        };
+        let target_reg = Registry::open(self.use_https, &host, create_info)?;
         let mut manager = target_reg.image_manager;
 
         let target_manifest = self.target_manifest;
