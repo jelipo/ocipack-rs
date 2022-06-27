@@ -20,6 +20,7 @@ use crate::reg::http::upload::RegUploader;
 use crate::reg::http::RegistryAuth;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
+use crate::reg::proxy::ProxyInfo;
 use crate::util::sha::bytes_sha256;
 use crate::GLOBAL_CONFIG;
 
@@ -28,6 +29,7 @@ pub mod home;
 pub mod http;
 pub mod manifest;
 pub mod oci;
+pub mod proxy;
 
 pub struct Reference<'a> {
     /// Image的名称
@@ -80,10 +82,21 @@ pub struct Registry {
     pub image_manager: MyImageManager,
 }
 
+pub struct RegistryCreateInfo {
+    pub auth: Option<RegistryAuth>,
+    pub conn_timeout_second: u64,
+    pub proxy: Option<ProxyInfo>,
+}
+
 impl Registry {
-    pub fn open(use_https: bool, host: &str, auth: Option<RegistryAuth>, conn_timeout_second: u64) -> Result<Registry> {
+    pub fn open(use_https: bool, host: &str, reg_cteate_info: RegistryCreateInfo) -> Result<Registry> {
         let reg_addr = format!("{}{}", if use_https { "https://" } else { "http://" }, host);
-        let client = RegistryHttpClient::new(reg_addr.clone(), auth, conn_timeout_second)?;
+        let client = RegistryHttpClient::new(
+            reg_addr,
+            reg_cteate_info.auth,
+            reg_cteate_info.conn_timeout_second,
+            reg_cteate_info.proxy,
+        )?;
         let image = MyImageManager::new(client);
         Ok(Registry { image_manager: image })
     }

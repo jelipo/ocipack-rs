@@ -11,6 +11,7 @@ use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
 use crate::reg::home::{LocalLayer, TempLayerInfo};
 use crate::reg::manifest::Manifest;
+use crate::reg::proxy::ProxyInfo;
 use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
 use crate::util::sha::{Sha256Reader, Sha256Writer};
@@ -22,7 +23,13 @@ pub struct BuildCommand {}
 impl BuildCommand {
     pub fn build(build_args: &BuildCmdArgs) -> Result<()> {
         let (source_info, build_info, source_auth) = build_source_info(build_args)?;
-        handle(source_info, build_info, source_auth, build_args)?;
+        handle(
+            source_info,
+            build_info,
+            source_auth,
+            build_args,
+            build_args.source_proxy.clone(),
+        )?;
         Ok(())
     }
 }
@@ -43,9 +50,21 @@ fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo
     Ok((source_info, build_info, source_reg_auth))
 }
 
-fn handle(source_info: SourceInfo, build_info: BuildInfo, source_auth: RegAuthType, build_cmds: &BuildCmdArgs) -> Result<()> {
+fn handle(
+    source_info: SourceInfo,
+    build_info: BuildInfo,
+    source_auth: RegAuthType,
+    build_cmds: &BuildCmdArgs,
+    proxy_info: Option<ProxyInfo>,
+) -> Result<()> {
     let home_dir = GLOBAL_CONFIG.home_dir.clone();
-    let pull_result = pull(&source_info, source_auth, !build_cmds.allow_insecure, build_cmds.conn_timeout)?;
+    let pull_result = pull(
+        &source_info,
+        source_auth,
+        !build_cmds.allow_insecure,
+        build_cmds.conn_timeout,
+        proxy_info,
+    )?;
 
     let temp_layer =
         build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| gz_layer_file(&tar_path, &home_dir)).transpose()?;
@@ -82,6 +101,7 @@ fn handle(source_info: SourceInfo, build_info: BuildInfo, source_auth: RegAuthTy
                 target_config_blob_serialize,
                 build_cmds.target_auth.as_ref(),
                 build_cmds.conn_timeout,
+                build_cmds.target_proxy.clone(),
             )?;
             registry_adapter.upload()?
         }
