@@ -11,6 +11,7 @@ use crate::progress::ProcessResult;
 use crate::progress::Processor;
 use crate::reg::http::upload::UploadResult;
 use crate::reg::manifest::Manifest;
+use crate::reg::proxy::ProxyInfo;
 use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry, RegistryCreateInfo};
 use crate::GLOBAL_CONFIG;
 
@@ -21,6 +22,7 @@ pub struct RegistryTargetAdapter {
     target_manifest: Manifest,
     target_config_blob_serialize: ConfigBlobSerialize,
     target_auth: RegAuthType,
+    target_proxy: Option<ProxyInfo>,
 }
 
 impl TargetImageAdapter for RegistryTargetAdapter {
@@ -38,6 +40,7 @@ impl RegistryTargetAdapter {
         target_config_blob_serialize: ConfigBlobSerialize,
         base_auth: Option<&BaseAuth>,
         conn_timeout_second: u64,
+        target_proxy: Option<ProxyInfo>,
     ) -> Result<RegistryTargetAdapter> {
         let temp_from = format!("FROM {}", image_raw);
         let instruction = Dockerfile::parse(&temp_from)?.instructions.remove(0);
@@ -61,6 +64,7 @@ impl RegistryTargetAdapter {
             target_manifest,
             target_config_blob_serialize,
             target_auth: auth,
+            target_proxy,
         })
     }
 
@@ -72,7 +76,7 @@ impl RegistryTargetAdapter {
         let create_info = RegistryCreateInfo {
             auth: reg_auth,
             conn_timeout_second: self.conn_timeout_second,
-            proxy: None, // TODO
+            proxy: self.target_proxy,
         };
         let target_reg = Registry::open(self.use_https, &host, create_info)?;
         let mut manager = target_reg.image_manager;

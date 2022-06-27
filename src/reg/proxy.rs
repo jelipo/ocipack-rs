@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct ProxyInfo {
     pub addr: String,
     pub auth: Option<ProxyAuth>,
@@ -5,13 +6,11 @@ pub struct ProxyInfo {
 
 impl ProxyInfo {
     pub fn new(addr: String, auth: Option<ProxyAuth>) -> ProxyInfo {
-        ProxyInfo {
-            addr,
-            auth,
-        }
+        ProxyInfo { addr, auth }
     }
 }
 
+#[derive(Clone)]
 pub struct ProxyAuth {
     pub username: String,
     pub password: String,
@@ -19,10 +18,6 @@ pub struct ProxyAuth {
 
 impl ProxyAuth {
     pub fn new(username: String, password: String) -> ProxyAuth {
-        ProxyAuth {
-            username,
-            password,
-        }
+        ProxyAuth { username, password }
     }
 }
-

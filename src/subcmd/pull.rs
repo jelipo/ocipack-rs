@@ -12,12 +12,18 @@ use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::http::download::DownloadResult;
 use crate::reg::manifest::Manifest;
 use crate::reg::oci::image::OciConfigBlob;
+use crate::reg::proxy::ProxyInfo;
 use crate::reg::{ConfigBlobEnum, Layer, Reference, RegContentType, RegDigest, Registry, RegistryCreateInfo};
 use crate::util::compress::uncompress;
 use crate::GLOBAL_CONFIG;
-use crate::reg::proxy::ProxyInfo;
 
-pub fn pull(source_info: &SourceInfo, source_auth: RegAuthType, use_https: bool, read_timeout_second: u64, proxy: Option<ProxyInfo>) -> Result<PullResult> {
+pub fn pull(
+    source_info: &SourceInfo,
+    source_auth: RegAuthType,
+    use_https: bool,
+    read_timeout_second: u64,
+    proxy: Option<ProxyInfo>,
+) -> Result<PullResult> {
     let image_info = &source_info.image_info;
     let image_host = &image_info.image_host;
     let from_image_reference = Reference {

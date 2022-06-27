@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-use std::collections::HashMap;
 use std::env;
 use std::str::FromStr;
 
@@ -7,7 +5,6 @@ use anyhow::Error;
 use clap::Parser;
 use url::Url;
 
-use crate::adapter::SourceInfo;
 use crate::reg::proxy::{ProxyAuth, ProxyInfo};
 
 #[derive(Parser)]
@@ -52,6 +49,10 @@ pub struct BuildCmdArgs {
     /// [OPTION] Auth of push target image. Example:'myname:mypass','myname:${MY_PASSWORD_ENV}'
     #[clap(long)]
     pub target_auth: Option<BaseAuth>,
+
+    /// [OPTION] Proxy of push target image. Example:'socks5://127.0.0.1:1080','http://name:pass@example:8080'
+    #[clap(long)]
+    pub target_proxy: Option<ProxyInfo>,
 
     /// [OPTION] Target format type. Support 'docker' and 'oci'.
     #[clap(long, short, default_value = "docker")]
@@ -104,17 +105,24 @@ impl FromStr for SourceType {
 }
 
 impl FromStr for ProxyInfo {
-    type Err = anyhow::Error;
+    type Err = Error;
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
         let url = Url::parse(arg)?;
-        let auth_opt = match url.username() {
-            username => {
-                let password = url.password().unwrap_or_else(|| "");
-                Some(ProxyAuth::new(username.to_string(), password.to_string()))
-            }
+        let auth_opt = if !url.username().eq("") {
+            Some(ProxyAuth::new(
+                url.username().to_string(),
+                url.password().unwrap_or("").to_string(),
+            ))
+        } else {
+            None
         };
-        let addr = format!("{}://{}:{}", url.scheme(), url.host_str().unwrap_or_else(|| "127.0.0.1"), url.port().unwrap_or_else(|| 80));
+        let addr = format!(
+            "{}://{}:{}",
+            url.scheme(),
+            url.host_str().unwrap_or("127.0.0.1"),
+            url.port().unwrap_or(80)
+        );
         Ok(ProxyInfo::new(addr, auth_opt))
     }
 }
