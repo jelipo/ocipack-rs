@@ -228,7 +228,7 @@ impl MyImageManager {
                 self.reg_client.simple_request::<DockerManifest>(request)?
             }
         };
-        Ok(response.status_code(), response.string_body())
+        Ok((response.status_code(), response.string_body()))
     }
 }
 
