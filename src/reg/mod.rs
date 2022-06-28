@@ -11,18 +11,18 @@ use url::Url;
 
 use manifest::Manifest;
 
-use crate::reg::docker::image::DockerConfigBlob;
+use crate::GLOBAL_CONFIG;
 use crate::reg::docker::DockerManifest;
+use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::http::upload::RegUploader;
 use crate::reg::http::RegistryAuth;
+use crate::reg::http::upload::RegUploader;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
 use crate::reg::proxy::ProxyInfo;
 use crate::util::sha::bytes_sha256;
-use crate::GLOBAL_CONFIG;
 
 pub mod docker;
 pub mod home;
@@ -199,7 +199,7 @@ impl MyImageManager {
         Ok(url)
     }
 
-    pub fn put_manifest(&mut self, refe: &Reference, manifest: Manifest) -> Result<String> {
+    pub fn put_manifest(&mut self, refe: &Reference, manifest: Manifest) -> Result<(u16, String)> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
         let response = match manifest {
@@ -228,7 +228,7 @@ impl MyImageManager {
                 self.reg_client.simple_request::<DockerManifest>(request)?
             }
         };
-        Ok(response.string_body())
+        Ok(response.status_code(), response.string_body())
     }
 }
 
@@ -371,7 +371,7 @@ pub struct RegContentType(pub &'static str);
 impl RegContentType {
     /// Docker content-type
     pub const DOCKER_MANIFEST: Self = Self("application/vnd.docker.distribution.manifest.v2+json");
-    pub const DOCKER_MANIFEST_LIST: Self = Self("application/vnd.docker.distribution.manifest.list.v2+json");
+    pub const _DOCKER_MANIFEST_LIST: Self = Self("application/vnd.docker.distribution.manifest.list.v2+json");
     pub const DOCKER_FOREIGN_LAYER_TGZ: Self = Self("application/vnd.docker.image.rootfs.foreign.diff.tar.gzip");
     pub const DOCKER_LAYER_TGZ: Self = Self("application/vnd.docker.image.rootfs.diff.tar.gzip");
     pub const DOCKER_CONTAINER_IMAGE: Self = Self("application/vnd.docker.container.image.v1+json");
@@ -386,7 +386,7 @@ impl RegContentType {
     pub const OCI_LAYER_NONDISTRIBUTABLE_ZSTD: Self = Self("application/vnd.oci.image.layer.nondistributable.v1.tar+zstd");
     pub const OCI_IMAGE_CONFIG: Self = Self("application/vnd.oci.image.config.v1+json");
 
-    pub const ALL: Self = Self("*/*");
+    pub const _ALL: Self = Self("*/*");
 
     pub fn val(&self) -> &'static str {
         self.0
@@ -397,7 +397,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -406,14 +406,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -422,6 +422,7 @@ impl RegContentType {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum CompressType {
     Tar,
     Tgz,
@@ -434,13 +435,12 @@ impl ToString for CompressType {
             CompressType::Tar => "TAR",
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
-        }
-        .to_string()
+        }.to_string()
     }
 }
 
 impl FromStr for CompressType {
-    type Err = anyhow::Error;
+    type Err = Error;
 
     fn from_str(str: &str) -> std::result::Result<Self, Self::Err> {
         match str {
