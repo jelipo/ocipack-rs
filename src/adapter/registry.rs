@@ -6,14 +6,14 @@ use crate::adapter::{ImageInfo, TargetImageAdapter, TargetInfo};
 use crate::config::cmd::{BaseAuth, TargetFormat};
 use crate::config::RegAuthType;
 use crate::const_data::DEFAULT_IMAGE_HOST;
+use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
-use crate::progress::ProcessResult;
 use crate::progress::Processor;
+use crate::progress::ProcessResult;
+use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry, RegistryCreateInfo};
 use crate::reg::http::upload::UploadResult;
 use crate::reg::manifest::Manifest;
 use crate::reg::proxy::ProxyInfo;
-use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry, RegistryCreateInfo};
-use crate::GLOBAL_CONFIG;
 
 pub struct RegistryTargetAdapter {
     info: TargetInfo,
@@ -105,15 +105,14 @@ impl RegistryTargetAdapter {
         for upload_result in upload_results {
             info!("upload done : {}", &upload_result.finished_info());
         }
-
-        let put_result = manager.put_manifest(
+        let (status_code, body) = manager.put_manifest(
             &Reference {
                 image_name: target_info.image_info.image_name.as_str(),
                 reference: target_info.image_info.reference.as_str(),
             },
             target_manifest,
         )?;
-        info!("put manifest result {}", put_result);
+        info!("put manifest result code:{} body:{}", status_code,body);
         Ok(())
     }
 }
