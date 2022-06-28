@@ -59,11 +59,11 @@ impl RegistryHttpClient {
         })
     }
 
-    pub fn _request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(&mut self, request: ClientRequest<T>) -> Result<R> {
+    pub fn request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(&mut self, request: ClientRequest<T>) -> Result<R> {
         let success_response = self.request_full_response(request)?;
-        let body_bytes = success_response._bytes_body();
-        let _body_sha256 = format!("sha256:{}", sha::_sha256(body_bytes));
-        success_response._json_body::<R>()
+        let body_bytes = success_response.bytes_body();
+        let _body_sha256 = format!("sha256:{}", sha::sha256(body_bytes));
+        success_response.json_body::<R>()
     }
 
     pub fn request_full_response<T: Serialize + ?Sized>(&mut self, request: ClientRequest<T>) -> Result<FullRegistryResponse> {
@@ -143,7 +143,7 @@ impl RegistryHttpClient {
 pub struct FullRegistryResponse {
     body_bytes: Bytes,
     content_type: Option<String>,
-    _docker_content_digest: Option<String>,
+    docker_content_digest: Option<String>,
     location_header: Option<String>,
     http_status: StatusCode,
 }
@@ -160,7 +160,7 @@ impl FullRegistryResponse {
         Ok(FullRegistryResponse {
             body_bytes,
             content_type: content_type_opt,
-            _docker_content_digest: docker_content_digest_opt,
+            docker_content_digest: docker_content_digest_opt,
             location_header,
             http_status: code,
         })
@@ -182,17 +182,17 @@ impl FullRegistryResponse {
         String::from_utf8_lossy(&self.body_bytes[..]).into()
     }
 
-    pub fn _bytes_body(&self) -> &Bytes {
+    pub fn bytes_body(&self) -> &Bytes {
         &self.body_bytes
     }
 
-    pub fn _json_body<R: DeserializeOwned>(&self) -> Result<R> {
+    pub fn json_body<R: DeserializeOwned>(&self) -> Result<R> {
         let json_result = serde_json::from_slice::<R>(self.body_bytes.as_ref());
         Ok(json_result?)
     }
 
-    pub fn _header_docker_content_digest(&self) -> Option<String> {
-        self._docker_content_digest.clone()
+    pub fn header_docker_content_digest(&self) -> Option<String> {
+        self.docker_content_digest.clone()
     }
 
     pub fn location_header(&self) -> Option<&String> {

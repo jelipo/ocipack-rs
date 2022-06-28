@@ -4,19 +4,19 @@ use std::path::{Path, PathBuf};
 use anyhow::{Error, Result};
 use tar::Builder;
 
-use crate::{GLOBAL_CONFIG, HomeDir};
-use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
+use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::reg::home::{LocalLayer, TempLayerInfo};
 use crate::reg::manifest::Manifest;
 use crate::reg::proxy::ProxyInfo;
+use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
-use crate::util::{compress, random};
 use crate::util::sha::{Sha256Reader, Sha256Writer};
+use crate::util::{compress, random};
+use crate::{HomeDir, GLOBAL_CONFIG};
 
 pub struct BuildCommand {}
 
@@ -29,7 +29,6 @@ impl BuildCommand {
             source_auth,
             build_args,
             build_args.source_proxy.clone(),
-            build_args.use_zstd,
         )?;
         Ok(())
     }
@@ -57,7 +56,6 @@ fn handle(
     source_auth: RegAuthType,
     build_cmds: &BuildCmdArgs,
     proxy_info: Option<ProxyInfo>,
-    use_zstd: bool,
 ) -> Result<()> {
     let home_dir = GLOBAL_CONFIG.home_dir.clone();
     let pull_result = pull(
@@ -67,18 +65,17 @@ fn handle(
         build_cmds.conn_timeout,
         proxy_info,
     )?;
-    let compress_type = if use_zstd { CompressType::Zstd } else { CompressType::Tgz };
+
     let temp_layer =
-        build_top_tar(&build_info.copy_files, &home_dir)?
-            .map(|tar_path| compress_layer_file(&tar_path, &home_dir, compress_type)).transpose()?;
+        build_top_tar(&build_info.copy_files, &home_dir)?.map(|tar_path| gz_layer_file(&tar_path, &home_dir)).transpose()?;
     let temp_local_layer = if let Some(temp_layer) = &temp_layer {
         home_dir.cache.blobs.move_to_blob(
             &temp_layer.compress_layer_path,
-            &temp_layer.compressed_tar_sha256,
+            &temp_layer.tgz_sha256,
             &temp_layer.tar_sha256,
         )?;
         let temp_local_layer =
-            home_dir.cache.blobs.create_layer_config(&temp_layer.tar_sha256, &temp_layer.compressed_tar_sha256, compress_type)?;
+            home_dir.cache.blobs.create_layer_config(&temp_layer.tar_sha256, &temp_layer.tgz_sha256, CompressType::Tgz)?;
         Some(temp_local_layer)
     } else {
         None
@@ -149,22 +146,22 @@ fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<Pa
     Ok(Some(tar_temp_file_path))
 }
 
-/// 压缩tar layer文件为指定格式
-fn compress_layer_file(tar_file_path: &Path, home_dir: &HomeDir, compress_type: CompressType) -> Result<TempLayerInfo> {
+/// 压缩tar layer文件为gz格式
+fn gz_layer_file(tar_file_path: &Path, home_dir: &HomeDir) -> Result<TempLayerInfo> {
     let tar_file = File::open(tar_file_path)?;
     let mut sha256_reader = Sha256Reader::new(tar_file);
-    let compress_file_name = random::random_str(20) + ".compress";
-    let compress_file_path = home_dir.cache.temp_dir.join(compress_file_name);
-    let compress_file = File::create(&compress_file_path)?;
-    let mut sha256_writer = Sha256Writer::new(compress_file);
-    compress::compress(compress_type, &mut sha256_reader, &mut sha256_writer)?;
+    let tgz_file_name = random::random_str(10) + ".tgz";
+    let tgz_file_path = home_dir.cache.temp_dir.join(tgz_file_name);
+    let tgz_file = File::create(&tgz_file_path)?;
+    let mut sha256_writer = Sha256Writer::new(tgz_file);
+    compress::gz_file(&mut sha256_reader, &mut sha256_writer)?;
     let tar_sha256 = sha256_reader.sha256()?;
-    let compressed_tar_sha256 = sha256_writer.sha256()?;
+    let tgz_sha256 = sha256_writer.sha256()?;
     Ok(TempLayerInfo {
-        compressed_tar_sha256,
+        tgz_sha256,
         tar_sha256,
-        compress_layer_path: compress_file_path,
-        compress_type,
+        compress_layer_path: tgz_file_path,
+        compress_type: CompressType::Tgz,
     })
 }
 
@@ -212,7 +209,7 @@ fn build_target_manifest(
     };
     if let Some(temp_layer) = temp_local_layer {
         let metadata = temp_layer.layer_file_path.metadata()?;
-        target_manifest.add_top_layer(metadata.len(), temp_layer.manifest_sha, temp_layer.compress_type)?
+        target_manifest.add_top_gz_layer(metadata.len(), temp_layer.manifest_sha)
     }
     Ok(target_manifest)
 }

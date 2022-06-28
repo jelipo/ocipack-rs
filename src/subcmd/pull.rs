@@ -63,9 +63,9 @@ pub fn pull(
         let digest = RegDigest::new_with_digest(manifest_layer.digest.to_string());
         let download_path = download_result.file_path.as_ref().ok_or_else(|| Error::msg("can not found download file"))?;
         // 计算解压完的tar的sha256值
-        let mut download_file = File::open(download_path)?;
+        let download_file = File::open(download_path)?;
         let mut sha256_encode = Sha256::new();
-        uncompress(layer_compress_type, &mut download_file, &mut sha256_encode)?;
+        uncompress(&layer_compress_type, download_file, &mut sha256_encode)?;
         let sha256 = &sha256_encode.finalize()[..];
         let tar_sha256 = hex::encode(sha256);
         GLOBAL_CONFIG.home_dir.cache.blobs.create_layer_config(&tar_sha256, &digest.sha256, layer_compress_type)?;

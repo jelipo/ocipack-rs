@@ -179,7 +179,7 @@ fn check(response: &Response) -> Result<()> {
     Ok(())
 }
 
-fn _get_filepath(url: &str, filename_type: &DownloadFilenameType) -> Result<Box<Path>> {
+fn get_filepath(url: &str, filename_type: &DownloadFilenameType) -> Result<Box<Path>> {
     let path_buf = match filename_type {
         DownloadFilenameType::Auto(auto) => {
             let ri = url.rfind('/').expect("URL error");

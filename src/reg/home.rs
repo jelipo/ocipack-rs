@@ -19,7 +19,7 @@ impl HomeDir {
         let home_dir = HomeDir {
             cache: CacheDir {
                 blobs: BlobsDir {
-                    _blob_path: blob_cache_dir_path.clone().into_boxed_path(),
+                    blob_path: blob_cache_dir_path.clone().into_boxed_path(),
                     config_path: blob_cache_dir_path.join("config").into_boxed_path(),
                     layers_path: blob_cache_dir_path.join("layers").into_boxed_path(),
                     download_dir: cache_dir_path.join("download").into_boxed_path(),
@@ -53,7 +53,7 @@ impl CacheDir {
 }
 
 pub struct BlobsDir {
-    _blob_path: Box<Path>,
+    blob_path: Box<Path>,
     pub config_path: Box<Path>,
     pub layers_path: Box<Path>,
     pub download_dir: Box<Path>,
@@ -107,7 +107,7 @@ impl BlobsDir {
 }
 
 pub struct TempLayerInfo {
-    pub compressed_tar_sha256: String,
+    pub tgz_sha256: String,
     pub tar_sha256: String,
     pub compress_layer_path: PathBuf,
     pub compress_type: CompressType,

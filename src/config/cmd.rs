@@ -2,7 +2,6 @@ use std::env;
 use std::str::FromStr;
 
 use anyhow::Error;
-use anyhow::Result;
 use clap::Parser;
 use url::Url;
 
@@ -62,10 +61,6 @@ pub struct BuildCmdArgs {
     /// [OPTION] Connection timeout in seconds.
     #[clap(long, default_value = "600")]
     pub conn_timeout: u64,
-
-    /// [OPTION] Compress files using zstd.
-    #[clap(long, parse(from_flag))]
-    pub use_zstd: bool,
 }
 
 #[derive(Clone)]
@@ -75,7 +70,7 @@ pub enum TargetFormat {
 }
 
 impl FromStr for TargetFormat {
-    type Err = Error;
+    type Err = anyhow::Error;
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
         Ok(match arg {
@@ -92,7 +87,7 @@ pub enum SourceType {
 }
 
 impl FromStr for SourceType {
-    type Err = Error;
+    type Err = anyhow::Error;
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
         let potion = arg.chars().position(|c| c == ':').ok_or_else(|| Error::msg("error source"))?;
@@ -137,7 +132,7 @@ pub enum TargetType {
 }
 
 impl FromStr for TargetType {
-    type Err = Error;
+    type Err = anyhow::Error;
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
         let potion = arg.chars().position(|c| c == ':').ok_or_else(|| Error::msg("error source"))?;
@@ -166,7 +161,7 @@ impl FromStr for BaseAuth {
     }
 }
 
-fn value_or_env(param: &str) -> Result<String> {
+fn value_or_env(param: &str) -> anyhow::Result<String> {
     let value = if param.starts_with("${") && param.ends_with('}') {
         env::var(&param[2..param.len() - 1])?
     } else {
@@ -176,7 +171,7 @@ fn value_or_env(param: &str) -> Result<String> {
 }
 
 #[test]
-fn it_works() -> Result<()> {
+fn it_works() -> anyhow::Result<()> {
     println!("{:?}", value_or_env("${PATH}")?);
     Ok(())
 }
