@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{Error, Result};
-use log::info;
+use log::debug;
 use reqwest::Method;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
@@ -11,18 +11,18 @@ use url::Url;
 
 use manifest::Manifest;
 
-use crate::GLOBAL_CONFIG;
-use crate::reg::docker::DockerManifest;
 use crate::reg::docker::image::DockerConfigBlob;
+use crate::reg::docker::DockerManifest;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::RegUploader;
+use crate::reg::http::RegistryAuth;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
 use crate::reg::proxy::ProxyInfo;
 use crate::util::sha::bytes_sha256;
+use crate::GLOBAL_CONFIG;
 
 pub mod docker;
 pub mod home;
@@ -183,7 +183,7 @@ impl MyImageManager {
         let mut location_url = self.layer_blob_upload_ready(name)?;
         location_url.query_pairs_mut().append_pair("digest", &blob_digest.digest);
         let blob_upload_url = location_url.as_str();
-        info!("blob_upload_url is {}", blob_upload_url);
+        debug!("blob_upload_url is {}", blob_upload_url);
         let reg_uploader = self.reg_client.upload(location_url.to_string(), blob_config, name, &file_path)?;
         Ok(reg_uploader)
     }
@@ -397,7 +397,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -406,14 +406,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -435,7 +435,8 @@ impl ToString for CompressType {
             CompressType::Tar => "TAR",
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 

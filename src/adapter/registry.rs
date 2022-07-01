@@ -1,19 +1,20 @@
 use anyhow::{Error, Result};
 use dockerfile_parser::{Dockerfile, Instruction};
-use log::info;
+use log::{debug, info};
+use reqwest::StatusCode;
 
 use crate::adapter::{ImageInfo, TargetImageAdapter, TargetInfo};
 use crate::config::cmd::{BaseAuth, TargetFormat};
 use crate::config::RegAuthType;
 use crate::const_data::DEFAULT_IMAGE_HOST;
-use crate::GLOBAL_CONFIG;
 use crate::progress::manager::ProcessorManager;
-use crate::progress::Processor;
 use crate::progress::ProcessResult;
-use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry, RegistryCreateInfo};
+use crate::progress::Processor;
 use crate::reg::http::upload::UploadResult;
 use crate::reg::manifest::Manifest;
 use crate::reg::proxy::ProxyInfo;
+use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry, RegistryCreateInfo};
+use crate::GLOBAL_CONFIG;
 
 pub struct RegistryTargetAdapter {
     info: TargetInfo,
@@ -103,7 +104,7 @@ impl RegistryTargetAdapter {
         let process_manager = ProcessorManager::new_processor_manager(reg_uploader_vec)?;
         let upload_results = process_manager.wait_all_done()?;
         for upload_result in upload_results {
-            info!("upload done : {}", &upload_result.finished_info());
+            debug!("upload done : {}", &upload_result.finished_info());
         }
         let (status_code, body) = manager.put_manifest(
             &Reference {
@@ -112,7 +113,11 @@ impl RegistryTargetAdapter {
             },
             target_manifest,
         )?;
-        info!("put manifest result code:{} body:{}", status_code,body);
+        if StatusCode::from_u16(status_code).is_ok() {
+            info!("upload image success");
+        } else {
+            info!("upload image failed\nHTTP code:{}\nbody:{}", status_code, body);
+        }
         Ok(())
     }
 }

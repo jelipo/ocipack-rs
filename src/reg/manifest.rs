@@ -2,12 +2,11 @@ use anyhow::Error;
 use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::to_string;
 
-use crate::CompressType;
-use crate::reg::{ConfigBlobSerialize, Layer, LayerConvert, RegContentType, RegDigest};
 use crate::reg::docker::DockerManifest;
 use crate::reg::oci::OciManifest;
+use crate::reg::{ConfigBlobSerialize, Layer, LayerConvert, RegContentType, RegDigest};
+use crate::CompressType;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -100,7 +99,7 @@ impl Manifest {
                     media_type: match compress_type {
                         CompressType::Tar => RegContentType::OCI_LAYER_TAR.val().to_string(),
                         CompressType::Tgz => RegContentType::OCI_LAYER_TGZ.val().to_string(),
-                        CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val().to_string()
+                        CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val().to_string(),
                     },
                     size,
                     digest: reg_digest.digest,

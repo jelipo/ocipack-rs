@@ -3,7 +3,6 @@
 
 extern crate derive_builder;
 
-use std::mem;
 use std::ops::Deref;
 use std::sync::{Arc, LazyLock};
 
@@ -13,8 +12,8 @@ use home::home_dir;
 
 use crate::config::cmd::CmdArgs;
 use crate::config::global::GlobalAppConfig;
-use crate::reg::CompressType;
 use crate::reg::home::HomeDir;
+use crate::reg::CompressType;
 use crate::subcmd::build::BuildCommand;
 
 mod adapter;

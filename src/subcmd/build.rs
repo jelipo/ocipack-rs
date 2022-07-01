@@ -4,19 +4,19 @@ use std::path::{Path, PathBuf};
 use anyhow::{Error, Result};
 use tar::Builder;
 
-use crate::{GLOBAL_CONFIG, HomeDir};
-use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
+use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::reg::home::{LocalLayer, TempLayerInfo};
 use crate::reg::manifest::Manifest;
 use crate::reg::proxy::ProxyInfo;
+use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
-use crate::util::{compress, random};
 use crate::util::sha::{Sha256Reader, Sha256Writer};
+use crate::util::{compress, random};
+use crate::{HomeDir, GLOBAL_CONFIG};
 
 pub struct BuildCommand {}
 
@@ -68,9 +68,9 @@ fn handle(
         proxy_info,
     )?;
     let compress_type = if use_zstd { CompressType::Zstd } else { CompressType::Tgz };
-    let temp_layer =
-        build_top_tar(&build_info.copy_files, &home_dir)?
-            .map(|tar_path| compress_layer_file(&tar_path, &home_dir, compress_type)).transpose()?;
+    let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?
+        .map(|tar_path| compress_layer_file(&tar_path, &home_dir, compress_type))
+        .transpose()?;
     let temp_local_layer = if let Some(temp_layer) = &temp_layer {
         home_dir.cache.blobs.move_to_blob(
             &temp_layer.compress_layer_path,
