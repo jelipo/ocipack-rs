@@ -2,6 +2,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
+use log::info;
 use tar::Builder;
 
 use crate::adapter::docker::DockerfileAdapter;
@@ -157,9 +158,11 @@ fn compress_layer_file(tar_file_path: &Path, home_dir: &HomeDir, compress_type: 
     let compress_file_path = home_dir.cache.temp_dir.join(compress_file_name);
     let compress_file = File::create(&compress_file_path)?;
     let mut sha256_writer = Sha256Writer::new(compress_file);
+    info!("compressing tar...   type:{}", compress_type.to_string());
     compress::compress(compress_type, &mut sha256_reader, &mut sha256_writer)?;
     let tar_sha256 = sha256_reader.sha256()?;
     let compressed_tar_sha256 = sha256_writer.sha256()?;
+    info!("compress complete. sha256:{:?}", compressed_tar_sha256);
     Ok(TempLayerInfo {
         compressed_tar_sha256,
         tar_sha256,

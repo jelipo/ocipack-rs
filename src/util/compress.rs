@@ -5,6 +5,7 @@ use anyhow::Result;
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
+use zstd::DEFAULT_COMPRESSION_LEVEL;
 
 use crate::reg::CompressType;
 
@@ -46,7 +47,7 @@ pub fn compress<R: Read, W: ?Sized + Write>(
     match compress_type {
         CompressType::Tar => io::copy(tar_input_reader, output_writer).map(|_| ())?,
         CompressType::Tgz => compress_gz(tar_input_reader, output_writer)?,
-        CompressType::Zstd => zstd::stream::copy_encode(tar_input_reader, output_writer, 0)?,
+        CompressType::Zstd => zstd::stream::copy_encode(tar_input_reader, output_writer, DEFAULT_COMPRESSION_LEVEL)?,
     }
     Ok(())
 }
