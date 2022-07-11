@@ -20,12 +20,12 @@
 ## 限制
 
 因为本工具没有任何Runtime，所以Dockerfile配置项中需要Runtime支持的一律无法正常支持。<br>
-`为了便于上手使用，本工具只是使用常见的Dockerfile作为配置文件，但并不是完全兼容Dockerfile`<br>
+`为了便于上手使用，本工具只是使用常见的Dockerfile作为配置，降低使用门槛，但并不是完全兼容Dockerfile`<br>
 |  | Filed |
 |-|-|
 | 支持的配置项 | `FROM` `LABEL` `CMD` `COPY` `ENV` `USER` `WORKDIR` `EXPOSE` |
-| 暂不支持但未来会支持| `ADD`(暂时用COPY代替) `ENTRYPOINT` `VOLUME` |
-| 不会支持 | `ARG` `RUN``MAINTAINER` |
+| 暂不支持但未来会支持| `ADD`(可以暂时用COPY代替) `ENTRYPOINT` `VOLUME` |
+| 不会支持 | `ARG` `RUN` `MAINTAINER` |
 
 <br>
 
