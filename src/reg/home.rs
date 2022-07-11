@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 
 use crate::reg::{CompressType, RegDigest};
 use crate::util::random;
@@ -99,7 +99,7 @@ impl BlobsDir {
         if diff_layer.exists() {
             fs::remove_file(&diff_layer)?;
         }
-        let diff_layer_parent = diff_layer.parent().ok_or_else(|| Error::msg("diff_layer must have a parent dir"))?;
+        let diff_layer_parent = diff_layer.parent().ok_or_else(|| anyhow!("diff_layer must have a parent dir"))?;
         create_dir_all(diff_layer_parent)?;
         fs::rename(file_path, diff_layer)?;
         Ok(())
@@ -130,7 +130,7 @@ impl LocalLayer {
         let (compress_type, diff_layer_sha) = LocalLayer::pares_config(&config_str)?;
         let layer_file_path = diff_layer_dir.join(diff_layer_sha);
         if !layer_file_path.exists() {
-            return Err(Error::msg("diff layer not found"));
+            return Err(anyhow!("diff layer not found"));
         }
         Ok(LocalLayer {
             manifest_sha: manifest_sha.to_string(),
@@ -144,7 +144,7 @@ impl LocalLayer {
     fn pares_config(config_str: &str) -> Result<(CompressType, &str)> {
         let split = config_str.split('\n').collect::<Vec<&str>>();
         if split.len() < 2 {
-            return Err(Error::msg("error diff layer config file"));
+            return Err(anyhow!("error diff layer config file"));
         }
         let compress_type = CompressType::from_str(split[0])?;
         let diff_layer_sha = split[1];

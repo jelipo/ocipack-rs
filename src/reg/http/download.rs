@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use reqwest::blocking::{Client, Response};
 use reqwest::Method;
 
@@ -172,9 +172,9 @@ impl RegHttpDownloader {
 
 fn check(response: &Response) -> Result<()> {
     let headers = response.headers();
-    let content_type = get_header(headers, "content-type").ok_or_else(|| Error::msg("content-type not found"))?;
+    let content_type = get_header(headers, "content-type").ok_or_else(|| anyhow!("content-type not found"))?;
     if !content_type.contains("application/octet-stream") {
-        return Err(Error::msg(format!("Not support the content type:{}", content_type)));
+        return Err(anyhow!("Not support the content type:{}", content_type));
     }
     Ok(())
 }

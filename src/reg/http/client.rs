@@ -3,7 +3,7 @@ use std::option::Option::Some;
 use std::path::Path;
 use std::time::Duration;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use reqwest::blocking::{Client, Response};
 use reqwest::redirect::Policy;
@@ -97,7 +97,7 @@ impl RegistryHttpClient {
         return if response.is_success() {
             Ok(response)
         } else {
-            Err(Error::msg(match response.get_content_type() {
+            Err(anyhow!(match response.get_content_type() {
                 None => format!("Request to registry failed,status_code:{}", response.status_code().as_str()),
                 Some(content_type) => format!(
                     "Request to registry failed,status_code:{:?} ,content-type:{} ,body:{}",

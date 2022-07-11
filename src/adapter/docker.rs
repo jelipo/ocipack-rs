@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::Read;
 use std::str::FromStr;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use dockerfile_parser::{BreakableStringComponent, Dockerfile, Instruction, ShellOrExecExpr};
 use log::warn;
 
@@ -22,7 +22,7 @@ impl DockerfileAdapter {
         let dockerfile = Dockerfile::parse(&str_body)?;
         let stages = dockerfile.stages().stages;
         if stages.len() != 1 {
-            return Err(Error::msg("only support one stage in Dockerfile"));
+            return Err(anyhow!("only support one stage in Dockerfile"));
         }
         let mut label_map = HashMap::<String, String>::new();
         let mut from_image = None;
@@ -43,7 +43,7 @@ impl DockerfileAdapter {
                             .tag
                             .or(from.image_parsed.hash)
                             .or_else(|| Some(String::from("latest")))
-                            .ok_or_else(|| Error::msg("can not found hash or tag"))?,
+                            .ok_or_else(|| anyhow!("can not found hash or tag"))?,
                     })
                 }
                 Instruction::Arg(_) | Instruction::Run(_) => {
@@ -79,7 +79,7 @@ impl DockerfileAdapter {
                 Instruction::Copy(copy) => {
                     let _i = copy.flags.len();
                     if !copy.flags.is_empty() {
-                        return Err(Error::msg("copy not support flag"));
+                        return Err(anyhow!("copy not support flag"));
                     };
                     copy_files.push(CopyFile {
                         source_path: copy.sources.into_iter().map(|str| str.content).collect::<Vec<String>>(),
@@ -129,7 +129,7 @@ impl DockerfileAdapter {
             }
         }
         let source_info = SourceInfo {
-            image_info: from_image.ok_or_else(|| Error::msg("dockerfile must has a 'From'"))?,
+            image_info: from_image.ok_or_else(|| anyhow!("dockerfile must has a 'From'"))?,
         };
         Ok((
             source_info,

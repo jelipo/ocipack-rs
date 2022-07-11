@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use reqwest::Method;
 
@@ -167,10 +167,7 @@ fn uploading(
         let _status_code = response.status().as_str();
         let mut response_string = String::new();
         let _read_size = response.read_to_string(&mut response_string)?;
-        Err(Error::msg(format!(
-            "{} upload request failed. {}",
-            short_hash, response_string
-        )))
+        Err(anyhow!("{} upload request failed. {}", short_hash, response_string))
     }
 }
 
@@ -195,7 +192,7 @@ pub struct RegUploadHandler {
 
 impl ProcessorAsync<UploadResult> for RegUploadHandler {
     fn wait_result(self: Box<Self>) -> Result<UploadResult> {
-        self.join.join().map_err(|_| Error::msg("join failed."))?
+        self.join.join().map_err(|_| anyhow!("join failed."))?
     }
 }
 

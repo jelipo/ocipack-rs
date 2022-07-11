@@ -1,8 +1,8 @@
 use std::env;
 use std::str::FromStr;
 
-use anyhow::Error;
 use anyhow::Result;
+use anyhow::{anyhow, Error};
 use clap::Parser;
 use url::Url;
 
@@ -81,7 +81,7 @@ impl FromStr for TargetFormat {
         Ok(match arg {
             "docker" => TargetFormat::Docker,
             "oci" => TargetFormat::Oci,
-            _ => return Err(Error::msg(format!("unknown target format type: {}", arg))),
+            _ => return Err(anyhow!("unknown target format type: {}", arg)),
         })
     }
 }
@@ -95,7 +95,7 @@ impl FromStr for SourceType {
     type Err = Error;
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
-        let potion = arg.chars().position(|c| c == ':').ok_or_else(|| Error::msg("error source"))?;
+        let potion = arg.chars().position(|c| c == ':').ok_or_else(|| anyhow!("error source"))?;
         let source_type = &arg[..potion];
         Ok(match source_type {
             "dockerfile" => SourceType::Dockerfile {
@@ -104,7 +104,7 @@ impl FromStr for SourceType {
             "cmd" => SourceType::Cmd {
                 tag: arg[potion + 1..].to_string(),
             },
-            _ => return Err(Error::msg(format!("unknown source type: {}", source_type))),
+            _ => return Err(anyhow!("unknown source type: {}", source_type)),
         })
     }
 }
@@ -140,11 +140,11 @@ impl FromStr for TargetType {
     type Err = Error;
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
-        let potion = arg.chars().position(|c| c == ':').ok_or_else(|| Error::msg("error source"))?;
+        let potion = arg.chars().position(|c| c == ':').ok_or_else(|| anyhow!("error source"))?;
         let target_type = &arg[..potion];
         Ok(match target_type {
             "registry" => TargetType::Registry(arg[potion + 1..].to_string()),
-            _ => return Err(Error::msg(format!("unknown target type: {}", target_type))),
+            _ => return Err(anyhow!("unknown target type: {}", target_type)),
         })
     }
 }
@@ -158,7 +158,7 @@ impl FromStr for BaseAuth {
     type Err = Error;
 
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
-        let potion = arg.chars().position(|c| c == ':').ok_or_else(|| Error::msg("error auth input"))?;
+        let potion = arg.chars().position(|c| c == ':').ok_or_else(|| anyhow!("error auth input"))?;
         Ok(BaseAuth {
             username: value_or_env(&arg[..potion])?,
             password: value_or_env(&arg[potion + 1..])?,

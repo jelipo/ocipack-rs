@@ -1,4 +1,4 @@
-use anyhow::Error;
+use anyhow::anyhow;
 use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
@@ -107,9 +107,9 @@ impl Manifest {
             ),
             Manifest::DockerV2S2(docker) => {
                 let media_type = match compress_type {
-                    CompressType::Tar => return Err(Error::msg("Docker image Manifest V 2, Schema 2 not support tar media.")),
+                    CompressType::Tar => return Err(anyhow!("Docker image Manifest V 2, Schema 2 not support tar media.")),
                     CompressType::Tgz => RegContentType::DOCKER_LAYER_TGZ.val().to_string(),
-                    CompressType::Zstd => return Err(Error::msg("Docker image Manifest V 2, Schema 2 not support zstd.")),
+                    CompressType::Zstd => return Err(anyhow!("Docker image Manifest V 2, Schema 2 not support zstd.")),
                 };
                 docker.layers.insert(
                     0,
@@ -140,9 +140,9 @@ pub fn ociv1_to_dockerv2s2(media_type: &str) -> Result<String> {
     } else if media_type == RegContentType::OCI_LAYER_TAR.val()
         || media_type == RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.val()
     {
-        return Err(Error::msg(format!("docker not support tar layer,source type:{}", media_type)));
+        return Err(anyhow!("docker not support tar layer,source type:{}", media_type));
     } else {
-        return Err(Error::msg(format!("error oci layer type:{}", media_type)));
+        return Err(anyhow!("error oci layer type:{}", media_type));
     };
     Ok(new_media_type.val().to_string())
 }
@@ -153,7 +153,7 @@ pub fn dockerv2s2_to_ociv1(media_type: &str) -> Result<String> {
     } else if media_type == RegContentType::DOCKER_FOREIGN_LAYER_TGZ.val() {
         RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ
     } else {
-        return Err(Error::msg(format!("error docker layer type:{}", media_type)));
+        return Err(anyhow!("error docker layer type:{}", media_type));
     };
     Ok(new_media_type.val().to_string())
 }

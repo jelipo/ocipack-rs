@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use sha2::{Digest, Sha256};
 
 use crate::adapter::SourceInfo;
@@ -61,7 +61,7 @@ pub fn pull(
             layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str()).expect("internal error");
         let layer_compress_type = RegContentType::compress_type(manifest_layer.media_type)?;
         let digest = RegDigest::new_with_digest(manifest_layer.digest.to_string());
-        let download_path = download_result.file_path.as_ref().ok_or_else(|| Error::msg("can not found download file"))?;
+        let download_path = download_result.file_path.as_ref().ok_or_else(|| anyhow!("can not found download file"))?;
         // 计算解压完的tar的sha256值
         let mut download_file = File::open(download_path)?;
         let mut sha256_encode = Sha256::new();

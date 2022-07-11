@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use tar::Builder;
 
 use crate::adapter::docker::DockerfileAdapter;
@@ -125,7 +125,7 @@ fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<Pa
         for source_path_str in &copyfile.source_path {
             let source_path = PathBuf::from(&source_path_str);
             if !source_path.exists() {
-                return Err(Error::msg(format!("path not found:{}", source_path_str)));
+                return Err(anyhow!("path not found:{}", source_path_str));
             }
             let dest_path = if copyfile.dest_path.ends_with('/') {
                 &copyfile.dest_path[1..]
@@ -133,7 +133,7 @@ fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<Pa
                 &copyfile.dest_path
             };
             if source_path.is_file() {
-                let file_name = source_path.file_name().ok_or_else(|| Error::msg("error file name"))?.to_string_lossy();
+                let file_name = source_path.file_name().ok_or_else(|| anyhow!("error file name"))?.to_string_lossy();
                 let dest_file_path = PathBuf::from(dest_path).join(file_name.to_string()).to_string_lossy().to_string();
                 dbg!(&dest_file_path);
                 let mut sourcefile = File::open(source_path)?;
@@ -141,7 +141,7 @@ fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<Pa
             } else if source_path.is_dir() {
                 tar_builder.append_dir(dest_path, source_path_str)?;
             } else {
-                return Err(Error::msg("copy only support file and dir".to_string()));
+                return Err(anyhow!("copy only support file and dir".to_string()));
             }
         }
     }

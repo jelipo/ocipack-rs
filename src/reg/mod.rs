@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Error, Result};
 use log::debug;
 use reqwest::Method;
 use serde::de::DeserializeOwned;
@@ -118,7 +118,7 @@ impl MyImageManager {
         let accepts = &[RegContentType::OCI_MANIFEST, RegContentType::DOCKER_MANIFEST];
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&path, scope, accepts);
         let response = self.reg_client.simple_request(request)?;
-        let content_type = response.content_type().ok_or_else(|| Error::msg("manifest content-type header not found"))?;
+        let content_type = response.content_type().ok_or_else(|| anyhow!("manifest content-type header not found"))?;
         if RegContentType::DOCKER_MANIFEST.val() == content_type {
             let manifest = serde_json::from_str::<DockerManifest>(&response.string_body())?;
             Ok(Manifest::DockerV2S2(manifest))
@@ -126,12 +126,11 @@ impl MyImageManager {
             let manifest = serde_json::from_str::<OciManifest>(&response.string_body())?;
             Ok(Manifest::OciV1(manifest))
         } else {
-            let msg = format!(
+            Err(anyhow!(
                 "unknown content-type:{},body:{}",
                 content_type.to_string(),
                 response.string_body()
-            );
-            Err(Error::msg(msg))
+            ))
         }
     }
 
@@ -238,7 +237,7 @@ fn exited(simple_response: &RawRegistryResponse) -> Result<bool> {
         404 => Ok(false),
         status_code => {
             let msg = format!("request registry error,status code:{}", status_code);
-            Err(Error::msg(msg))
+            Err(anyhow!(msg))
         }
     }
 }
@@ -417,7 +416,7 @@ impl RegContentType {
         {
             Ok(CompressType::Zstd)
         } else {
-            Err(Error::msg("not a layer media type"))
+            Err(anyhow!("not a layer media type"))
         }
     }
 }
@@ -448,7 +447,7 @@ impl FromStr for CompressType {
             "TAR" => Ok(CompressType::Tar),
             "TGZ" => Ok(CompressType::Tgz),
             "ZSTD" => Ok(CompressType::Zstd),
-            _ => Err(Error::msg(format!("unknown compress type:{}", str))),
+            _ => Err(anyhow!("unknown compress type:{}", str)),
         }
     }
 }
