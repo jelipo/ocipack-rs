@@ -21,12 +21,21 @@
 
 因为本工具没有任何Runtime，所以Dockerfile配置项中需要Runtime支持的一律无法正常支持。<br>
 `为了便于上手使用，本工具只是使用常见的Dockerfile作为配置文件，但并不是完全兼容Dockerfile`<br>
-支持的配置项：`FROM`,`LABEL`,`CMD`,`COPY`,`ENV`,`USER`,`WORKDIR`,`EXPOSE`。<br>
-暂不支持但未来会支持：`ADD`(暂时用COPY代替),`ENTRYPOINT`,`VOLUME`。<br>
-不会支持：`ARG`,`RUN`,`MAINTAINER`。<br>
+|  | Filed |
+|-|-|
+| 支持的配置项 | `FROM` `LABEL` `CMD` `COPY` `ENV` `USER` `WORKDIR` `EXPOSE` |
+| 暂不支持但未来会支持| `ADD`(暂时用COPY代替) `ENTRYPOINT` `VOLUME` |
+| 不会支持 | `ARG` `RUN``MAINTAINER` |
 
 <br>
-目前的Image Manifest主流为Docker，但是Docker Manifest格式也分为多个版本，本工具对于Docker格式只支持`Image Manifest V 2, Schema 2`，对于老版本的`Image Manifest V 2, Schema 1`不支持，也不计划进行支持。
+
+目前的Image Manifest主流为Docker，但是Docker Manifest格式也分为多个版本，本工具对于Docker格式只支持`Image Manifest V 2, Schema 2` ，对于老版本的`Image Manifest V 2, Schema 1` 不支持，也不计划进行支持。
+
+| 版本 | 是否支持 |
+|-|-|
+| `Image Manifest V 2, Schema 2` | ✅  |
+| `Image Manifest V 2, Schema 1` | ❌ |
+| `OCI Image Manifest` | ✅ |
 
 ## 功能
 
@@ -101,7 +110,7 @@ export MY_PASSWORD_ENV=password
 此功能主要是为了 Docker和OCI 之间的转换。主要命令跟`build`子命令大同小异，可以参考上面的`构建（Build）`。<br>
 可以使用`ocipack-rs build -h`查看详情。<br>
 
-### TODO
+### 挖坑
 - 支持导出或者导入本地的容器引擎。
 - 更多的Dockerfile配置项。
 - 创建新Image时提供 使用`zstd`压缩所有layer。
