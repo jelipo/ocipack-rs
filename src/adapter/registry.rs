@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use dockerfile_parser::{Dockerfile, Instruction};
 use log::{debug, info};
-use reqwest::StatusCode;
 
 use crate::adapter::{ImageInfo, TargetImageAdapter, TargetInfo};
 use crate::config::cmd::{BaseAuth, TargetFormat};

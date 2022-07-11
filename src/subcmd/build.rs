@@ -5,19 +5,19 @@ use anyhow::{anyhow, Result};
 use log::info;
 use tar::Builder;
 
+use crate::{GLOBAL_CONFIG, HomeDir};
+use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
-use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
+use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::reg::home::{LocalLayer, TempLayerInfo};
 use crate::reg::manifest::Manifest;
 use crate::reg::proxy::ProxyInfo;
-use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
-use crate::util::sha::{Sha256Reader, Sha256Writer};
 use crate::util::{compress, random};
-use crate::{HomeDir, GLOBAL_CONFIG};
+use crate::util::sha::{Sha256Reader, Sha256Writer};
 
 pub struct BuildCommand {}
 
@@ -40,20 +40,28 @@ impl BuildCommand {
 }
 
 fn print_build_success(build_args: &BuildCmdArgs) {
-    println!(r#"
+    println!(
+        r#"
 Build job successful!
 
 Target image:
 {}
-"#, match &build_args.target { TargetType::Registry(r) => r });
+"#,
+        match &build_args.target {
+            TargetType::Registry(r) => r,
+        }
+    );
 }
 
 fn print_build_failed(err: anyhow::Error) {
-    println!(r#"
+    println!(
+        r#"
 Build job failed!
 
 {}
-"#, err);
+"#,
+        err
+    );
 }
 
 fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
@@ -193,7 +201,7 @@ fn compress_layer_file(tar_file_path: &Path, home_dir: &HomeDir, compress_type: 
     })
 }
 
-fn build_target_config_blob(
+pub fn build_target_config_blob(
     build_info: BuildInfo,
     source_config_blob: &ConfigBlobEnum,
     temp_layer_opt: Option<&TempLayerInfo>,
@@ -225,7 +233,7 @@ fn build_target_config_blob(
     target_config_blob
 }
 
-fn build_target_manifest(
+pub fn build_target_manifest(
     source_manifest: Manifest,
     target_format: &TargetFormat,
     temp_local_layer: Option<LocalLayer>,

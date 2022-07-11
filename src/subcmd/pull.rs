@@ -31,7 +31,10 @@ pub fn pull(
         image_name: &image_info.image_name,
         reference: image_info.reference.as_str(),
     };
-    info!("From image info. host='{}' name='{}' reference='{}'",image_host,&image_info.image_name,image_info.reference);
+    info!(
+        "Source image info. host='{}' name='{}' reference='{}'",
+        image_host, &image_info.image_name, image_info.reference
+    );
     let registry_auth = source_auth.get_auth()?;
     let info = RegistryCreateInfo {
         auth: registry_auth,
@@ -39,12 +42,15 @@ pub fn pull(
         proxy,
     };
     let mut from_registry = Registry::open(use_https, image_host, info)?;
-    info!("Get from image manifest info.");
+    info!("Get source image manifest info.");
     let manifest = from_registry.image_manager.manifests(&from_image_reference)?;
-    info!("From image type: {}", match manifest {
-        Manifest::OciV1(_) => "OCI",
-        Manifest::DockerV2S2(_) => "Docker V2,Schema2"
-    });
+    info!(
+        "Source image type: {}",
+        match manifest {
+            Manifest::OciV1(_) => "OCI",
+            Manifest::DockerV2S2(_) => "Docker V2,Schema2",
+        }
+    );
     let config_digest = manifest.config_digest();
     let layers = manifest.layers();
     let mut reg_downloader_vec = Vec::<Box<dyn Processor<DownloadResult>>>::new();

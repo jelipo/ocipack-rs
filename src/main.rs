@@ -12,10 +12,11 @@ use home::home_dir;
 
 use crate::config::cmd::CmdArgs;
 use crate::config::global::GlobalAppConfig;
-use crate::reg::CompressType;
 use crate::reg::home::HomeDir;
+use crate::reg::CompressType;
 use crate::subcmd::build::BuildCommand;
 use crate::subcmd::clean::CleanCommand;
+use crate::subcmd::transform::TransformCommand;
 
 mod adapter;
 mod bar;
@@ -39,7 +40,9 @@ fn main() -> Result<()> {
         CmdArgs::Build(build_args) => {
             BuildCommand::build(build_args)?;
         }
-        CmdArgs::Transform => {}
+        CmdArgs::Transform(transform_args) => {
+            TransformCommand::transform(transform_args)?;
+        }
         CmdArgs::Clean(clean_args) => {
             CleanCommand::clean(clean_args)?;
         }

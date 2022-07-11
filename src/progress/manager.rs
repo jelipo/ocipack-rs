@@ -36,6 +36,7 @@ impl<R: ProcessResult> ProcessorManager<R> {
     }
 
     pub fn wait_all_done(mut self) -> Result<Vec<R>> {
+        println!();
         let mut statuses = self.statuses;
         let mut result_infos = Vec::<R>::new();
         while !statuses.is_empty() {
@@ -59,6 +60,7 @@ impl<R: ProcessResult> ProcessorManager<R> {
             statuses = new_status;
             sleep(Duration::from_secs(1));
         }
+        println!();
         Ok(result_infos)
     }
 }

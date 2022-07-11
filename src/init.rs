@@ -1,7 +1,7 @@
-use std::io::Write;
 use anyhow::Result;
 use chrono::Local;
 use env_logger::Env;
+use std::io::Write;
 
 /// 整个App初始化方法
 pub fn init() -> Result<()> {

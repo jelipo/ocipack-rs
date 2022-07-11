@@ -9,13 +9,16 @@ use url::Url;
 use crate::reg::proxy::{ProxyAuth, ProxyInfo};
 
 #[derive(Parser)]
-#[clap(about = "Fast build docker/oci image", version, author = "jelipo(github.com/jelipo)")]
+#[clap(about = "Fast build docker/oci image", version, author = "jelipo (github.com/jelipo)")]
 pub enum CmdArgs {
     /// Build a new image and push to registry.
     Build(Box<BuildCmdArgs>),
-    /// 转换Image的格式，目前支持 Docker(V2S2) 和 OCI 的互相转换
-    Transform,
-    /// Clean cache dir
+
+    /// Convert OCI and docker image to each other{n}
+    /// Docker format only support V2,Schema2
+    Transform(Box<TransformCmdArgs>),
+
+    /// Clean cache dir.
     Clean(CleanCmdArgs),
 }
 
@@ -28,6 +31,14 @@ pub struct CleanCmdArgs {
     /// Clean temp dir.
     #[clap(long, short, parse(from_flag))]
     pub temp: bool,
+
+    /// Clean blob dir.
+    #[clap(long, short, parse(from_flag))]
+    pub blob: bool,
+
+    /// Clean download dir.
+    #[clap(long, short, parse(from_flag))]
+    pub download: bool,
 }
 
 #[derive(clap::Args)]
@@ -41,8 +52,8 @@ pub struct BuildCmdArgs {
     pub target_allow_insecure: bool,
 
     /// Source type.
-    /// Support dockerfile,cmd type
-    /// Example:'dockerfile:/path/to/.Dockerfile','cmd:my.reg.com/source/image:1.0'
+    /// Support dockerfile type
+    /// Example:'dockerfile:/path/to/.Dockerfile'
     #[clap(long, short)]
     pub source: SourceType,
 
@@ -79,6 +90,52 @@ pub struct BuildCmdArgs {
     /// [OPTION] Compress files using zstd.
     #[clap(long, parse(from_flag))]
     pub use_zstd: bool,
+}
+
+#[derive(clap::Args)]
+pub struct TransformCmdArgs {
+    /// Allow insecure registry
+    #[clap(long, short, parse(from_flag))]
+    pub allow_insecure: bool,
+
+    /// Allow target insecure registry
+    #[clap(long, parse(from_flag))]
+    pub target_allow_insecure: bool,
+
+    /// Source image.
+    /// Example:'my.reg.com/source/image:1.0'
+    #[clap(long, short)]
+    pub source_image: String,
+
+    /// [OPTION] Auth of pull source image. Example:'myname:mypass','myname:${MY_PASSWORD_ENV}'
+    #[clap(long)]
+    pub source_auth: Option<BaseAuth>,
+
+    /// [OPTION] Proxy of pull source image. Example:'socks5://127.0.0.1:1080','http://name:pass@example:8080'
+    #[clap(long)]
+    pub source_proxy: Option<ProxyInfo>,
+
+    /// Target type.
+    /// Support 'registry'
+    /// Example:'registry:my.reg.com/target/image:1.1'
+    #[clap(long, short)]
+    pub target: TargetType,
+
+    /// [OPTION] Auth of push target image. Example:'myname:mypass','myname:${MY_PASSWORD_ENV}'
+    #[clap(long)]
+    pub target_auth: Option<BaseAuth>,
+
+    /// [OPTION] Proxy of push target image. Example:'socks5://127.0.0.1:1080','http://name:pass@example:8080'
+    #[clap(long)]
+    pub target_proxy: Option<ProxyInfo>,
+
+    /// Target format type. Support 'docker' and 'oci'.
+    #[clap(long, short)]
+    pub format: TargetFormat,
+
+    /// [OPTION] Connection timeout in seconds.
+    #[clap(long, default_value = "600")]
+    pub conn_timeout: u64,
 }
 
 #[derive(Clone)]

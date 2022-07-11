@@ -19,7 +19,11 @@ impl DockerfileAdapter {
         let mut dockerfile_file = File::open(path)?;
         let mut str_body = String::new();
         let _read_size = dockerfile_file.read_to_string(&mut str_body)?;
-        let dockerfile = Dockerfile::parse(&str_body)?;
+        Self::parse_from_str(&str_body)
+    }
+
+    pub fn parse_from_str(str_body: &str) -> Result<(SourceInfo, BuildInfo)> {
+        let dockerfile = Dockerfile::parse(str_body)?;
         let stages = dockerfile.stages().stages;
         if stages.len() != 1 {
             return Err(anyhow!("only support one stage in Dockerfile"));

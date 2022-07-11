@@ -1,6 +1,6 @@
 [package]
 name = "ocipack-rs"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -30,7 +30,7 @@ rand = "0.8"
 url = "2.2"
 home = "0.5"
 base64 = "0.13"
-clap = { version = "3.2.5", features = ["derive"] }
+clap = { version = "3.2.8", features = ["derive"] }
 dockerfile-parser = "0.8.0"
 derive_builder = "0.11"
 zstd = "0.11"

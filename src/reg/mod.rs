@@ -396,7 +396,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -405,14 +405,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -435,7 +435,7 @@ impl ToString for CompressType {
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
         }
-            .to_string()
+        .to_string()
     }
 }
 
