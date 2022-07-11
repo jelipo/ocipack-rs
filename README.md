@@ -3,7 +3,8 @@
 一个可以快速构建 OCI/Docker 镜像的工具
 
 ## 特性
-- 在没有`Docker/Containerd`等容器环境下构建简单镜像
+- 在没有`Docker/Containerd`等容器引擎环境下构建简单镜像
+- 兼容Dockerfile大部分配置项
 - 支持OCI和Docker格式，并支持互相转换
 - 支持`Pull和Push`时使用 `socks5/http` 代理
 - 一个单独的二进制，体积小
