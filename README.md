@@ -19,7 +19,7 @@
 - 居家办公需要连接VPN到组织的网络中，但是Windows和MacOS使用虚拟机运行`Docker`，这意味着虚拟机中的`Docker`无法通过宿主的VPN网络`Pull和Push`。
 - `Linux`服务器上，`Docker`/`Containerd` 等引擎在构建时拉取公共镜像因为众所周知的原因速度非常慢。即使有`socks5/http`
   代理，但是服务器上可能还有正在运行的容器化进程，配置代理意味着重启，且整个容器引擎都会走代理，一般是不可接受的，况且频繁配置也很麻烦。
-- `CI/CD`环境中，你可能可以使用`Docker多步构建`、`CI工具提供的环境`构建一个镜像并打包成`Image`并上传到`Registry`中。<br>
+- `CI/CD`环境中，你可能可以使用`Docker多阶段构建`、`CI工具提供的环境`构建一个镜像并打包成`Image`并上传到`Registry`中。<br>
   通常这是两个步骤:`构建产物`和`构建成Image并Push`，但是有时候CI环境并不如我们的意(可能没有容器环境、只有`Docker in Docker`等)，而且需要学习每个CI环境来完成我们的这两个步骤。<br>
   如果有一个通用的工具可以把`产物`构建成`Image`并Push到`Registry`就可以大大提升我们对不同CI环境的兼容。
 
@@ -35,6 +35,7 @@
 | 支持的配置项 | `FROM` `LABEL` `CMD` `COPY` `ENV` `USER` `WORKDIR` `EXPOSE` |
 | 暂不支持但未来会支持| `ADD`(可以暂时用COPY代替) `ENTRYPOINT` `VOLUME` |
 | 不会支持 | `ARG` `RUN` `MAINTAINER` |
+| 多阶段构建 | 不支持 |
 
 <br>
 
