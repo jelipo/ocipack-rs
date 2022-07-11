@@ -205,7 +205,7 @@ pub trait RegistryResponse {
 
     fn content_type(&self) -> Option<&str>;
 
-    fn status_code(&self) -> u16;
+    fn status_code(&self) -> StatusCode;
 
     fn string_body(self) -> String;
 }
@@ -228,8 +228,8 @@ impl RegistryResponse for RawRegistryResponse {
         })
     }
 
-    fn status_code(&self) -> u16 {
-        self.response.status().as_u16()
+    fn status_code(&self) -> StatusCode {
+        self.response.status()
     }
 
     fn string_body(mut self) -> String {

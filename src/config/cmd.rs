@@ -9,12 +9,25 @@ use url::Url;
 use crate::reg::proxy::{ProxyAuth, ProxyInfo};
 
 #[derive(Parser)]
-#[clap(about = "An image tool", version, author = "jelipo <me@jelipo.com>")]
+#[clap(about = "Fast build docker/oci image", version, author = "jelipo(github.com/jelipo)")]
 pub enum CmdArgs {
-    /// 构建一个新的Image
-    Build(BuildCmdArgs),
+    /// Build a new image and push to registry.
+    Build(Box<BuildCmdArgs>),
     /// 转换Image的格式，目前支持 Docker(V2S2) 和 OCI 的互相转换
     Transform,
+    /// Clean cache dir
+    Clean(CleanCmdArgs),
+}
+
+#[derive(clap::Args)]
+pub struct CleanCmdArgs {
+    /// Clean all file.
+    #[clap(long, short, parse(from_flag))]
+    pub all: bool,
+
+    /// Clean temp dir.
+    #[clap(long, short, parse(from_flag))]
+    pub temp: bool,
 }
 
 #[derive(clap::Args)]

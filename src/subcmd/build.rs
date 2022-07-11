@@ -24,16 +24,36 @@ pub struct BuildCommand {}
 impl BuildCommand {
     pub fn build(build_args: &BuildCmdArgs) -> Result<()> {
         let (source_info, build_info, source_auth) = build_source_info(build_args)?;
-        handle(
+        match handle(
             source_info,
             build_info,
             source_auth,
             build_args,
             build_args.source_proxy.clone(),
             build_args.use_zstd,
-        )?;
+        ) {
+            Ok(_) => print_build_success(build_args),
+            Err(err) => print_build_failed(err),
+        }
         Ok(())
     }
+}
+
+fn print_build_success(build_args: &BuildCmdArgs) {
+    println!(r#"
+Build job successful!
+
+Target image:
+{}
+"#, match &build_args.target { TargetType::Registry(r) => r });
+}
+
+fn print_build_failed(err: anyhow::Error) {
+    println!(r#"
+Build job failed!
+
+{}
+"#, err);
 }
 
 fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
@@ -89,6 +109,7 @@ fn handle(
     let source_manifest = pull_result.manifest;
 
     let target_config_blob_serialize = target_config_blob.serialize()?;
+    info!("Build a new target manifest.");
     let target_manifest = build_target_manifest(
         source_manifest,
         &build_cmds.format,
@@ -118,6 +139,7 @@ fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<Pa
     if copyfiles.is_empty() {
         return Ok(None);
     }
+    info!("Building new tar...");
     let tar_file_name = random::random_str(10) + ".tar";
     let tar_temp_file_path = home_dir.cache.temp_dir.join(tar_file_name);
     let tar_temp_file = File::create(tar_temp_file_path.as_path())?;
@@ -136,7 +158,6 @@ fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<Pa
             if source_path.is_file() {
                 let file_name = source_path.file_name().ok_or_else(|| anyhow!("error file name"))?.to_string_lossy();
                 let dest_file_path = PathBuf::from(dest_path).join(file_name.to_string()).to_string_lossy().to_string();
-                dbg!(&dest_file_path);
                 let mut sourcefile = File::open(source_path)?;
                 tar_builder.append_file(dest_file_path, &mut sourcefile)?;
             } else if source_path.is_dir() {
@@ -147,6 +168,7 @@ fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<Pa
         }
     }
     tar_builder.finish()?;
+    info!("Build tar complete");
     Ok(Some(tar_temp_file_path))
 }
 
@@ -158,11 +180,11 @@ fn compress_layer_file(tar_file_path: &Path, home_dir: &HomeDir, compress_type: 
     let compress_file_path = home_dir.cache.temp_dir.join(compress_file_name);
     let compress_file = File::create(&compress_file_path)?;
     let mut sha256_writer = Sha256Writer::new(compress_file);
-    info!("compressing tar...   type:{}", compress_type.to_string());
+    info!("Compressing tar...  (compress-type={})", compress_type.to_string());
     compress::compress(compress_type, &mut sha256_reader, &mut sha256_writer)?;
     let tar_sha256 = sha256_reader.sha256()?;
     let compressed_tar_sha256 = sha256_writer.sha256()?;
-    info!("compress complete. sha256:{:?}", compressed_tar_sha256);
+    info!("Compress complete. (sha256={})", compressed_tar_sha256);
     Ok(TempLayerInfo {
         compressed_tar_sha256,
         tar_sha256,

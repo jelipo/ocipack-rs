@@ -102,10 +102,12 @@ impl RegistryTargetAdapter {
         reg_uploader_vec.push(Box::new(config_blob_uploader));
         //
         let process_manager = ProcessorManager::new_processor_manager(reg_uploader_vec)?;
+        info!("Start pushing... (total={})", process_manager.size());
         let upload_results = process_manager.wait_all_done()?;
         for upload_result in upload_results {
-            debug!("upload done : {}", &upload_result.finished_info());
+            debug!("Upload done: {}", &upload_result.finished_info());
         }
+        info!("Putting manifest...");
         let (status_code, body) = manager.put_manifest(
             &Reference {
                 image_name: target_info.image_info.image_name.as_str(),
@@ -113,11 +115,11 @@ impl RegistryTargetAdapter {
             },
             target_manifest,
         )?;
-        if StatusCode::from_u16(status_code).is_ok() {
-            info!("upload image success");
+        if status_code.is_success() {
+            info!("Upload image finished.");
+            Ok(())
         } else {
-            info!("upload image failed\nHTTP code:{}\nbody:{}", status_code, body);
+            Err(anyhow!("put manifest failed\nHTTP code:{}\nbody:{}", status_code, body))
         }
-        Ok(())
     }
 }

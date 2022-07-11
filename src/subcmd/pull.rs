@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 
 use anyhow::{anyhow, Result};
+use log::info;
 use sha2::{Digest, Sha256};
 
 use crate::adapter::SourceInfo;
@@ -30,7 +31,7 @@ pub fn pull(
         image_name: &image_info.image_name,
         reference: image_info.reference.as_str(),
     };
-
+    info!("From image info. host='{}' name='{}' reference='{}'",image_host,&image_info.image_name,image_info.reference);
     let registry_auth = source_auth.get_auth()?;
     let info = RegistryCreateInfo {
         auth: registry_auth,
@@ -38,8 +39,12 @@ pub fn pull(
         proxy,
     };
     let mut from_registry = Registry::open(use_https, image_host, info)?;
-
+    info!("Get from image manifest info.");
     let manifest = from_registry.image_manager.manifests(&from_image_reference)?;
+    info!("From image type: {}", match manifest {
+        Manifest::OciV1(_) => "OCI",
+        Manifest::DockerV2S2(_) => "Docker V2,Schema2"
+    });
     let config_digest = manifest.config_digest();
     let layers = manifest.layers();
     let mut reg_downloader_vec = Vec::<Box<dyn Processor<DownloadResult>>>::new();
@@ -49,8 +54,8 @@ pub fn pull(
             from_registry.image_manager.layer_blob_download(from_image_reference.image_name, &digest, Some(layer.size))?;
         reg_downloader_vec.push(Box::new(downloader))
     }
-
     let manager = ProcessorManager::new_processor_manager(reg_downloader_vec)?;
+    info!("Start pulling... (total={})", manager.size());
     let download_results = manager.wait_all_done()?;
     let layer_digest_map = layer_to_map(&layers);
     for download_result in &download_results {
@@ -80,6 +85,7 @@ pub fn pull(
             from_registry.image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, config_digest)?,
         ),
     };
+
     Ok(PullResult {
         config_blob: config_blob_enum,
         manifest,

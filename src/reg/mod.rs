@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Error, Result};
 use log::debug;
-use reqwest::Method;
+use reqwest::{Method, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 use url::Url;
@@ -198,7 +198,7 @@ impl MyImageManager {
         Ok(url)
     }
 
-    pub fn put_manifest(&mut self, refe: &Reference, manifest: Manifest) -> Result<(u16, String)> {
+    pub fn put_manifest(&mut self, refe: &Reference, manifest: Manifest) -> Result<(StatusCode, String)> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
         let response = match manifest {
@@ -232,7 +232,7 @@ impl MyImageManager {
 }
 
 fn exited(simple_response: &RawRegistryResponse) -> Result<bool> {
-    match simple_response.status_code() {
+    match simple_response.status_code().as_u16() {
         200..300 => Ok(true),
         404 => Ok(false),
         status_code => {
@@ -396,7 +396,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -405,14 +405,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -435,7 +435,7 @@ impl ToString for CompressType {
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
         }
-        .to_string()
+            .to_string()
     }
 }
 

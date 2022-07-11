@@ -1,4 +1,6 @@
+use std::io::Write;
 use anyhow::Result;
+use chrono::Local;
 use env_logger::Env;
 
 /// 整个App初始化方法
@@ -11,5 +13,15 @@ pub fn init() -> Result<()> {
 /// 初始化日志
 fn log_init() {
     let env = Env::default().default_filter_or("info");
-    env_logger::init_from_env(env);
+    env_logger::Builder::from_env(env)
+        .format(|fmt, record| {
+            writeln!(
+                fmt,
+                "[{} {}] {}",
+                Local::now().format("%H:%M:%S%.3f"),
+                record.level(),
+                &record.args()
+            )
+        })
+        .init();
 }
