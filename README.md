@@ -1,9 +1,8 @@
 # ocipack-rs
 
-
-
 <div align="center">
-一个可以快速构建 OCI/Docker 镜像的工具<br><br><br>
+<br>
+一个可以快速构建 OCI/Docker 镜像的工具<br><br>
 
 ![GitHub last commit](https://img.shields.io/github/last-commit/jelipo/ocipack-rs)
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/jelipo/ocipack-rs)
@@ -19,12 +18,17 @@
 
 ## 特性
 - 在没有`Docker/Containerd`等容器引擎环境下构建简单镜像
-- 兼容Dockerfile大部分配置项
-- 支持OCI和Docker格式，并支持互相转换
+- 兼容 Dockerfile 大部分配置项
+- 支持 OCI 和 Docker 格式，并支持互相转换
 - 支持`Pull和Push`时使用 `socks5/http` 代理
-- 一个单独的二进制，体积小
-- 支持 `Windows` `MacOS` `Linux`
-- 支持zstd压缩
+- 一个单独的二进制，体积小，Linux下无依赖
+- 支持 `Windows` `MacOS` `Linux` 三个平台的使用
+- 支持性能非常好的`zstd`解压缩算法
+
+## 下载
+```
+curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-rs-0.3.0-amd64_linux.tar | tar xv
+```
 
 ## 简介
 
@@ -46,7 +50,7 @@
 因为本工具没有任何Runtime，所以Dockerfile配置项中需要Runtime支持的一律无法正常支持。<br>
 `为了便于上手使用，本工具只是使用常见的Dockerfile作为配置，降低使用门槛，但并不是完全兼容Dockerfile`<br>
 |  | Filed |
-|-|-|
+| :---: | :---: |
 | 支持的配置项 | `FROM` `LABEL` `CMD` `COPY` `ENV` `USER` `WORKDIR` `EXPOSE` |
 | 暂不支持但未来会支持| `ADD`(可以暂时用COPY代替) `ENTRYPOINT` `VOLUME` |
 | 不会支持 | `ARG` `RUN` `MAINTAINER` |
@@ -57,14 +61,14 @@
 目前的Image Manifest主流为Docker，但是Docker Manifest格式也分为多个版本，本工具对于Docker格式只支持`Image Manifest V 2, Schema 2` ，对于老版本的`Image Manifest V 2, Schema 1` 不支持，也不计划进行支持。
 
 | 版本 | 是否支持 |
-|-|-|
+| :---: | :---: |
 | `Image Manifest V 2, Schema 2` | ✅  |
 | `Image Manifest V 2, Schema 1` | ❌ |
 | `OCI Image Manifest` | ✅ |
 
 ## 功能
 
-### 构建（Build）
+## 构建（Build）
 
 最主要的功能，拉取Base Image，然后把文件COPY进Image，然后Push。<br>
 使用`ocipack-rs build`子命令。
@@ -170,20 +174,22 @@ my.harbor.com/jelipo/demo:v1
 如果你的`FROM image`需要代理才能访问或者加速拉取，可以设置`--source-proxy`选项。
 
 
-### 转换(Transform)
+## 转换(Transform)
 
 此功能主要是为了 Docker和OCI 之间的转换。主要命令跟`build`子命令大同小异，可以参考上面的`构建（Build）`。<br>
 可以使用`ocipack-rs build -h`查看详情。<br>
 
-### 清理缓存(Clean)
+## 清理缓存(Clean)
 因为无论Pull还是Push，都会需要暂存文件在本地中，一边下次Pull加速。
 
 可以使用`ocipack-rs clean`子命令清理本地的缓存文件夹，可以使用`ocipack-rs clean -h`查看更多参数选项。
+<br>
 
-### 挖坑
+## 挖坑
 - 支持导出或者导入本地的容器引擎。
 - 更多的Dockerfile配置项。
 - 创建新Image时提供 使用`zstd`压缩所有layer。
+<br>
 
-### 最后
+## 最后
 本工具目前属于个人开发使用阶段，虽然基本功能自测没有问题，但是还没有稳定，不建议在重要环境使用。
