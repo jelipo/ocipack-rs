@@ -1,6 +1,21 @@
 # ocipack-rs
 
-一个可以快速构建 OCI/Docker 镜像的工具
+
+
+<div align="center">
+一个可以快速构建 OCI/Docker 镜像的工具<br><br><br>
+
+![GitHub last commit](https://img.shields.io/github/last-commit/jelipo/ocipack-rs)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/jelipo/ocipack-rs)
+![GitHub all releases](https://img.shields.io/github/downloads/jelipo/ocipack-rs/total)
+![GitHub repo size](https://img.shields.io/github/repo-size/jelipo/ocipack-rs)
+[![Github Release Publish Status](https://img.shields.io/github/workflow/status/jelipo/ocipack-rs/Rust)](https://github.com/jelipo/ocipack-rs/actions)
+[![License](https://img.shields.io/github/license/jelipo/ocipack-rs)](https://github.com/jelipo/ocipack-rs)
+
+
+
+
+</div>
 
 ## 特性
 - 在没有`Docker/Containerd`等容器引擎环境下构建简单镜像
