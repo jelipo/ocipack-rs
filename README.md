@@ -93,8 +93,13 @@
 ```
 
 #### 样例
+我们先假设好样例条件：
+- 我们要把一个文件 COPY 进Image中，run image 时打印此文件的内容，Image的名称为`my.harbor.com/jelipo/demo:v1`。
+- `my.harbor.com`是我们的`Image Registry`，并且没有使用`HTTPS`，而是使用了`HTTP`，因为默认`Image Registry`是`HTTPS`的，所以需要手动指定`--target-allow-insecure`。
+- 我们想让新Image使用`OCI`格式。
+- 我们不想让密码出现在history中，所以我们计划从环境变量中获取上传到`Image Registry`的密码。（以下`export MY_PASSWORD_ENV`只是演示用，实际设置环境变量的方式根据自己实际情况设置）
 
-创建`Dockerfile`:
+接着创建一个`Dockerfile`文件，这个`Dockerfile`既是我们构建Image的配置文件，也是我们计划run image时打印内容的文件。写入以下内容:
 
 ```
 FROM ubuntu:22.04
@@ -102,11 +107,11 @@ COPY Dockerfile /root/
 CMD cat /root/Dockerfile
 ```
 
-假设`my.harbor.com`是个`HTTP`网站，没有使用`HTTPS`。新Image使用`OCI`格式。<br>
-运行：
+接着运行以下命令：
 
 ```bash
 export MY_PASSWORD_ENV=password
+
 ./ocipack-rs build \
   --source=dockerfile:./Dockerfile \
   --target=registry:my.harbor.com/jelipo/demo:v1 \
@@ -115,10 +120,50 @@ export MY_PASSWORD_ENV=password
   --format=oci
 ```
 
+如果顺利，将会输出:
+```
+[14:19:31.830 INFO] Source image info. host='registry-1.docker.io' name='library/ubuntu' reference='22.04'
+[14:19:31.830 INFO] Get source image manifest info.
+[14:19:35.785 INFO] Source image type: Docker V2,Schema2
+[14:19:35.785 INFO] Start pulling... (total=1)
+
+405f018f9d1d    29.01MiB / 29.01MiB     √   complete
+
+[14:22:10.683 INFO] Building new tar...
+[14:22:10.683 INFO] Build tar complete
+[14:22:10.683 INFO] Compressing tar...  (compress-type=TGZ)
+[14:22:10.683 INFO] Compress complete. (sha256=ef35529d1fe64b5c5e3f2705dc953b224729963c40519fe0bf427a6744a343dd)
+[14:22:10.683 INFO] Build a new target manifest.
+[14:22:11.510 INFO] Start pushing... (total=3)
+
+ef35529d1fe6        160B / 160B         √   succuss
+405f018f9d1d    29.01MiB / 29.01MiB     √   blob exists in registry
+6718bd7ae33c        854B / 854B         √   succuss
+
+[14:22:12.510 INFO] Putting manifest...
+[14:22:12.557 INFO] Upload image finished.
+
+Build job successful!
+
+Target image:
+my.harbor.com/jelipo/demo:v1
+
+```
+当看到`Build job successful`字样时，说明我们已经构建完成并上传到了`Registry`。
+
+##### 可能遇到的问题
+如果你的`FROM image`需要代理才能访问或者加速拉取，可以设置`--source-proxy`选项。
+
+
 ### 转换(Transform)
 
 此功能主要是为了 Docker和OCI 之间的转换。主要命令跟`build`子命令大同小异，可以参考上面的`构建（Build）`。<br>
 可以使用`ocipack-rs build -h`查看详情。<br>
+
+### 清理缓存(Clean)
+因为无论Pull还是Push，都会需要暂存文件在本地中，一边下次Pull加速。
+
+可以使用`ocipack-rs clean`子命令清理本地的缓存文件夹，可以使用`ocipack-rs clean -h`查看更多参数选项。
 
 ### 挖坑
 - 支持导出或者导入本地的容器引擎。
