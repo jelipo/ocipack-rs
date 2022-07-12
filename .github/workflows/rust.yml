@@ -10,17 +10,17 @@ env:
 
 jobs:
   build-amd64-linux:
-    runs-on: ubuntu-18.04
-    container: 'centos:centos7.9.2009'
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
-      - name: Install gcc
-        run: yum install gcc make -y
+      - name: Install musl
+        run: yum install musl musl-dev make -y
       - name: Set env
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
         with:
+          target: x86_64-unknown-linux-musl
           toolchain: nightly
           override: true
           components: rustfmt, clippy
@@ -28,7 +28,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release
+          args: --release --target=x86_64-unknown-linux-musl
       - name: Rename
         run: cp ./target/release/ocipack-rs ./target/release/ocipack-rs-${{ env.RELEASE_VERSION }}-amd64_linux
       - name: Release
