@@ -21,7 +21,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           target: x86_64-unknown-linux-musl
-          toolchain: nightly
+          toolchain: nightly-x86_64-unknown-linux-musl
           override: true
           components: rustfmt, clippy
       - name: Run cargo build
