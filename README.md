@@ -30,7 +30,7 @@
 在 Linux 和 MacOS 下载：
 
 ```
-curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-rs-0.3.0-amd64_$(uname).tar.tgz | tar xzv
+curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-rs-0.3.0-amd64_$(uname).tar.gz | tar xzv
 #
 ```
 

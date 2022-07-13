@@ -35,7 +35,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ./ocipack-rs-${{ env.RELEASE_VERSION }}-amd64_linux.tar
+          files: ./ocipack-rs-${{ env.RELEASE_VERSION }}-amd64_linux.tar.gz
   build-amd64-windows:
     runs-on: windows-latest
     steps:
