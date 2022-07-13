@@ -31,9 +31,13 @@
 
 ```
 curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-rs-0.3.0-amd64_$(uname).tar.gz | tar xzv
-#
 ```
 
+把下载解压完成的 `ocipack-rs` 放到 `/usr/local/bin/` （可选操作）
+
+```
+cp ocipack-rs /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack-rs
+```
 ## 简介
 
 作者在学习云原生和写代码的时候，经常需要构建一个简单的镜像，但是有时候会因为各种原因导致并不轻松。
