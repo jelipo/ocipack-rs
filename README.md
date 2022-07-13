@@ -18,16 +18,20 @@
 
 ## 特性
 - 在没有`Docker/Containerd`等容器引擎环境下构建简单镜像
-- 兼容 Dockerfile 大部分配置项
-- 支持 OCI 和 Docker 格式，并支持互相转换
-- 支持`Pull和Push`时使用 `socks5/http` 代理
-- 一个单独的二进制，体积小，Linux下无依赖
+- 兼容 Dockerfile 大部分配置项，降低上手难度
+- 支持 OCI 和 Docker 镜像格式，并支持互相转换
+- 支持镜像`Pull和Push`时使用 `socks5/http` 代理
+- 一个单独的二进制，Linux下静态编译无依赖，alpine也可使用
 - 支持 `Windows` `MacOS` `Linux` 三个平台的使用
 - 支持性能非常好的`zstd`解压缩算法
 
 ## 下载
+
+在 Linux 和 MacOS 下载：
+
 ```
-curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-rs-0.3.0-amd64_linux.tar | tar xv
+curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-rs-0.3.0-amd64_linux.tar.tgz | tar xzv
+#
 ```
 
 ## 简介
@@ -35,12 +39,12 @@ curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-rs-
 作者在学习云原生和写代码的时候，经常需要构建一个简单的镜像，但是有时候会因为各种原因导致并不轻松。
 
 - 着急开发，但是没有`Docker/Containerd`等环境。
-- 居家办公需要连接VPN到组织的网络中，但是Windows和MacOS使用虚拟机运行`Docker`，这意味着虚拟机中的`Docker`无法通过宿主的VPN网络`Pull和Push`。
+- 居家办公需要连接VPN到组织的网络中，但是 Windows 和 MacOS 使用虚拟机运行`Docker`，这意味着虚拟机中的`Docker`无法通过宿主的VPN网络`Pull和Push`镜像。
 - `Linux`服务器上，`Docker`/`Containerd` 等引擎在构建时拉取公共镜像因为众所周知的原因速度非常慢。即使有`socks5/http`
   代理，但是服务器上可能还有正在运行的容器化进程，配置代理意味着重启，且整个容器引擎都会走代理，一般是不可接受的，况且频繁配置也很麻烦。
 - `CI/CD`环境中，你可能可以使用`Docker多阶段构建`、`CI工具提供的环境`构建一个镜像并打包成`Image`并上传到`Registry`中。<br>
-  通常这是两个步骤:`构建产物`和`构建成Image并Push`，但是有时候CI环境并不如我们的意(可能没有容器环境、只有`Docker in Docker`等)，而且需要学习每个CI环境来完成我们的这两个步骤。<br>
-  如果有一个通用的工具可以把`产物`构建成`Image`并Push到`Registry`就可以大大提升我们对不同CI环境的兼容。
+  通常这是两个步骤:`构建产物`和`构建成镜像并Push`，但是有时候CI环境并不如我们的意(可能没有容器环境、只有`Docker in Docker`无法Push 等问题)，而且需要学习每个CI环境来完成我们的这两个步骤。<br>
+  如果有一个通用的工具可以把`产物`构建成镜像并Push到`Registry`就可以大大提升我们对不同CI环境的兼容。
 
 针对以上问题，所以写了一个小工具去解决这些问题。<br>
 也有很多别的工具可以解决，重复造轮子的目的，也是为了加深Rust的编写能力和Image知识。<br>
@@ -118,7 +122,7 @@ curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-rs-
 - 我们想让新Image使用`OCI`格式。
 - 我们不想让密码出现在history中，所以我们计划从环境变量中获取上传到`Image Registry`的密码。（以下`export MY_PASSWORD_ENV`只是演示用，实际设置环境变量的方式根据自己实际情况设置）
 
-接着创建一个`Dockerfile`文件，这个`Dockerfile`既是我们构建Image的配置文件，也是我们计划run image时打印内容的文件。写入以下内容:
+接着创建一个`Dockerfile`文件，这个`Dockerfile`既是我们构建Image的配置文件，也是我们计划`run image`时打印内容的文件。写入以下内容:
 
 ```
 FROM ubuntu:22.04
