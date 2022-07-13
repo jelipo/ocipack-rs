@@ -1,15 +1,15 @@
-# ocipack-rs
-
 <div align="center">
+<br>
+<h1>ocipack-rs</h1>
 <br>
 一个可以快速构建 OCI/Docker 镜像的工具<br><br>
 
-![GitHub last commit](https://img.shields.io/github/last-commit/jelipo/ocipack-rs)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/jelipo/ocipack-rs)
-![GitHub all releases](https://img.shields.io/github/downloads/jelipo/ocipack-rs/total)
+[![GitHub last commit](https://img.shields.io/github/last-commit/jelipo/ocipack-rs)](https://github.com/jelipo/ocipack-rs/commits)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/jelipo/ocipack-rs)](https://github.com/jelipo/ocipack-rs/releases)
+[![GitHub all releases](https://img.shields.io/github/downloads/jelipo/ocipack-rs/total)](https://github.com/jelipo/ocipack-rs/releases)
 ![GitHub repo size](https://img.shields.io/github/repo-size/jelipo/ocipack-rs)
 [![Github Release Publish Status](https://img.shields.io/github/workflow/status/jelipo/ocipack-rs/Rust)](https://github.com/jelipo/ocipack-rs/actions)
-[![License](https://img.shields.io/github/license/jelipo/ocipack-rs)](https://github.com/jelipo/ocipack-rs)
+[![License](https://img.shields.io/github/license/jelipo/ocipack-rs)](https://github.com/jelipo/ocipack-rs/blob/master/LICENSE)
 
 
 
@@ -119,7 +119,7 @@ cp ocipack-rs /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack-rs
         [OPTION] Compress files using zstd
 ```
 
-#### 样例
+### 样例
 我们先假设好样例条件：
 - 我们要把一个文件 COPY 进Image中，run image 时打印此文件的内容，Image的名称为`my.harbor.com/jelipo/demo:v1`。
 - `my.harbor.com`是我们的`Image Registry`，并且没有使用`HTTPS`，而是使用了`HTTP`，因为默认`Image Registry`是`HTTPS`的，所以需要手动指定`--target-allow-insecure`。
@@ -178,7 +178,7 @@ my.harbor.com/jelipo/demo:v1
 ```
 当看到`Build job successful`字样时，说明我们已经构建完成并上传到了`Registry`。
 
-##### 可能遇到的问题
+### 可能遇到的问题
 如果你的`FROM image`需要代理才能访问或者加速拉取，可以设置`--source-proxy`选项。
 
 
