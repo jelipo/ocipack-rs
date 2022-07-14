@@ -66,7 +66,7 @@ jobs:
           files: |
             ./ocipack.exe
       - name: Zip
-        run: 7z a -tzip -r ocipack-${{ env.RELEASE_VERSION }}-amd64_windows.zip ./ocipack.exe
+        run: Compress-Archive ./ocipack.exe ocipack-${{ env.RELEASE_VERSION }}-amd64_windows.zip
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
