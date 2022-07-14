@@ -65,7 +65,6 @@ jobs:
           version: latest
           files: |
             ./ocipack.exe
-          args: -o ./ocipack.exe
       - name: Zip
         run: 7z a -tzip -r ocipack-${{ env.RELEASE_VERSION }}-amd64_windows.zip ./ocipack.exe
       - name: Release
