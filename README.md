@@ -27,7 +27,7 @@
 
 ## 下载
 
-在 Linux 和 MacOS 下载：
+### Linux 和 MacOS
 
 ```
 curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-0.3.0-amd64_$(uname).tar.gz | tar xzv
@@ -38,6 +38,15 @@ curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-0.3
 ```
 cp ocipack /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack
 ```
+
+### Windows
+
+```
+curl.exe -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-0.3.0-amd64_windows.zip -o ocipack.zip
+
+tar -xf ocipack.zip
+```
+
 ## 简介
 
 作者在学习云原生和写代码的时候，经常需要构建一个简单的镜像，但是有时候会因为各种原因导致并不轻松。
