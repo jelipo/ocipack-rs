@@ -128,14 +128,11 @@ tar -xf ocipack.zip
         [OPTION] Compress files using zstd
 ```
 
-### 样例
-我们先假设好样例条件：
-- 我们要把一个文件 COPY 进Image中，run image 时打印此文件的内容，Image的名称为`my.harbor.com/jelipo/demo:v1`。
-- `my.harbor.com`是我们的`Image Registry`，并且没有使用`HTTPS`，而是使用了`HTTP`，因为默认`Image Registry`是`HTTPS`的，所以需要手动指定`--target-allow-insecure`。
-- 我们想让新Image使用`OCI`格式。
-- 我们不想让密码出现在history中，所以我们计划从环境变量中获取上传到`Image Registry`的密码。（以下`export MY_PASSWORD_ENV`只是演示用，实际设置环境变量的方式根据自己实际情况设置）
+### 使用举例
 
-接着创建一个`Dockerfile`文件，这个`Dockerfile`既是我们构建Image的配置文件，也是我们计划`run image`时打印内容的文件。写入以下内容:
+很多时候，我们需要的功能只是把文件COPY进`Base Image`，然后运行。
+
+创建一个`Dockerfile`文件，这个`Dockerfile`既是我们构建Image的配置文件，也是我们计划`run image`时打印内容的文件。写入以下内容:
 
 ```
 FROM ubuntu:22.04
@@ -146,39 +143,14 @@ CMD cat /root/Dockerfile
 接着运行以下命令：
 
 ```bash
-export MY_PASSWORD_ENV=password
-
 ./ocipack build \
   --source=dockerfile:./Dockerfile \
   --target=registry:my.harbor.com/jelipo/demo:v1 \
-  --target-auth=jelipo:${MY_PASSWORD_ENV} \
-  --target-allow-insecure \
-  --format=oci
+  --target-auth=jelipo:my_password
 ```
 
-如果顺利，将会输出:
+如果顺利，末尾将会输出:
 ```
-[14:19:31.830 INFO] Source image info. host='registry-1.docker.io' name='library/ubuntu' reference='22.04'
-[14:19:31.830 INFO] Get source image manifest info.
-[14:19:35.785 INFO] Source image type: Docker V2,Schema2
-[14:19:35.785 INFO] Start pulling... (total=1)
-
-405f018f9d1d    29.01MiB / 29.01MiB     √   complete
-
-[14:22:10.683 INFO] Building new tar...
-[14:22:10.683 INFO] Build tar complete
-[14:22:10.683 INFO] Compressing tar...  (compress-type=TGZ)
-[14:22:10.683 INFO] Compress complete. (sha256=ef35529d1fe64b5c5e3f2705dc953b224729963c40519fe0bf427a6744a343dd)
-[14:22:10.683 INFO] Build a new target manifest.
-[14:22:11.510 INFO] Start pushing... (total=3)
-
-ef35529d1fe6        160B / 160B         √   succuss
-405f018f9d1d    29.01MiB / 29.01MiB     √   blob exists in registry
-6718bd7ae33c        854B / 854B         √   succuss
-
-[14:22:12.510 INFO] Putting manifest...
-[14:22:12.557 INFO] Upload image finished.
-
 Build job successful!
 
 Target image:
@@ -187,9 +159,29 @@ my.harbor.com/jelipo/demo:v1
 ```
 当看到`Build job successful`字样时，说明我们已经构建完成并上传到了`Registry`。
 
-### 可能遇到的问题
-如果你的`FROM image`需要代理才能访问或者加速拉取，可以设置`--source-proxy`选项。
+接下来我们执行`docker run -it --rm my.harbor.com/jelipo/demo:v1`时会输出我们的`Dockerfile`内容。
 
+### 可能遇到的问题
+
+#### Base Image 拉取非常慢
+
+如果是`hub.docker.com`中的公共镜像，因为网络原因本身就很慢，可以使用`--source-proxy`设置一个代理加速访问。
+
+#### Pull 或 Push 的 Registry 不支持HTTPS协议
+
+目前大多数容器引擎或者工具都会默认使用`HTTPS`访问`Registry`，但是很多内网或者学习使用时会使用`HTTP`协议的 Registry 。
+
+当Pull镜像的Registry是`HTTP`协议添加`--allow-insecure`选项。
+
+如果Push的Registry是`HTTP`协议，添加`--target-allow-insecure`选项。
+
+#### 执行命令后，在Linux history中会显示我的密码
+
+工具支持从环境变量中读取密码，可以在`build`子命令的help中看`--source-auth`或者`--target-auth`的说明。
+
+#### 构建出来的Image是Docker Manifest格式的，想要OCI格式的
+
+添加`--format=oci`选项。
 
 ## 转换(Transform)
 
