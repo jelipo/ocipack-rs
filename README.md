@@ -166,6 +166,7 @@ my.harbor.com/jelipo/demo:v1
 #### Base Image 拉取非常慢
 
 如果是`hub.docker.com`中的公共镜像，因为网络原因本身就很慢，可以使用`--source-proxy`设置一个代理加速访问。
+<br><br>
 
 #### Pull 或 Push 的 Registry 不支持HTTPS协议
 
@@ -174,26 +175,29 @@ my.harbor.com/jelipo/demo:v1
 当Pull镜像的Registry是`HTTP`协议添加`--allow-insecure`选项。
 
 如果Push的Registry是`HTTP`协议，添加`--target-allow-insecure`选项。
+<br><br>
 
 #### 执行命令后，在Linux history中会显示我的密码
 
 工具支持从环境变量中读取密码，可以在`build`子命令的help中看`--source-auth`或者`--target-auth`的说明。
+<br><br>
 
 #### 构建出来的Image是Docker Manifest格式的，想要OCI格式的
 
 添加`--format=oci`选项。
+<br><br>
 
 ## 转换(Transform)
 
 此功能主要是为了 Docker和OCI 之间的转换。主要命令跟`build`子命令大同小异，可以参考上面的`构建（Build）`。<br>
-可以使用`ocipack build -h`查看详情。<br>
+可以使用`ocipack build -h`查看详情。<br><br>
 
 ## 清理缓存(Clean)
 因为无论Pull还是Push，都会需要暂存文件在本地中，一边下次Pull加速。
 
 可以使用`ocipack clean`子命令清理本地的缓存文件夹，可以使用`ocipack clean -h`查看更多参数选项。
 <br>
-
+<br>
 ## 挖坑
 - 支持导出或者导入本地的容器引擎。
 - 更多的Dockerfile配置项。
