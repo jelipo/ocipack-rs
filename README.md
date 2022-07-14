@@ -83,6 +83,41 @@ tar -xf ocipack.zip
 | `Image Manifest V 2, Schema 1` | ❌ |
 | `OCI Image Manifest` | ✅ |
 
+
+## 使用举例
+
+很多时候，我们需要的功能只是把文件COPY进`Base Image`，然后运行。
+
+创建一个`Dockerfile`文件，这个`Dockerfile`既是我们构建Image的配置文件，也是我们计划`run image`时打印内容的文件。写入以下内容:
+
+```
+FROM ubuntu:22.04
+COPY Dockerfile /root/
+CMD cat /root/Dockerfile
+```
+
+接着运行以下命令：
+
+```bash
+./ocipack build \
+  --source=dockerfile:./Dockerfile \
+  --target=registry:my.harbor.com/jelipo/demo:v1 \
+  --target-auth=jelipo:my_password
+```
+
+如果顺利，末尾将会输出:
+```
+Build job successful!
+
+Target image:
+my.harbor.com/jelipo/demo:v1
+
+```
+当看到`Build job successful`字样时，说明我们已经构建完成并上传到了`Registry`。
+
+接下来我们执行`docker run -it --rm my.harbor.com/jelipo/demo:v1`时会输出我们的`Dockerfile`内容。
+
+
 ## 功能
 
 ## 构建（Build）
@@ -128,47 +163,15 @@ tar -xf ocipack.zip
         [OPTION] Compress files using zstd
 ```
 
-### 使用举例
 
-很多时候，我们需要的功能只是把文件COPY进`Base Image`，然后运行。
+## 可能遇到的问题
 
-创建一个`Dockerfile`文件，这个`Dockerfile`既是我们构建Image的配置文件，也是我们计划`run image`时打印内容的文件。写入以下内容:
-
-```
-FROM ubuntu:22.04
-COPY Dockerfile /root/
-CMD cat /root/Dockerfile
-```
-
-接着运行以下命令：
-
-```bash
-./ocipack build \
-  --source=dockerfile:./Dockerfile \
-  --target=registry:my.harbor.com/jelipo/demo:v1 \
-  --target-auth=jelipo:my_password
-```
-
-如果顺利，末尾将会输出:
-```
-Build job successful!
-
-Target image:
-my.harbor.com/jelipo/demo:v1
-
-```
-当看到`Build job successful`字样时，说明我们已经构建完成并上传到了`Registry`。
-
-接下来我们执行`docker run -it --rm my.harbor.com/jelipo/demo:v1`时会输出我们的`Dockerfile`内容。
-
-### 可能遇到的问题
-
-#### Base Image 拉取非常慢
+### Base Image 拉取非常慢
 
 如果是`hub.docker.com`中的公共镜像，因为网络原因本身就很慢，可以使用`--source-proxy`设置一个代理加速访问。
 <br><br>
 
-#### Pull 或 Push 的 Registry 不支持HTTPS协议
+### Pull 或 Push 的 Registry 不支持HTTPS协议
 
 目前大多数容器引擎或者工具都会默认使用`HTTPS`访问`Registry`，但是很多内网或者学习使用时会使用`HTTP`协议的 Registry 。
 
@@ -177,12 +180,12 @@ my.harbor.com/jelipo/demo:v1
 如果Push的Registry是`HTTP`协议，添加`--target-allow-insecure`选项。
 <br><br>
 
-#### 执行命令后，在Linux history中会显示我的密码
+### 执行命令后，在Linux history中会显示我的密码
 
 工具支持从环境变量中读取密码，可以在`build`子命令的help中看`--source-auth`或者`--target-auth`的说明。
 <br><br>
 
-#### 构建出来的Image是Docker Manifest格式的，想要OCI格式的
+### 构建出来的Image是Docker Manifest格式的，想要OCI格式的
 
 添加`--format=oci`选项。
 <br><br>
