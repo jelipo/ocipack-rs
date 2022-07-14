@@ -1,5 +1,5 @@
 [package]
-name = "ocipack-rs"
+name = "ocipack"
 version = "0.3.0"
 edition = "2021"
 

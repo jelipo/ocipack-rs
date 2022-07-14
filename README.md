@@ -1,6 +1,6 @@
 <div align="center">
 <br>
-<h1>ocipack-rs</h1>
+<h1>ocipack</h1>
 <br>
 一个可以快速构建 OCI/Docker 镜像的工具<br><br>
 
@@ -27,17 +27,26 @@
 
 ## 下载
 
-在 Linux 和 MacOS 下载：
+### Linux 和 MacOS
 
 ```
-curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-rs-0.3.0-amd64_$(uname).tar.gz | tar xzv
+curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-0.3.0-amd64_$(uname).tar.gz | tar xzv
 ```
 
-把下载解压完成的 `ocipack-rs` 放到 `/usr/local/bin/` （可选操作）
+把下载解压完成的 `ocipack` 放到 `/usr/local/bin/` （可选操作）
 
 ```
-cp ocipack-rs /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack-rs
+cp ocipack /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack
 ```
+
+### Windows
+
+```
+curl.exe -L https://github.com/jelipo/ocipack-rs/releases/download/0.3.0/ocipack-0.3.0-amd64_windows.zip -o ocipack.zip
+
+tar -xf ocipack.zip
+```
+
 ## 简介
 
 作者在学习云原生和写代码的时候，经常需要构建一个简单的镜像，但是有时候会因为各种原因导致并不轻松。
@@ -79,7 +88,7 @@ cp ocipack-rs /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack-rs
 ## 构建（Build）
 
 最主要的功能，拉取Base Image，然后把文件COPY进Image，然后Push。<br>
-使用`ocipack-rs build`子命令。
+使用`ocipack build`子命令。
 
 ```bash
 # 当base image的registry为http而非https时需要启用
@@ -139,7 +148,7 @@ CMD cat /root/Dockerfile
 ```bash
 export MY_PASSWORD_ENV=password
 
-./ocipack-rs build \
+./ocipack build \
   --source=dockerfile:./Dockerfile \
   --target=registry:my.harbor.com/jelipo/demo:v1 \
   --target-auth=jelipo:${MY_PASSWORD_ENV} \
@@ -185,12 +194,12 @@ my.harbor.com/jelipo/demo:v1
 ## 转换(Transform)
 
 此功能主要是为了 Docker和OCI 之间的转换。主要命令跟`build`子命令大同小异，可以参考上面的`构建（Build）`。<br>
-可以使用`ocipack-rs build -h`查看详情。<br>
+可以使用`ocipack build -h`查看详情。<br>
 
 ## 清理缓存(Clean)
 因为无论Pull还是Push，都会需要暂存文件在本地中，一边下次Pull加速。
 
-可以使用`ocipack-rs clean`子命令清理本地的缓存文件夹，可以使用`ocipack-rs clean -h`查看更多参数选项。
+可以使用`ocipack clean`子命令清理本地的缓存文件夹，可以使用`ocipack clean -h`查看更多参数选项。
 <br>
 
 ## 挖坑
