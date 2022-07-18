@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use dockerfile_parser::{BreakableStringComponent, Dockerfile, Instruction, ShellOrExecExpr};
-use log::warn;
+use log::{debug, warn};
 
 use crate::adapter::{BuildInfo, CopyFile, ImageInfo, SourceImageAdapter, SourceInfo};
 use crate::const_data::DEFAULT_IMAGE_HOST;
@@ -18,7 +18,8 @@ impl DockerfileAdapter {
     pub fn parse(path: &str) -> Result<(SourceInfo, BuildInfo)> {
         let mut dockerfile_file = File::open(path)?;
         let mut str_body = String::new();
-        let _read_size = dockerfile_file.read_to_string(&mut str_body)?;
+        let read_size = dockerfile_file.read_to_string(&mut str_body)?;
+        debug!("Dockerfile size: {:?}",read_size);
         Self::parse_from_str(&str_body)
     }
 
@@ -81,7 +82,6 @@ impl DockerfileAdapter {
                     })
                 }
                 Instruction::Copy(copy) => {
-                    let _i = copy.flags.len();
                     if !copy.flags.is_empty() {
                         return Err(anyhow!("copy not support flag"));
                     };

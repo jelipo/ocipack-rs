@@ -97,10 +97,11 @@ impl Manifest {
                 0,
                 CommonManifestLayer {
                     media_type: match compress_type {
-                        CompressType::Tar => RegContentType::OCI_LAYER_TAR.val().to_string(),
-                        CompressType::Tgz => RegContentType::OCI_LAYER_TGZ.val().to_string(),
-                        CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val().to_string(),
-                    },
+                        CompressType::Tar => RegContentType::OCI_LAYER_TAR.val(),
+                        CompressType::Tgz => RegContentType::OCI_LAYER_TGZ.val(),
+                        CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val(),
+                    }
+                    .to_string(),
                     size,
                     digest: reg_digest.digest,
                 },

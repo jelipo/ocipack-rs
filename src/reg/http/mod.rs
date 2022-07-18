@@ -51,12 +51,13 @@ fn do_request_raw_read<R: Read + Send + 'static>(
     url: &str,
     method: Method,
     http_auth_opt: Option<&HttpAuth>,
-    _accept: Option<&RegContentType>,
+    accepts: &[RegContentType],
     body: Option<R>,
     size: u64,
 ) -> Result<Response> {
     let request_body = body.map(|read| RequestBody::Read(Body::sized(read, size)));
-    let request = build_request::<String>(client, url, method, http_auth_opt, &[], request_body, None)?;
+
+    let request = build_request::<String>(client, url, method, http_auth_opt, accepts, request_body, None)?;
     let http_response = client.execute(request)?;
     Ok(http_response)
 }
@@ -74,9 +75,7 @@ fn build_request<T: Serialize + ?Sized>(
     let mut builder = client.request(method, url);
     match http_auth_opt {
         None => {}
-        Some(HttpAuth::BasicAuth { username, password }) => {
-            builder = builder.basic_auth(username, Some(password));
-        }
+        Some(HttpAuth::BasicAuth { username, password }) => builder = builder.basic_auth(username, Some(password)),
         Some(HttpAuth::BearerToken { token }) => builder = builder.bearer_auth(token),
     }
     // Set accept header

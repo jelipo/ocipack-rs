@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use home::home_dir;
 
 use crate::config::cmd::BaseAuth;
@@ -64,8 +64,8 @@ fn get_auth_from_dockerconfig(user_docker_config: UserDockerConfig, reg_host: &s
                 let vec = base64::decode(base64_str)?;
                 let decode_str = String::from_utf8(vec)?;
                 let mut split = decode_str.split(':');
-                let username = split.next().expect("error docker file").to_string();
-                let password = split.next().expect("error docker file").to_string();
+                let username = split.next().ok_or_else(|| anyhow!("error docker file"))?.to_string();
+                let password = split.next().ok_or_else(|| anyhow!("error docker file"))?.to_string();
                 return Ok(Some(RegistryAuth { username, password }));
             }
         }

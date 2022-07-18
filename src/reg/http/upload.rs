@@ -10,9 +10,9 @@ use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use reqwest::Method;
 
-use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
-use crate::reg::http::{do_request_raw_read, HttpAuth};
+use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
 use crate::reg::BlobConfig;
+use crate::reg::http::{do_request_raw_read, HttpAuth};
 
 pub struct RegUploader {
     reg_uploader_enum: RegUploaderEnum,
@@ -119,11 +119,12 @@ impl Processor<UploadResult> for RegUploader {
                     let status_core = &mut status.status_core.lock().unwrap();
                     status_core.done = true;
                     if let Err(err) = &result {
-                        println!("{}\n{}", err, err.backtrace());
+                        Err(anyhow!("{}\n{}", err, err.backtrace()))
+                    } else {
+                        Ok(UploadResult {
+                            result_str: "succuss".to_string(),
+                        })
                     }
-                    Ok(UploadResult {
-                        result_str: "succuss".to_string(),
-                    })
                 });
                 Box::new(RegUploadHandler { join: handle })
             }
@@ -154,7 +155,7 @@ fn uploading(
         reg_http_uploader.url.as_str(),
         Method::PUT,
         Some(&reg_http_uploader.auth),
-        None,
+        &[],
         Some(reader),
         file_size,
     )?;
