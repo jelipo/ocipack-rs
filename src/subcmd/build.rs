@@ -215,6 +215,7 @@ pub fn build_target_config_blob(
     if let Some(temp_layer) = temp_layer_opt {
         let new_tar_digest = format!("sha256:{}", temp_layer.tar_sha256);
         target_config_blob.add_diff_layer(new_tar_digest);
+        // TODO add a history
     }
     target_config_blob.add_labels(build_info.labels);
     target_config_blob.add_envs(build_info.envs);
