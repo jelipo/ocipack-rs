@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::reg::manifest::{CommonManifestConfig, CommonManifestLayer};
-use crate::reg::{Layer, LayerConvert};
+use crate::reg::{Layer, LayerConvert, ManifestRaw};
 
 pub mod image;
 
@@ -13,14 +13,6 @@ pub struct OciManifest {
     pub media_type: Option<String>,
     pub config: CommonManifestConfig,
     pub layers: Vec<CommonManifestLayer>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct OciManifestConfig {
-    pub media_type: String,
-    pub size: u64,
-    pub digest: String,
 }
 
 impl LayerConvert for OciManifest {

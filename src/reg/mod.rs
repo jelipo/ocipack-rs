@@ -11,18 +11,18 @@ use url::Url;
 
 use manifest::Manifest;
 
-use crate::reg::docker::image::DockerConfigBlob;
+use crate::GLOBAL_CONFIG;
 use crate::reg::docker::DockerManifest;
+use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::http::upload::RegUploader;
 use crate::reg::http::RegistryAuth;
+use crate::reg::http::upload::RegUploader;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
 use crate::reg::proxy::ProxyInfo;
 use crate::util::sha::bytes_sha256;
-use crate::GLOBAL_CONFIG;
 
 pub mod docker;
 pub mod home;
@@ -112,19 +112,20 @@ impl MyImageManager {
     }
 
     /// 获取Image的Manifest
-    pub fn manifests(&mut self, refe: &Reference) -> Result<Manifest> {
+    pub fn manifests(&mut self, refe: &Reference) -> Result<(Manifest, String)> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
         let accepts = &[RegContentType::OCI_MANIFEST, RegContentType::DOCKER_MANIFEST];
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&path, scope, accepts);
         let response = self.reg_client.simple_request(request)?;
         let content_type = response.content_type().ok_or_else(|| anyhow!("manifest content-type header not found"))?;
+        let manifest_body = response.string_body();
         if RegContentType::DOCKER_MANIFEST.val() == content_type {
-            let manifest = serde_json::from_str::<DockerManifest>(&response.string_body())?;
-            Ok(Manifest::DockerV2S2(manifest))
+            let manifest = serde_json::from_str::<DockerManifest>(&manifest_body)?;
+            Ok((Manifest::DockerV2S2(manifest), manifest_body))
         } else if RegContentType::OCI_MANIFEST.val() == content_type {
-            let manifest = serde_json::from_str::<OciManifest>(&response.string_body())?;
-            Ok(Manifest::OciV1(manifest))
+            let manifest = serde_json::from_str::<OciManifest>(&manifest_body)?;
+            Ok((Manifest::OciV1(manifest), manifest_body))
         } else {
             Err(anyhow!(
                 "unknown content-type:{},body:{}",
@@ -244,6 +245,10 @@ fn exited(simple_response: &RawRegistryResponse) -> Result<bool> {
 
 pub trait LayerConvert {
     fn get_layers(&self) -> Vec<Layer>;
+}
+
+pub trait ManifestRaw {
+    fn raw(&self) -> &str;
 }
 
 pub struct Layer<'a> {
@@ -396,7 +401,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -405,14 +410,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -435,7 +440,7 @@ impl ToString for CompressType {
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
         }
-        .to_string()
+            .to_string()
     }
 }
 

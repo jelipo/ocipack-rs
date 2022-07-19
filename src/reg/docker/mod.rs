@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::manifest::{CommonManifestConfig, CommonManifestLayer};
 use crate::reg::{Layer, LayerConvert};
+use crate::reg::manifest::{CommonManifestConfig, CommonManifestLayer};
 
 pub mod image;
 
@@ -26,12 +26,4 @@ impl LayerConvert for DockerManifest {
             })
             .collect::<Vec<Layer>>()
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct DockerManifestConfig {
-    pub media_type: String,
-    pub size: u64,
-    pub digest: String,
 }

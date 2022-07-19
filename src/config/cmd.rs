@@ -20,6 +20,30 @@ pub enum CmdArgs {
 
     /// Clean cache dir.
     Clean(CleanCmdArgs),
+
+    /// Show Image info.
+    ShowInfo(ShowInfoArgs),
+}
+
+#[derive(clap::Args)]
+pub struct ShowInfoArgs {
+    /// [OPTION] Allow insecure registry
+    #[clap(long, short, parse(from_flag))]
+    pub allow_insecure: bool,
+
+    /// Support 'registry'
+    /// Example:'registry:my.reg.com/target/image:1.1'
+    #[clap(long, short)]
+    pub image: TargetType,
+
+    /// [OPTION] Auth of image. Example:'myname:mypass','myname:${MY_PASSWORD_ENV}'
+    #[clap(long)]
+    pub auth: Option<BaseAuth>,
+
+    /// [OPTION] Proxy of get image info. Example:'socks5://127.0.0.1:1080','http://name:pass@example:8080'
+    #[clap(long)]
+    pub proxy: Option<ProxyInfo>,
+
 }
 
 #[derive(clap::Args)]

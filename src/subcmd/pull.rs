@@ -43,13 +43,9 @@ pub fn pull(
     };
     let mut from_registry = Registry::open(use_https, image_host, info)?;
     info!("Get source image manifest info.");
-    let manifest = from_registry.image_manager.manifests(&from_image_reference)?;
+    let (manifest, _) = from_registry.image_manager.manifests(&from_image_reference)?;
     info!(
-        "Source image type: {}",
-        match manifest {
-            Manifest::OciV1(_) => "OCI",
-            Manifest::DockerV2S2(_) => "Docker V2,Schema2",
-        }
+        "Source image type: {}",manifest.manifest_type()
     );
     let config_digest = manifest.config_digest();
     let layers = manifest.layers();
