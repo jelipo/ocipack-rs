@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::reg::manifest::{CommonManifestConfig, CommonManifestLayer};
-use crate::reg::{Layer, LayerConvert, ManifestRaw};
+use crate::reg::{Layer, LayerConvert};
 
 pub mod image;
 

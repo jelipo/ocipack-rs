@@ -5,19 +5,19 @@ use anyhow::{anyhow, Result};
 use log::info;
 use tar::Builder;
 
-use crate::{GLOBAL_CONFIG, HomeDir};
-use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
+use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::reg::home::{LocalLayer, TempLayerInfo};
 use crate::reg::manifest::Manifest;
 use crate::reg::proxy::ProxyInfo;
+use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
-use crate::util::{compress, random};
 use crate::util::sha::{Sha256Reader, Sha256Writer};
+use crate::util::{compress, random};
+use crate::{HomeDir, GLOBAL_CONFIG};
 
 pub struct BuildCommand {}
 

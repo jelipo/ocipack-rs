@@ -101,7 +101,7 @@ impl Manifest {
                         CompressType::Tgz => RegContentType::OCI_LAYER_TGZ.val(),
                         CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val(),
                     }
-                        .to_string(),
+                    .to_string(),
                     size,
                     digest: reg_digest.digest,
                 },
@@ -132,7 +132,7 @@ impl Manifest {
         }
     }
 
-    pub fn manifest_type(&self) -> &str{
+    pub fn manifest_type(&self) -> &str {
         match self {
             Manifest::OciV1(_) => "OCI",
             Manifest::DockerV2S2(_) => "Docker V2,Schema2",

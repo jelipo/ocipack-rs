@@ -11,18 +11,18 @@ use url::Url;
 
 use manifest::Manifest;
 
-use crate::GLOBAL_CONFIG;
-use crate::reg::docker::DockerManifest;
 use crate::reg::docker::image::DockerConfigBlob;
+use crate::reg::docker::DockerManifest;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::RegUploader;
+use crate::reg::http::RegistryAuth;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
 use crate::reg::proxy::ProxyInfo;
 use crate::util::sha::bytes_sha256;
+use crate::GLOBAL_CONFIG;
 
 pub mod docker;
 pub mod home;
@@ -119,11 +119,12 @@ impl MyImageManager {
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&path, scope, accepts);
         let response = self.reg_client.simple_request(request)?;
         let content_type = response.content_type().ok_or_else(|| anyhow!("manifest content-type header not found"))?;
-        let manifest_body = response.string_body();
         if RegContentType::DOCKER_MANIFEST.val() == content_type {
+            let manifest_body = response.string_body();
             let manifest = serde_json::from_str::<DockerManifest>(&manifest_body)?;
             Ok((Manifest::DockerV2S2(manifest), manifest_body))
         } else if RegContentType::OCI_MANIFEST.val() == content_type {
+            let manifest_body = response.string_body();
             let manifest = serde_json::from_str::<OciManifest>(&manifest_body)?;
             Ok((Manifest::OciV1(manifest), manifest_body))
         } else {
@@ -144,13 +145,13 @@ impl MyImageManager {
         exited(&response)
     }
 
-    pub fn config_blob<T: ConfigBlob + DeserializeOwned>(&mut self, name: &str, blob_digest: &str) -> Result<T> {
+    pub fn config_blob<T: ConfigBlob + DeserializeOwned>(&mut self, name: &str, blob_digest: &str) -> Result<(T, String)> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let accepts = &[RegContentType::OCI_IMAGE_CONFIG, RegContentType::DOCKER_CONTAINER_IMAGE];
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&url_path, Some(name), accepts);
         let response = self.reg_client.simple_request(request)?;
         let str_body = response.string_body();
-        Ok(serde_json::from_str::<T>(&str_body)?)
+        Ok((serde_json::from_str::<T>(&str_body)?, str_body))
     }
 
     pub fn layer_blob_download(&mut self, name: &str, blob_digest: &RegDigest, layer_size: Option<u64>) -> Result<RegDownloader> {
@@ -362,6 +363,27 @@ impl ConfigBlobEnum {
             size: size as u64,
         })
     }
+
+    pub fn os(&self) -> Option<&String> {
+        match self {
+            ConfigBlobEnum::OciV1(oci) => oci.os.as_ref(),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.os.as_ref(),
+        }
+    }
+
+    pub fn arch(&self) -> Option<&String> {
+        match self {
+            ConfigBlobEnum::OciV1(oci) => oci.architecture.as_ref(),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.architecture.as_ref(),
+        }
+    }
+
+    pub fn cmd(&self) -> Option<&Vec<String>> {
+        match self {
+            ConfigBlobEnum::OciV1(oci) => oci.config.cmd.as_ref(),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.config.cmd.as_ref(),
+        }
+    }
 }
 
 pub struct ConfigBlobSerialize {
@@ -401,7 +423,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -410,14 +432,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -440,7 +462,7 @@ impl ToString for CompressType {
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
         }
-            .to_string()
+        .to_string()
     }
 }
 

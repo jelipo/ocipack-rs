@@ -44,9 +44,7 @@ pub fn pull(
     let mut from_registry = Registry::open(use_https, image_host, info)?;
     info!("Get source image manifest info.");
     let (manifest, _) = from_registry.image_manager.manifests(&from_image_reference)?;
-    info!(
-        "Source image type: {}",manifest.manifest_type()
-    );
+    info!("Source image type: {}", manifest.manifest_type());
     let config_digest = manifest.config_digest();
     let layers = manifest.layers();
     let mut reg_downloader_vec = Vec::<Box<dyn Processor<DownloadResult>>>::new();
@@ -80,12 +78,14 @@ pub fn pull(
     }
 
     let config_blob_enum = match &manifest {
-        Manifest::OciV1(_) => ConfigBlobEnum::OciV1(
-            from_registry.image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, config_digest)?,
-        ),
-        Manifest::DockerV2S2(_) => ConfigBlobEnum::DockerV2S2(
-            from_registry.image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, config_digest)?,
-        ),
+        Manifest::OciV1(_) => {
+            let (blob, _) = from_registry.image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, config_digest)?;
+            ConfigBlobEnum::OciV1(blob)
+        }
+        Manifest::DockerV2S2(_) => {
+            let (blob, _) = from_registry.image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, config_digest)?;
+            ConfigBlobEnum::DockerV2S2(blob)
+        }
     };
 
     Ok(PullResult {

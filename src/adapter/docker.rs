@@ -17,7 +17,7 @@ impl DockerfileAdapter {
         let mut dockerfile_file = File::open(path)?;
         let mut str_body = String::new();
         let read_size = dockerfile_file.read_to_string(&mut str_body)?;
-        debug!("Dockerfile size: {:?}",read_size);
+        debug!("Dockerfile size: {:?}", read_size);
         Self::parse_from_str(&str_body)
     }
 
