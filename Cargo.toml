@@ -13,7 +13,7 @@ strip = "debuginfo"
 
 [dependencies]
 chrono = "0.4"
-reqwest = { version = "0.11", features = ["gzip", "blocking", "json", "deflate", "socks", "rustls-tls"], default-features = false }
+
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
@@ -37,3 +37,11 @@ zstd = "0.11"
 fantasy-util = "0.1.8"
 ubyte = "0.10"
 colored = "2"
+
+[dependencies.reqwest]
+version = "0.11"
+features = ["gzip", "blocking", "json", "deflate", "socks"]
+
+[target.'cfg(linux)'.dependencies.reqwest]
+features = ["gzip", "blocking", "json", "deflate", "socks", "rustls-tls"]
+default-features = false
