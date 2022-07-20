@@ -47,7 +47,8 @@ impl RegTokenHandler {
     fn get_remote_token(&mut self, scope_opt: Option<&str>, token_type: TokenType) -> Result<(String, u64)> {
         let adapter = match &self.authenticate_adapter {
             None => {
-                let new_adapter = AuthenticateAdapter::new_authenticate_adapter(&self.registry_addr, &self.client)?;
+                let new_adapter = AuthenticateAdapter::new_authenticate_adapter(&self.registry_addr, &self.client)
+                    .map_err(|err| anyhow!("get token failed: {}",err))?;
                 self.authenticate_adapter = Some(new_adapter);
                 self.authenticate_adapter.as_ref().unwrap()
             }
@@ -68,8 +69,8 @@ impl AuthenticateAdapter {
     pub fn new_authenticate_adapter(registry_addr: &str, client: &Client) -> Result<AuthenticateAdapter> {
         let bearer_url = format!("{}/v2/", registry_addr);
         let http_response = do_request_raw::<u8>(client, bearer_url.as_str(), Method::GET, None, &[], None, None)?;
-        let www_authenticate =
-            get_header(http_response.headers(), "Www-Authenticate").expect("Www-Authenticate header not found");
+        let www_authenticate = get_header(http_response.headers(), "Www-Authenticate")
+            .ok_or_else(|| anyhow!("'Www-Authenticate' header not found"))?;
         let regex = Regex::new("^Bearer realm=\"(?P<realm>.*)\",service=\"(?P<service>.*)\".*")?;
         let captures = regex
             .captures(www_authenticate.as_str())

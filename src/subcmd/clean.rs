@@ -4,6 +4,7 @@ use crate::{HomeDir, GLOBAL_CONFIG};
 use anyhow::Result;
 use log::info;
 use std::ops::Deref;
+use colored::Colorize;
 
 pub struct CleanCommand {}
 
@@ -56,19 +57,17 @@ fn clean_download(home_dir: &HomeDir) -> Result<()> {
 }
 
 fn print_build_success() {
-    println!(
-        r#"
+    println!("{}", r#"
 Clean successful!
-"#
-    );
+"#.green());
 }
 
 fn print_build_failed(err: anyhow::Error) {
-    println!(
+    println!("{}", format!(
         r#"
 Clean failed.
 {}
 "#,
         err
-    );
+    ).red());
 }
