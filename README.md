@@ -193,7 +193,7 @@ my.harbor.com/jelipo/demo:v1
 ## 转换(Transform)
 
 此功能主要是为了 Docker和OCI 之间的转换。主要命令跟`build`子命令大同小异，可以参考上面的`构建（Build）`。<br>
-可以使用`ocipack build -h`查看详情。<br><br>
+可以使用`ocipack transform -h`查看详情。<br><br>
 
 ## 清理缓存(Clean)
 因为无论Pull还是Push，都会需要暂存文件在本地中，一边下次Pull加速。
@@ -201,6 +201,15 @@ my.harbor.com/jelipo/demo:v1
 可以使用`ocipack clean`子命令清理本地的缓存文件夹，可以使用`ocipack clean -h`查看更多参数选项。
 <br>
 <br>
+
+## 查看Image信息(Show Info)
+
+当你想查看Registry中的Image信息，但是又无从下手的时候，可以使用此命令查看详细信息。
+
+例如`ocipack show-info -i registry:nginx:latest`查看nginx:latest的详细信息。
+<br>
+<br>
+
 ## 挖坑
 - 支持导出或者导入本地的容器引擎。
 - 更多的Dockerfile配置项。
