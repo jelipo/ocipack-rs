@@ -112,7 +112,7 @@ impl MyImageManager {
     }
 
     /// 获取Image的Manifest
-    pub fn manifests(&mut self, refe: &Reference) -> Result<Manifest> {
+    pub fn manifests(&mut self, refe: &Reference) -> Result<(Manifest, String)> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
         let accepts = &[RegContentType::OCI_MANIFEST, RegContentType::DOCKER_MANIFEST];
@@ -120,11 +120,13 @@ impl MyImageManager {
         let response = self.reg_client.simple_request(request)?;
         let content_type = response.content_type().ok_or_else(|| anyhow!("manifest content-type header not found"))?;
         if RegContentType::DOCKER_MANIFEST.val() == content_type {
-            let manifest = serde_json::from_str::<DockerManifest>(&response.string_body())?;
-            Ok(Manifest::DockerV2S2(manifest))
+            let manifest_body = response.string_body();
+            let manifest = serde_json::from_str::<DockerManifest>(&manifest_body)?;
+            Ok((Manifest::DockerV2S2(manifest), manifest_body))
         } else if RegContentType::OCI_MANIFEST.val() == content_type {
-            let manifest = serde_json::from_str::<OciManifest>(&response.string_body())?;
-            Ok(Manifest::OciV1(manifest))
+            let manifest_body = response.string_body();
+            let manifest = serde_json::from_str::<OciManifest>(&manifest_body)?;
+            Ok((Manifest::OciV1(manifest), manifest_body))
         } else {
             Err(anyhow!(
                 "unknown content-type:{},body:{}",
@@ -143,13 +145,13 @@ impl MyImageManager {
         exited(&response)
     }
 
-    pub fn config_blob<T: ConfigBlob + DeserializeOwned>(&mut self, name: &str, blob_digest: &str) -> Result<T> {
+    pub fn config_blob<T: ConfigBlob + DeserializeOwned>(&mut self, name: &str, blob_digest: &str) -> Result<(T, String)> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest);
         let accepts = &[RegContentType::OCI_IMAGE_CONFIG, RegContentType::DOCKER_CONTAINER_IMAGE];
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&url_path, Some(name), accepts);
         let response = self.reg_client.simple_request(request)?;
         let str_body = response.string_body();
-        Ok(serde_json::from_str::<T>(&str_body)?)
+        Ok((serde_json::from_str::<T>(&str_body)?, str_body))
     }
 
     pub fn layer_blob_download(&mut self, name: &str, blob_digest: &RegDigest, layer_size: Option<u64>) -> Result<RegDownloader> {
@@ -244,6 +246,10 @@ fn exited(simple_response: &RawRegistryResponse) -> Result<bool> {
 
 pub trait LayerConvert {
     fn get_layers(&self) -> Vec<Layer>;
+}
+
+pub trait ManifestRaw {
+    fn raw(&self) -> &str;
 }
 
 pub struct Layer<'a> {
@@ -356,6 +362,27 @@ impl ConfigBlobEnum {
             digest,
             size: size as u64,
         })
+    }
+
+    pub fn os(&self) -> Option<&String> {
+        match self {
+            ConfigBlobEnum::OciV1(oci) => oci.os.as_ref(),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.os.as_ref(),
+        }
+    }
+
+    pub fn arch(&self) -> Option<&String> {
+        match self {
+            ConfigBlobEnum::OciV1(oci) => oci.architecture.as_ref(),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.architecture.as_ref(),
+        }
+    }
+
+    pub fn cmd(&self) -> Option<&Vec<String>> {
+        match self {
+            ConfigBlobEnum::OciV1(oci) => oci.config.cmd.as_ref(),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.config.cmd.as_ref(),
+        }
     }
 }
 

@@ -131,6 +131,13 @@ impl Manifest {
             Manifest::DockerV2S2(docker) => &docker.config.digest,
         }
     }
+
+    pub fn manifest_type(&self) -> &str {
+        match self {
+            Manifest::OciV1(_) => "OCI",
+            Manifest::DockerV2S2(_) => "Docker V2,Schema2",
+        }
+    }
 }
 
 pub fn ociv1_to_dockerv2s2(media_type: &str) -> Result<String> {

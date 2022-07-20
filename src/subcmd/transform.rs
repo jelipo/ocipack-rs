@@ -57,14 +57,14 @@ Transform job failed!
 
 fn gen_source_info(transform_args: &TransformCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
     let fake_dockerfile_body = format!("FROM {}", &transform_args.source_image);
-    let (mut source_info, build_info) = DockerfileAdapter::parse_from_str(&fake_dockerfile_body)?;
+    let (mut image_info, build_info) = DockerfileAdapter::parse_from_str(&fake_dockerfile_body)?;
     // add library
-    let image_name = &source_info.image_info.image_name;
+    let image_name = &image_info.image_name;
     if !image_name.contains('/') {
-        source_info.image_info.image_name = format!("library/{}", image_name)
+        image_info.image_name = format!("library/{}", image_name)
     }
-    let source_reg_auth = RegAuthType::build_auth(source_info.image_info.image_host.clone(), transform_args.source_auth.as_ref());
-    Ok((source_info, build_info, source_reg_auth))
+    let source_reg_auth = RegAuthType::build_auth(image_info.image_host.clone(), transform_args.source_auth.as_ref());
+    Ok((SourceInfo { image_info }, build_info, source_reg_auth))
 }
 
 pub fn transform_handle(

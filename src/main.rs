@@ -16,6 +16,7 @@ use crate::reg::home::HomeDir;
 use crate::reg::CompressType;
 use crate::subcmd::build::BuildCommand;
 use crate::subcmd::clean::CleanCommand;
+use crate::subcmd::show_info::ShowInfoCommand;
 use crate::subcmd::transform::TransformCommand;
 
 mod adapter;
@@ -45,6 +46,9 @@ fn main() -> Result<()> {
         }
         CmdArgs::Clean(clean_args) => {
             CleanCommand::clean(clean_args)?;
+        }
+        CmdArgs::ShowInfo(show_info_args) => {
+            ShowInfoCommand::show(show_info_args)?;
         }
     }
     Ok(())

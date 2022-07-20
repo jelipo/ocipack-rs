@@ -15,14 +15,6 @@ pub struct OciManifest {
     pub layers: Vec<CommonManifestLayer>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct OciManifestConfig {
-    pub media_type: String,
-    pub size: u64,
-    pub digest: String,
-}
-
 impl LayerConvert for OciManifest {
     fn get_layers(&self) -> Vec<Layer> {
         self.layers

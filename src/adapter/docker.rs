@@ -7,23 +7,21 @@ use anyhow::{anyhow, Result};
 use dockerfile_parser::{BreakableStringComponent, Dockerfile, Instruction, ShellOrExecExpr};
 use log::{debug, warn};
 
-use crate::adapter::{BuildInfo, CopyFile, ImageInfo, SourceImageAdapter, SourceInfo};
+use crate::adapter::{BuildInfo, CopyFile, ImageInfo};
 use crate::const_data::DEFAULT_IMAGE_HOST;
 
-pub struct DockerfileAdapter {
-    info: SourceInfo,
-}
+pub struct DockerfileAdapter {}
 
 impl DockerfileAdapter {
-    pub fn parse(path: &str) -> Result<(SourceInfo, BuildInfo)> {
+    pub fn parse(path: &str) -> Result<(ImageInfo, BuildInfo)> {
         let mut dockerfile_file = File::open(path)?;
         let mut str_body = String::new();
         let read_size = dockerfile_file.read_to_string(&mut str_body)?;
-        debug!("Dockerfile size: {:?}",read_size);
+        debug!("Dockerfile size: {:?}", read_size);
         Self::parse_from_str(&str_body)
     }
 
-    pub fn parse_from_str(str_body: &str) -> Result<(SourceInfo, BuildInfo)> {
+    pub fn parse_from_str(str_body: &str) -> Result<(ImageInfo, BuildInfo)> {
         let dockerfile = Dockerfile::parse(str_body)?;
         let stages = dockerfile.stages().stages;
         if stages.len() != 1 {
@@ -132,11 +130,9 @@ impl DockerfileAdapter {
                 },
             }
         }
-        let source_info = SourceInfo {
-            image_info: from_image.ok_or_else(|| anyhow!("dockerfile must has a 'From'"))?,
-        };
+        let image_info = from_image.ok_or_else(|| anyhow!("dockerfile must has a 'From'"))?;
         Ok((
-            source_info,
+            image_info,
             BuildInfo {
                 labels: label_map,
                 envs: envs_map,
@@ -147,15 +143,5 @@ impl DockerfileAdapter {
                 ports: if ports.is_empty() { None } else { Some(ports) },
             },
         ))
-    }
-}
-
-impl SourceImageAdapter for DockerfileAdapter {
-    fn info(&self) -> &SourceInfo {
-        &self.info
-    }
-
-    fn into_info(self: Box<Self>) -> SourceInfo {
-        self.info
     }
 }
