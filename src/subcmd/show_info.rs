@@ -1,15 +1,17 @@
 use anyhow::Result;
+use colored::Colorize;
+use log::info;
 use serde_json::Value;
 
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::ImageInfo;
 use crate::config::cmd::{BaseAuth, ShowInfoArgs, TargetType};
 use crate::config::RegAuthType;
+use crate::reg::{ConfigBlobEnum, Reference, Registry, RegistryCreateInfo};
 use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::manifest::Manifest;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::proxy::ProxyInfo;
-use crate::reg::{ConfigBlobEnum, Reference, Registry, RegistryCreateInfo};
 
 pub struct ShowInfoCommand {}
 
@@ -19,7 +21,10 @@ impl ShowInfoCommand {
             TargetType::Registry(image) => {
                 let proxy = show_info_args.proxy.clone();
                 let (image_info, auth) = RegistryImageInfo::gen_image_info(image, show_info_args.auth.as_ref())?;
-                RegistryImageInfo::info(!show_info_args.allow_insecure, image_info, auth, proxy)?
+                info!("Requesting registry...");
+                let detail = RegistryImageInfo::info(!show_info_args.allow_insecure, image_info, auth, proxy)?;
+                info!("Request done.");
+                detail
             }
         };
         print_image_detail(show_info)?;
@@ -30,33 +35,22 @@ impl ShowInfoCommand {
 fn print_image_detail(info: ImageShowInfo) -> Result<()> {
     let manifest_pretty = serde_json::to_string_pretty(&serde_json::from_str::<Value>(&info.manifest_raw)?)?;
     let config_blob_pretty = serde_json::to_string_pretty(&serde_json::from_str::<Value>(&info.config_blob_raw)?)?;
-    let cmd = info.cmds.map(|v| format!("{:?}", v)).unwrap_or_else(|| "NONE".to_string());
-    println!(
-        r#"
-host: {}
-image-name: {}
-image-reference: {}
-manifest-type: {}
-os: {}
-arch: {}
-cmds: {}
-
-manifest-raw:
-{}
-
-config-blob-raw:
-{}
-"#,
-        info.image_host,
-        info.image,
-        info.reference,
-        info.manifest_type,
-        info.os.unwrap_or_else(|| "NOT SET".to_string()),
-        info.arch.unwrap_or_else(|| "NOT SET".to_string()),
-        cmd,
-        manifest_pretty,
-        config_blob_pretty
-    );
+    let cmd = info.cmds.map(|v| format!("{:?}", v).green()).unwrap_or_else(|| "NONE".yellow());
+    let vec = vec![
+        ("HOST", info.image_host.green()),
+        ("IMAGE_NAME", info.image.green()),
+        ("IMAGE_REFERENCE", info.reference.green()),
+        ("MANIFEST_TYPE", info.manifest_type.green()),
+        ("OS", info.os.map(|os| os.green()).unwrap_or_else(|| "NOT SET".yellow())),
+        ("ARCH", info.arch.map(|arch| arch.green()).unwrap_or_else(|| "NOT SET".yellow())),
+        ("CMD", cmd),
+    ];
+    println!("\n{}\n", "IMAGE DETAILS".cyan());
+    for (name, value) in vec {
+        println!("{:16}: {}", name.blue(), value);
+    }
+    println!("{:16}:\n{}\n", "MANIFEST_RAW".blue(), manifest_pretty.green());
+    println!("{:16}:\n{}\n", "CONFIG_BLOB_RAW".blue(), config_blob_pretty.green());
     Ok(())
 }
 

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use colored::Colorize;
 use log::info;
 
 use crate::adapter::docker::DockerfileAdapter;
@@ -31,7 +32,7 @@ impl TransformCommand {
 }
 
 fn print_transform_success(build_args: &TransformCmdArgs) {
-    println!(
+    println!("{}", format!(
         r#"
 Transform job successful!
 
@@ -41,18 +42,16 @@ Target image:
         match &build_args.target {
             TargetType::Registry(r) => r,
         }
-    );
+    ).green());
 }
 
 fn print_transform_failed(err: anyhow::Error) {
-    println!(
+    println!("{}", format!(
         r#"
 Transform job failed!
 
 {}
-"#,
-        err
-    );
+"#, err).red());
 }
 
 fn gen_source_info(transform_args: &TransformCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
