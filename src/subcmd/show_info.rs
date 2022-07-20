@@ -7,11 +7,11 @@ use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::ImageInfo;
 use crate::config::cmd::{BaseAuth, ShowInfoArgs, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::{ConfigBlobEnum, Reference, Registry, RegistryCreateInfo};
 use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::manifest::Manifest;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::proxy::ProxyInfo;
+use crate::reg::{ConfigBlobEnum, Reference, Registry, RegistryCreateInfo};
 
 pub struct ShowInfoCommand {}
 
@@ -42,7 +42,10 @@ fn print_image_detail(info: ImageShowInfo) -> Result<()> {
         ("IMAGE_REFERENCE", info.reference.green()),
         ("MANIFEST_TYPE", info.manifest_type.green()),
         ("OS", info.os.map(|os| os.green()).unwrap_or_else(|| "NOT SET".yellow())),
-        ("ARCH", info.arch.map(|arch| arch.green()).unwrap_or_else(|| "NOT SET".yellow())),
+        (
+            "ARCH",
+            info.arch.map(|arch| arch.green()).unwrap_or_else(|| "NOT SET".yellow()),
+        ),
         ("CMD", cmd),
     ];
     println!("\n{}\n", "IMAGE DETAILS".cyan());

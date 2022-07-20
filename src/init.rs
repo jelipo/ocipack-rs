@@ -1,9 +1,9 @@
 use anyhow::Result;
 use chrono::Local;
-use env_logger::Env;
-use std::io::Write;
 use colored::Colorize;
+use env_logger::Env;
 use log::Level;
+use std::io::Write;
 
 /// 整个App初始化方法
 pub fn init() -> Result<()> {
@@ -23,7 +23,7 @@ fn log_init() {
                 Level::Warn => level.as_str().yellow(),
                 Level::Info => level.as_str().green(),
                 Level::Debug => level.as_str().red(),
-                Level::Trace => level.as_str().cyan()
+                Level::Trace => level.as_str().cyan(),
             };
             writeln!(
                 fmt,

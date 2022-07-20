@@ -6,19 +6,19 @@ use colored::Colorize;
 use log::info;
 use tar::Builder;
 
-use crate::{GLOBAL_CONFIG, HomeDir};
-use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
+use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::reg::home::{LocalLayer, TempLayerInfo};
 use crate::reg::manifest::Manifest;
 use crate::reg::proxy::ProxyInfo;
+use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
-use crate::util::{compress, random};
 use crate::util::sha::{Sha256Reader, Sha256Writer};
+use crate::util::{compress, random};
+use crate::{HomeDir, GLOBAL_CONFIG};
 
 pub struct BuildCommand {}
 
@@ -41,22 +41,36 @@ impl BuildCommand {
 }
 
 fn print_build_success(build_args: &BuildCmdArgs) {
-    println!("{}", format!(
-        r#"
+    println!(
+        "{}",
+        format!(
+            r#"
 Build job successful!
 
 Target image:
 {}
-"#, match &build_args.target { TargetType::Registry(r) => r }).green());
+"#,
+            match &build_args.target {
+                TargetType::Registry(r) => r,
+            }
+        )
+        .green()
+    );
 }
 
 fn print_build_failed(err: anyhow::Error) {
-    println!("{}", format!(
-        r#"
+    println!(
+        "{}",
+        format!(
+            r#"
 Build job failed!
 
 {}
-"#, err).red());
+"#,
+            err
+        )
+        .red()
+    );
 }
 
 fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {

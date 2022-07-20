@@ -2,9 +2,9 @@ use crate::config::cmd::CleanCmdArgs;
 use crate::util::file::PathExt;
 use crate::{HomeDir, GLOBAL_CONFIG};
 use anyhow::Result;
+use colored::Colorize;
 use log::info;
 use std::ops::Deref;
-use colored::Colorize;
 
 pub struct CleanCommand {}
 
@@ -57,17 +57,25 @@ fn clean_download(home_dir: &HomeDir) -> Result<()> {
 }
 
 fn print_build_success() {
-    println!("{}", r#"
+    println!(
+        "{}",
+        r#"
 Clean successful!
-"#.green());
+"#
+        .green()
+    );
 }
 
 fn print_build_failed(err: anyhow::Error) {
-    println!("{}", format!(
-        r#"
+    println!(
+        "{}",
+        format!(
+            r#"
 Clean failed.
 {}
 "#,
-        err
-    ).red());
+            err
+        )
+        .red()
+    );
 }

@@ -13,8 +13,8 @@ use home::home_dir;
 
 use crate::config::cmd::CmdArgs;
 use crate::config::global::GlobalAppConfig;
-use crate::reg::CompressType;
 use crate::reg::home::HomeDir;
+use crate::reg::CompressType;
 use crate::subcmd::build::BuildCommand;
 use crate::subcmd::clean::CleanCommand;
 use crate::subcmd::show_info::ShowInfoCommand;
@@ -80,13 +80,21 @@ fn print_log() {
     let logo_2_5 = r#"\ \  \___|\ \  \ \  \ \  \____\ \  \\ \  \ "#.magenta();
     let logo_2_6 = r#" \ \__\    \ \__\ \__\ \_______\ \__\\ \__\"#.magenta();
     let logo_2_7 = r#"  \|__|     \|__|\|__|\|_______|\|__| \|__|"#.magenta();
-    println!("{}{}\n{}{}\n{}{}\n{}{}\n{}{}\n{}{}\n{}{}\n",
-             logo_1_1, logo_2_1,
-             logo_1_2, logo_2_2,
-             logo_1_3, logo_2_3,
-             logo_1_4, logo_2_4,
-             logo_1_5, logo_2_5,
-             logo_1_6, logo_2_6,
-             logo_1_7, logo_2_7,
+    println!(
+        "{}{}\n{}{}\n{}{}\n{}{}\n{}{}\n{}{}\n{}{}\n",
+        logo_1_1,
+        logo_2_1,
+        logo_1_2,
+        logo_2_2,
+        logo_1_3,
+        logo_2_3,
+        logo_1_4,
+        logo_2_4,
+        logo_1_5,
+        logo_2_5,
+        logo_1_6,
+        logo_2_6,
+        logo_1_7,
+        logo_2_7,
     )
 }

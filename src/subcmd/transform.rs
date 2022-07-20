@@ -32,26 +32,36 @@ impl TransformCommand {
 }
 
 fn print_transform_success(build_args: &TransformCmdArgs) {
-    println!("{}", format!(
-        r#"
+    println!(
+        "{}",
+        format!(
+            r#"
 Transform job successful!
 
 Target image:
 {}
 "#,
-        match &build_args.target {
-            TargetType::Registry(r) => r,
-        }
-    ).green());
+            match &build_args.target {
+                TargetType::Registry(r) => r,
+            }
+        )
+        .green()
+    );
 }
 
 fn print_transform_failed(err: anyhow::Error) {
-    println!("{}", format!(
-        r#"
+    println!(
+        "{}",
+        format!(
+            r#"
 Transform job failed!
 
 {}
-"#, err).red());
+"#,
+            err
+        )
+        .red()
+    );
 }
 
 fn gen_source_info(transform_args: &TransformCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {

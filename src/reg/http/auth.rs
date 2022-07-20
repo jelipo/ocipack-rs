@@ -48,7 +48,7 @@ impl RegTokenHandler {
         let adapter = match &self.authenticate_adapter {
             None => {
                 let new_adapter = AuthenticateAdapter::new_authenticate_adapter(&self.registry_addr, &self.client)
-                    .map_err(|err| anyhow!("get token failed: {}",err))?;
+                    .map_err(|err| anyhow!("get token failed: {}", err))?;
                 self.authenticate_adapter = Some(new_adapter);
                 self.authenticate_adapter.as_ref().unwrap()
             }
