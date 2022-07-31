@@ -37,8 +37,9 @@ zstd = "0.11"
 fantasy-util = "0.1.8"
 ubyte = "0.10"
 colored = "2"
-tonic = { version = "0.8.0", feature = [""] }
+tonic = { version = "0.8.0", feature = ["prost-types"] }
 prost = "0.11.0"
+prost-types = "0.11.0"
 
 [build-dependencies]
 tonic-build = "0.8.0"
