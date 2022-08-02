@@ -3,6 +3,8 @@ use std::option::Option::Some;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Result};
+use fantasy_util::time::system_time::SystemLocalTime;
+use log::warn;
 use regex::Regex;
 use reqwest::blocking::Client;
 use reqwest::Method;
@@ -55,8 +57,11 @@ impl RegTokenHandler {
             Some(adapter) => adapter,
         };
         let token_response = adapter.new_token(scope_opt, self.basic_auth.as_ref(), &self.client, token_type)?;
-        let second_time_now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
-        Ok((token_response.token, second_time_now + token_response.expires_in as u64))
+        let expires_in = token_response.expires_in.unwrap_or_else(|| {
+            warn!("'expires_in' not found in token response. Set the expires time to 60 second by default.");
+            60
+        });
+        Ok((token_response.token, SystemLocalTime::unix_secs() + expires_in as u64))
     }
 }
 
@@ -99,17 +104,19 @@ impl AuthenticateAdapter {
         }
         let http_response = do_request_raw::<u8>(client, url.as_str(), Method::GET, basic_auth, &[], None, None)?;
         let status = http_response.status();
+        let response_text = http_response.text().unwrap_or_else(|_| String::new());
         if !status.is_success() {
-            return Err(anyhow!("get token failed,code:{}", status.as_str()));
+            return Err(anyhow!("get token failed,code: {}. response: {}", status.as_str(),&response_text));
         }
-        Ok(http_response.json::<TokenResponse>()?)
+        serde_json::from_str::<TokenResponse>(&response_text)
+            .map_err(|err| anyhow!("deserialization 'get token' response failed: {}. response: {}.",err,response_text))
     }
 }
 
 #[derive(Deserialize)]
 pub struct TokenResponse {
     token: String,
-    expires_in: usize,
+    expires_in: Option<usize>,
 }
 
 struct InnerToken {
