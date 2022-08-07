@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use fantasy_util::time::system_time::SystemLocalTime;
 use log::warn;
 use regex::Regex;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use reqwest::Method;
 use serde::Deserialize;
 
@@ -31,14 +31,14 @@ impl RegTokenHandler {
         }
     }
 
-    pub fn token(&mut self, scope_opt: Option<&str>, token_type: TokenType) -> Result<String> {
+    pub async fn token(&mut self, scope_opt: Option<&str>, token_type: TokenType) -> Result<String> {
         let scope = match scope_opt {
             None => "",
             Some(scope) => scope,
         };
         match self.token_cache.get_token(scope, token_type.clone()) {
             None => {
-                let (token, expire_second_time) = self.get_remote_token(scope_opt, token_type.clone())?;
+                let (token, expire_second_time) = self.get_remote_token(scope_opt, token_type.clone()).await?;
                 self.token_cache.put_token(scope, token_type, expire_second_time, &token);
                 Ok(token)
             }
@@ -46,17 +46,17 @@ impl RegTokenHandler {
         }
     }
 
-    fn get_remote_token(&mut self, scope_opt: Option<&str>, token_type: TokenType) -> Result<(String, u64)> {
+    async fn get_remote_token(&mut self, scope_opt: Option<&str>, token_type: TokenType) -> Result<(String, u64)> {
         let adapter = match &self.authenticate_adapter {
             None => {
-                let new_adapter = AuthenticateAdapter::new_authenticate_adapter(&self.registry_addr, &self.client)
+                let new_adapter = AuthenticateAdapter::new_authenticate_adapter(&self.registry_addr, &self.client).await
                     .map_err(|err| anyhow!("get token failed: {}", err))?;
                 self.authenticate_adapter = Some(new_adapter);
                 self.authenticate_adapter.as_ref().unwrap()
             }
             Some(adapter) => adapter,
         };
-        let token_response = adapter.new_token(scope_opt, self.basic_auth.as_ref(), &self.client, token_type)?;
+        let token_response = adapter.new_token(scope_opt, self.basic_auth.as_ref(), &self.client, token_type).await?;
         let expires_in = token_response.expires_in.unwrap_or_else(|| {
             warn!("'expires_in' not found in token response. Set the expires time to 60 second by default.");
             60
@@ -71,9 +71,9 @@ pub struct AuthenticateAdapter {
 }
 
 impl AuthenticateAdapter {
-    pub fn new_authenticate_adapter(registry_addr: &str, client: &Client) -> Result<AuthenticateAdapter> {
+    pub async fn new_authenticate_adapter(registry_addr: &str, client: &Client) -> Result<AuthenticateAdapter> {
         let bearer_url = format!("{}/v2/", registry_addr);
-        let http_response = do_request_raw::<u8>(client, bearer_url.as_str(), Method::GET, None, &[], None, None)?;
+        let http_response = do_request_raw::<u8>(client, bearer_url.as_str(), Method::GET, None, &[], None, None).await?;
         let www_authenticate = get_header(http_response.headers(), "Www-Authenticate")
             .ok_or_else(|| anyhow!("'Www-Authenticate' header not found"))?;
         let regex = Regex::new("^Bearer realm=\"(?P<realm>.*)\",service=\"(?P<service>.*)\".*")?;
@@ -88,7 +88,7 @@ impl AuthenticateAdapter {
         })
     }
 
-    pub fn new_token(
+    pub async fn new_token(
         &self,
         scope: Option<&str>,
         basic_auth: Option<&HttpAuth>,
@@ -102,9 +102,9 @@ impl AuthenticateAdapter {
                 TokenType::Pull => url = url + "&scope=repository:" + scope_raw + ":pull",
             }
         }
-        let http_response = do_request_raw::<u8>(client, url.as_str(), Method::GET, basic_auth, &[], None, None)?;
+        let http_response = do_request_raw::<u8>(client, url.as_str(), Method::GET, basic_auth, &[], None, None).await?;
         let status = http_response.status();
-        let response_text = http_response.text().unwrap_or_else(|_| String::new());
+        let response_text = http_response.text().await.unwrap_or_else(|_| String::new());
         if !status.is_success() {
             return Err(anyhow!("get token failed,code: {}. response: {}", status.as_str(),&response_text));
         }

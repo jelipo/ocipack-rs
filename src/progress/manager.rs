@@ -35,7 +35,7 @@ impl<R: ProcessResult> ProcessorManager<R> {
         self.statuses.len()
     }
 
-    pub fn wait_all_done(mut self) -> Result<Vec<R>> {
+    pub async fn wait_all_done(mut self) -> Result<Vec<R>> {
         println!();
         let mut statuses = self.statuses;
         let mut result_infos = Vec::<R>::new();
@@ -45,7 +45,7 @@ impl<R: ProcessResult> ProcessorManager<R> {
                 let status = &progress_status.status();
                 bar.set_size(status.now_size, status.full_size);
                 if status.is_done {
-                    let process_result = processor.wait_result()?;
+                    let process_result = processor.wait_result().await?;
                     let finished_info = process_result.finished_info();
                     bar.finish(true, finished_info);
                     result_infos.push(process_result);

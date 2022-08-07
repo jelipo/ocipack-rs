@@ -1,14 +1,17 @@
 use std::borrow::BorrowMut;
-use std::fs::File;
-use std::io::Write;
+use tokio::fs::File;
+use std::future::Future;
+use std::io::{Cursor, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::thread::JoinHandle;
+use futures_util::StreamExt;
 
 use anyhow::{anyhow, Result};
-use reqwest::blocking::{Client, Response};
+use async_trait::async_trait;
+use reqwest::{Client, Response};
 use reqwest::Method;
+use tokio::task::JoinHandle;
+use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
 use crate::reg::http::{do_request_raw, get_header, HttpAuth};
@@ -71,6 +74,7 @@ impl RegDownloader {
     }
 }
 
+#[async_trait]
 impl Processor<DownloadResult> for RegDownloader {
     fn start(&self) -> Box<dyn ProcessorAsync<DownloadResult>> {
         let blob_config = self.blob_down_config.clone();
@@ -92,13 +96,15 @@ impl Processor<DownloadResult> for RegDownloader {
             auth: self.auth.clone(),
             client: self.client.as_ref().unwrap().clone(),
         };
-        let handle = thread::spawn::<_, Result<DownloadResult>>(move || {
+
+
+        let handle = tokio::spawn(async move {
             let downloader = reg_http_downloader;
-            let result = downloading(status.clone(), &file_path, downloader);
+            let result = downloading(status.clone(), &file_path, downloader).await;
             let status_core = &mut status.status_core.lock().unwrap();
             status_core.done = true;
             if let Err(err) = &result {
-                println!("{}\n{}", err, err.backtrace());
+                println!("{}", err);
             }
             Ok(DownloadResult {
                 file_path: Some(file_path),
@@ -108,6 +114,7 @@ impl Processor<DownloadResult> for RegDownloader {
                 result_str: "complete".to_string(),
             })
         });
+
         Box::new(RegDownloadHandler { join: handle })
     }
 
@@ -120,9 +127,10 @@ pub struct RegDownloadHandler {
     join: JoinHandle<Result<DownloadResult>>,
 }
 
+#[async_trait]
 impl ProcessorAsync<DownloadResult> for RegDownloadHandler {
-    fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
-        let result = self.join.join();
+    async fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
+        let result = self.join.await;
         result.unwrap()
     }
 }
@@ -131,20 +139,21 @@ pub struct RegFinishedDownloader {
     result: DownloadResult,
 }
 
+#[async_trait]
 impl ProcessorAsync<DownloadResult> for RegFinishedDownloader {
-    fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
+    async fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
         Ok(self.result)
     }
 }
 
-fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloader: RegHttpDownloader) -> Result<()> {
+async fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloader: RegHttpDownloader) -> Result<()> {
     //检查本地是否存在已有
     let parent_path = file_path.parent().expect("find file parent dir failed");
     if !parent_path.exists() {
         let _create_result = std::fs::create_dir(parent_path);
     }
     // 请求HTTP下载
-    let mut http_response = reg_http_downloader.do_request_raw()?;
+    let http_response = reg_http_downloader.do_request_raw().await?;
     check(&http_response)?;
     if let Some(len) = http_response.content_length() {
         let mut status_core = status.status_core.lock().expect("lock failed");
@@ -152,7 +161,12 @@ fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloade
     }
     let file = File::create(file_path)?;
     let mut writer = RegDownloaderWriter { status, file };
-    let _copy_size = std::io::copy(&mut http_response, &mut writer)?;
+
+    let mut stream = http_response.bytes_stream();
+    while let Some(item) = stream.next().await {
+        let bytes: bytes::Bytes = item?;
+        writer.write(bytes.as_ref())?;
+    }
     writer.flush()?;
     Ok(())
 }
@@ -164,9 +178,9 @@ struct RegHttpDownloader {
 }
 
 impl RegHttpDownloader {
-    fn do_request_raw(&self) -> Result<Response> {
+    async fn do_request_raw(&self) -> Result<Response> {
         let url = self.url.as_str();
-        do_request_raw::<u8>(&self.client, url, Method::GET, self.auth.as_ref(), &[], None, None)
+        do_request_raw::<u8>(&self.client, url, Method::GET, self.auth.as_ref(), &[], None, None).await
     }
 }
 

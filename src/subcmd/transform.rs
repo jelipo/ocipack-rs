@@ -76,7 +76,7 @@ fn gen_source_info(transform_args: &TransformCmdArgs) -> Result<(SourceInfo, Bui
     Ok((SourceInfo { image_info }, build_info, source_reg_auth))
 }
 
-pub fn transform_handle(
+pub async fn transform_handle(
     source_info: SourceInfo,
     build_info: BuildInfo,
     source_auth: RegAuthType,
@@ -90,7 +90,7 @@ pub fn transform_handle(
         !transform_cmds.allow_insecure,
         transform_cmds.conn_timeout,
         proxy_info,
-    )?;
+    ).await?;
     let target_config_blob = build_target_config_blob(build_info, &pull_result.config_blob, None, &transform_cmds.format);
     let source_manifest = pull_result.manifest;
 
@@ -109,7 +109,7 @@ pub fn transform_handle(
                 transform_cmds.conn_timeout,
                 transform_cmds.target_proxy.clone(),
             )?;
-            registry_adapter.upload()?
+            registry_adapter.upload().await?
         }
     }
     Ok(())

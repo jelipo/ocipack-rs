@@ -1,4 +1,4 @@
-use std::fs::File;
+use tokio::fs::File;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};

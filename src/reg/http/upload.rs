@@ -1,18 +1,18 @@
-use std::fs::File;
+use tokio::fs::File;
 use std::io::Read;
 use std::ops::DerefMut;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
-use reqwest::blocking::Client;
+use async_trait::async_trait;
+use reqwest::Client;
 use reqwest::Method;
+use tokio::task::JoinHandle;
 
-use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
-use crate::reg::http::{do_request_raw_read, HttpAuth};
+use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
 use crate::reg::BlobConfig;
+use crate::reg::http::{do_request_raw_read, HttpAuth};
 
 pub struct RegUploader {
     reg_uploader_enum: RegUploaderEnum,
@@ -25,7 +25,7 @@ pub struct RegFinishedUploader {
 }
 
 impl ProcessorAsync<UploadResult> for RegFinishedUploader {
-    fn wait_result(self: Box<Self>) -> Result<UploadResult> {
+    async fn wait_result(self: Box<Self>) -> Result<UploadResult> {
         Ok(self.upload_result)
     }
 }
@@ -113,13 +113,13 @@ impl Processor<UploadResult> for RegUploader {
                 };
                 let file_path_clone = self.blob_config.file_path.to_str().unwrap().to_string();
                 let blob_config_arc = self.blob_config.clone();
-                let handle = thread::spawn::<_, Result<UploadResult>>(move || {
+                let handle = tokio::spawn(async move {
                     let uploader = reg_http_uploader;
-                    let result = uploading(status.clone(), file_path_clone.clone().as_str(), uploader, blob_config_arc);
+                    let result = uploading(status.clone(), file_path_clone.clone().as_str(), uploader, blob_config_arc).await;
                     let status_core = &mut status.status_core.lock().unwrap();
                     status_core.done = true;
                     if let Err(err) = &result {
-                        Err(anyhow!("{}\n{}", err, err.backtrace()))
+                        Err(anyhow!("{}", err))
                     } else {
                         Ok(UploadResult {
                             result_str: "succuss".to_string(),
@@ -136,12 +136,12 @@ impl Processor<UploadResult> for RegUploader {
     }
 }
 
-fn uploading(
+async fn uploading(
     status: RegUploaderStatus,
     file_path: &str,
     reg_http_uploader: RegHttpUploader,
     blob_config: Arc<BlobConfig>,
-) -> Result<()> {
+) -> Result<String> {
     //检查本地是否存在已有
     let file_path = Path::new(file_path);
     let local_file = File::open(file_path)?;
@@ -150,7 +150,7 @@ fn uploading(
         status,
         file: local_file,
     };
-    let mut response = do_request_raw_read::<RegUploaderReader>(
+    let response = do_request_raw_read::<RegUploaderReader>(
         &reg_http_uploader.client,
         reg_http_uploader.url.as_str(),
         Method::PUT,
@@ -158,17 +158,15 @@ fn uploading(
         &[],
         Some(reader),
         file_size,
-    )?;
+    ).await?;
     let short_hash = &blob_config.short_hash;
     if response.status().is_success() {
-        let mut response_string = String::new();
-        let _read_size = response.read_to_string(&mut response_string)?;
-        Ok(())
+        let body = response.text().await.unwrap_or("".to_string());
+        Ok(body)
     } else {
-        let _status_code = response.status().as_str();
-        let mut response_string = String::new();
-        let _read_size = response.read_to_string(&mut response_string)?;
-        Err(anyhow!("{} upload request failed. {}", short_hash, response_string))
+        let status_code = response.status();
+        let body = response.text().await.unwrap_or("".to_string());
+        Err(anyhow!("{} upload request failed. status_code: {} body: {}", short_hash,status_code, body))
     }
 }
 
@@ -191,9 +189,10 @@ pub struct RegUploadHandler {
     join: JoinHandle<Result<UploadResult>>,
 }
 
+#[async_trait]
 impl ProcessorAsync<UploadResult> for RegUploadHandler {
-    fn wait_result(self: Box<Self>) -> Result<UploadResult> {
-        self.join.join().map_err(|_| anyhow!("join failed."))?
+    async fn wait_result(self: Box<Self>) -> Result<UploadResult> {
+        self.join.await.map_err(|_| anyhow!("join failed."))?
     }
 }
 

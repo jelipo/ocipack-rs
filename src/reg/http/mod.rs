@@ -2,10 +2,15 @@ use std::io::Read;
 use std::str::FromStr;
 
 use anyhow::Result;
-use reqwest::blocking::{Body, Client, Request, Response};
-use reqwest::header::HeaderMap;
+use bytes::Bytes;
+use futures_util::Stream;
+use reqwest::{Body, Client, Request, Response};
 use reqwest::{Method, Url};
+use reqwest::header::HeaderMap;
 use serde::Serialize;
+use tokio::fs::File;
+use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::reg::RegContentType;
 
@@ -31,7 +36,7 @@ pub enum RequestBody<'a, T: Serialize + ?Sized> {
     Read(Body),
 }
 
-fn do_request_raw<T: Serialize + ?Sized>(
+async fn do_request_raw<T: Serialize + ?Sized>(
     client: &Client,
     url: &str,
     method: Method,
@@ -42,23 +47,24 @@ fn do_request_raw<T: Serialize + ?Sized>(
 ) -> Result<Response> {
     let request_body = body.map(|json| RequestBody::Json(json));
     let request = build_request::<T>(client, url, method, http_auth_opt, accepts, request_body, content_type)?;
-    let http_response = client.execute(request)?;
+    let http_response = client.execute(request).await?;
     Ok(http_response)
 }
 
-fn do_request_raw_read<R: Read + Send + 'static>(
+async fn do_request_raw_read<R: AsyncRead + Send + Sync + 'static>(
     client: &Client,
     url: &str,
     method: Method,
     http_auth_opt: Option<&HttpAuth>,
     accepts: &[RegContentType],
-    body: Option<R>,
+    body: Option<FramedRead<R, BytesCodec>>,
     size: u64,
 ) -> Result<Response> {
-    let request_body = body.map(|read| RequestBody::Read(Body::sized(read, size)));
-
+    let request_body = body.map(|framed_read| {
+        RequestBody::Read(Body::wrap_stream(framed_read))
+    });
     let request = build_request::<String>(client, url, method, http_auth_opt, accepts, request_body, None)?;
-    let http_response = client.execute(request)?;
+    let http_response = client.execute(request).await?;
     Ok(http_response)
 }
 

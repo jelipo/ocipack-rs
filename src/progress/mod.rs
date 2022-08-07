@@ -1,19 +1,21 @@
 use std::sync::Arc;
-
+use async_trait::async_trait;
 use anyhow::Result;
 
 use crate::reg::BlobConfig;
 
 pub mod manager;
 
+#[async_trait]
 pub trait Processor<R> {
     fn start(&self) -> Box<dyn ProcessorAsync<R>>;
 
     fn process_status(&self) -> Box<dyn ProgressStatus>;
 }
 
+#[async_trait]
 pub trait ProcessorAsync<R> {
-    fn wait_result(self: Box<Self>) -> Result<R>;
+    async fn wait_result(self: Box<Self>) -> Result<R>;
 }
 
 pub struct CoreStatus {

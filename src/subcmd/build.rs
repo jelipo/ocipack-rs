@@ -1,4 +1,4 @@
-use std::fs::File;
+use tokio::fs::File;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
@@ -89,7 +89,7 @@ fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo
     Ok((SourceInfo { image_info }, build_info, source_reg_auth))
 }
 
-fn handle(
+async fn handle(
     source_info: SourceInfo,
     build_info: BuildInfo,
     source_auth: RegAuthType,
@@ -104,7 +104,7 @@ fn handle(
         !build_cmds.allow_insecure,
         build_cmds.conn_timeout,
         proxy_info,
-    )?;
+    ).await?;
     let compress_type = if use_zstd { CompressType::Zstd } else { CompressType::Tgz };
     let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?
         .map(|tar_path| compress_layer_file(&tar_path, &home_dir, compress_type))
@@ -145,7 +145,7 @@ fn handle(
                 build_cmds.conn_timeout,
                 build_cmds.target_proxy.clone(),
             )?;
-            registry_adapter.upload()?
+            registry_adapter.upload().await?
         }
     }
     Ok(())
