@@ -35,7 +35,7 @@ pub async fn pull(
         "Source image info. host='{}' name='{}' reference='{}'",
         image_host, &image_info.image_name, image_info.reference
     );
-    let registry_auth = source_auth.get_auth()?;
+    let registry_auth = source_auth.get_auth().await?;
     let info = RegistryCreateInfo {
         auth: registry_auth,
         conn_timeout_second: read_timeout_second,
@@ -80,11 +80,13 @@ pub async fn pull(
 
     let config_blob_enum = match &manifest {
         Manifest::OciV1(_) => {
-            let (blob, _) = from_registry.image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, config_digest).await?;
+            let (blob, _) =
+                from_registry.image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, config_digest).await?;
             ConfigBlobEnum::OciV1(blob)
         }
         Manifest::DockerV2S2(_) => {
-            let (blob, _) = from_registry.image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, config_digest).await?;
+            let (blob, _) =
+                from_registry.image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, config_digest).await?;
             ConfigBlobEnum::DockerV2S2(blob)
         }
     };

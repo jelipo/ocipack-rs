@@ -49,7 +49,8 @@ impl RegTokenHandler {
     async fn get_remote_token(&mut self, scope_opt: Option<&str>, token_type: TokenType) -> Result<(String, u64)> {
         let adapter = match &self.authenticate_adapter {
             None => {
-                let new_adapter = AuthenticateAdapter::new_authenticate_adapter(&self.registry_addr, &self.client).await
+                let new_adapter = AuthenticateAdapter::new_authenticate_adapter(&self.registry_addr, &self.client)
+                    .await
                     .map_err(|err| anyhow!("get token failed: {}", err))?;
                 self.authenticate_adapter = Some(new_adapter);
                 self.authenticate_adapter.as_ref().unwrap()
@@ -106,10 +107,19 @@ impl AuthenticateAdapter {
         let status = http_response.status();
         let response_text = http_response.text().await.unwrap_or_else(|_| String::new());
         if !status.is_success() {
-            return Err(anyhow!("get token failed,code: {}. response: {}", status.as_str(),&response_text));
+            return Err(anyhow!(
+                "get token failed,code: {}. response: {}",
+                status.as_str(),
+                &response_text
+            ));
         }
-        serde_json::from_str::<TokenResponse>(&response_text)
-            .map_err(|err| anyhow!("deserialization 'get token' response failed: {}. response: {}.",err,response_text))
+        serde_json::from_str::<TokenResponse>(&response_text).map_err(|err| {
+            anyhow!(
+                "deserialization 'get token' response failed: {}. response: {}.",
+                err,
+                response_text
+            )
+        })
     }
 }
 

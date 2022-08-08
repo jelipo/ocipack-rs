@@ -71,7 +71,7 @@ impl RegistryTargetAdapter {
     pub async fn upload(self) -> Result<()> {
         let home_dir = GLOBAL_CONFIG.home_dir.clone();
         let target_info = self.info;
-        let reg_auth = self.target_auth.get_auth()?;
+        let reg_auth = self.target_auth.get_auth().await?;
         let host = target_info.image_info.image_host;
         let create_info = RegistryCreateInfo {
             auth: reg_auth,
@@ -107,13 +107,15 @@ impl RegistryTargetAdapter {
             debug!("Upload done: {}", &upload_result.finished_info());
         }
         info!("Putting manifest...");
-        let (status_code, body) = manager.put_manifest(
-            &Reference {
-                image_name: target_info.image_info.image_name.as_str(),
-                reference: target_info.image_info.reference.as_str(),
-            },
-            target_manifest,
-        ).await?;
+        let (status_code, body) = manager
+            .put_manifest(
+                &Reference {
+                    image_name: target_info.image_info.image_name.as_str(),
+                    reference: target_info.image_info.reference.as_str(),
+                },
+                target_manifest,
+            )
+            .await?;
         if status_code.is_success() {
             info!("Upload image finished.");
             Ok(())

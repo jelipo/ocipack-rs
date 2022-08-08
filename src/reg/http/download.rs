@@ -1,15 +1,16 @@
+use futures_util::StreamExt;
 use std::borrow::BorrowMut;
-use tokio::fs::File;
 use std::future::Future;
 use std::io::{Cursor, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use futures_util::StreamExt;
+use tokio::fs::File;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use reqwest::{Client, Response};
 use reqwest::Method;
+use reqwest::{Client, Response};
+use tokio::io::AsyncWriteExt;
 use tokio::task::JoinHandle;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
@@ -97,7 +98,6 @@ impl Processor<DownloadResult> for RegDownloader {
             client: self.client.as_ref().unwrap().clone(),
         };
 
-
         let handle = tokio::spawn(async move {
             let downloader = reg_http_downloader;
             let result = downloading(status.clone(), &file_path, downloader).await;
@@ -159,7 +159,7 @@ async fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_dow
         let mut status_core = status.status_core.lock().expect("lock failed");
         status_core.borrow_mut().file_size = len;
     }
-    let file = File::create(file_path)?;
+    let file = File::create(file_path).await?;
     let mut writer = RegDownloaderWriter { status, file };
 
     let mut stream = http_response.bytes_stream();

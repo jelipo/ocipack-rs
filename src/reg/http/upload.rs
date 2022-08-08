@@ -1,18 +1,21 @@
-use tokio::fs::File;
 use std::io::Read;
 use std::ops::DerefMut;
 use std::path::Path;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll};
+use tokio::fs::File;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use reqwest::Method;
+use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
 use tokio::task::JoinHandle;
 
-use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
-use crate::reg::BlobConfig;
+use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
 use crate::reg::http::{do_request_raw_read, HttpAuth};
+use crate::reg::BlobConfig;
 
 pub struct RegUploader {
     reg_uploader_enum: RegUploaderEnum,
@@ -24,6 +27,7 @@ pub struct RegFinishedUploader {
     upload_result: UploadResult,
 }
 
+#[async_trait]
 impl ProcessorAsync<UploadResult> for RegFinishedUploader {
     async fn wait_result(self: Box<Self>) -> Result<UploadResult> {
         Ok(self.upload_result)
@@ -144,8 +148,8 @@ async fn uploading(
 ) -> Result<String> {
     //检查本地是否存在已有
     let file_path = Path::new(file_path);
-    let local_file = File::open(file_path)?;
-    let file_size = local_file.metadata()?.len();
+    let local_file = File::open(file_path).await?;
+    let file_size = local_file.metadata().await?.len();
     let reader = RegUploaderReader {
         status,
         file: local_file,
@@ -158,7 +162,8 @@ async fn uploading(
         &[],
         Some(reader),
         file_size,
-    ).await?;
+    )
+        .await?;
     let short_hash = &blob_config.short_hash;
     if response.status().is_success() {
         let body = response.text().await.unwrap_or("".to_string());
@@ -166,7 +171,12 @@ async fn uploading(
     } else {
         let status_code = response.status();
         let body = response.text().await.unwrap_or("".to_string());
-        Err(anyhow!("{} upload request failed. status_code: {} body: {}", short_hash,status_code, body))
+        Err(anyhow!(
+            "{} upload request failed. status_code: {} body: {}",
+            short_hash,
+            status_code,
+            body
+        ))
     }
 }
 
@@ -175,13 +185,15 @@ pub struct RegUploaderReader {
     file: File,
 }
 
-impl Read for RegUploaderReader {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let size = self.file.read(buf)?;
-        let mut guard = self.status.status_core.lock().unwrap();
-        let core = guard.deref_mut();
-        core.curr_size += size as u64;
-        Ok(size)
+impl AsyncRead for RegUploaderReader {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        let read = self.file.poll_read(cx, buf)
+            .map_ok(|| {
+                let mut guard = self.status.status_core.lock().unwrap();
+                let core = guard.deref_mut();
+                core.curr_size += size as u64;
+            });
+        read
     }
 }
 

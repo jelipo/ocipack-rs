@@ -1,11 +1,12 @@
 use std::collections::HashMap;
-use tokio::fs::File;
 use std::io::Read;
 use std::str::FromStr;
+use tokio::fs::File;
 
 use anyhow::{anyhow, Result};
 use dockerfile_parser::{BreakableStringComponent, Dockerfile, Instruction, ShellOrExecExpr};
 use log::{debug, warn};
+use tokio::io::AsyncReadExt;
 
 use crate::adapter::{BuildInfo, CopyFile, ImageInfo};
 use crate::const_data::DEFAULT_IMAGE_HOST;
@@ -13,10 +14,10 @@ use crate::const_data::DEFAULT_IMAGE_HOST;
 pub struct DockerfileAdapter {}
 
 impl DockerfileAdapter {
-    pub fn parse(path: &str) -> Result<(ImageInfo, BuildInfo)> {
-        let mut dockerfile_file = File::open(path)?;
+    pub async fn parse(path: &str) -> Result<(ImageInfo, BuildInfo)> {
+        let mut dockerfile_file = File::open(path).await?;
         let mut str_body = String::new();
-        let read_size = dockerfile_file.read_to_string(&mut str_body)?;
+        let read_size = dockerfile_file.read_to_string(&mut str_body).await?;
         debug!("Dockerfile size: {:?}", read_size);
         Self::parse_from_str(&str_body)
     }

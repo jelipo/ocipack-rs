@@ -6,18 +6,18 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
+use reqwest::redirect::Policy;
 use reqwest::{Client, Response};
 use reqwest::{Method, Proxy, StatusCode};
-use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::reg::{BlobConfig, RegContentType};
-use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::reg::http::auth::{RegTokenHandler, TokenType};
 use crate::reg::http::download::RegDownloader;
 use crate::reg::http::upload::RegUploader;
+use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::reg::proxy::ProxyInfo;
+use crate::reg::{BlobConfig, RegContentType};
 use crate::util::sha;
 
 pub struct RegistryHttpClient {
@@ -60,14 +60,20 @@ impl RegistryHttpClient {
         })
     }
 
-    pub async fn _request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(&mut self, request: ClientRequest<'_, T>) -> Result<R> {
+    pub async fn _request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(
+        &mut self,
+        request: ClientRequest<'_, T>,
+    ) -> Result<R> {
         let success_response = self.request_full_response(request).await?;
         let body_bytes = success_response._bytes_body();
         let _body_sha256 = format!("sha256:{}", sha::_sha256(body_bytes));
         success_response._json_body::<R>()
     }
 
-    pub async fn request_full_response<T: Serialize + ?Sized>(&mut self, request: ClientRequest<'_, T>) -> Result<FullRegistryResponse> {
+    pub async fn request_full_response<T: Serialize + ?Sized>(
+        &mut self,
+        request: ClientRequest<'_, T>,
+    ) -> Result<FullRegistryResponse> {
         self.do_request(request).await
     }
 
@@ -88,7 +94,8 @@ impl RegistryHttpClient {
             request.accept,
             request.body,
             request.request_content_type,
-        ).await?;
+        )
+        .await?;
         Ok(http_response)
     }
 
@@ -129,7 +136,13 @@ impl RegistryHttpClient {
         Ok(downloader)
     }
 
-    pub async fn upload(&mut self, url: String, blob_config: BlobConfig, scope: &str, file_local_path: &Path) -> Result<RegUploader> {
+    pub async fn upload(
+        &mut self,
+        url: String,
+        blob_config: BlobConfig,
+        scope: &str,
+        file_local_path: &Path,
+    ) -> Result<RegUploader> {
         let token = self.reg_token_handler.token(Some(scope), TokenType::PushAndPull).await?;
         Ok(RegUploader::new_uploader(
             url,

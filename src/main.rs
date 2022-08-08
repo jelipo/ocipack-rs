@@ -1,5 +1,7 @@
 #![feature(exclusive_range_pattern)]
 #![feature(once_cell)]
+#![feature(async_iter_from_iter)]
+#![feature(async_closure)]
 
 extern crate derive_builder;
 
@@ -35,22 +37,23 @@ pub static GLOBAL_CONFIG: LazyLock<GlobalAppConfig> = LazyLock::new(init_config)
 
 pub static CACHE_DIR_NAME: &str = "pack_cache";
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     init::init()?;
     let global_config = GLOBAL_CONFIG.deref();
     print_log();
     match &global_config.cmd_args {
         CmdArgs::Build(build_args) => {
-            BuildCommand::build(build_args)?;
+            BuildCommand::build(build_args).await?;
         }
         CmdArgs::Transform(transform_args) => {
-            TransformCommand::transform(transform_args)?;
+            TransformCommand::transform(transform_args).await?;
         }
         CmdArgs::Clean(clean_args) => {
             CleanCommand::clean(clean_args)?;
         }
         CmdArgs::ShowInfo(show_info_args) => {
-            ShowInfoCommand::show(show_info_args)?;
+            ShowInfoCommand::show(show_info_args).await?;
         }
     }
     Ok(())

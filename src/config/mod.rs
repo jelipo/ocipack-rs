@@ -1,8 +1,12 @@
-use tokio::fs::File;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
+use bytes::Buf;
 use home::home_dir;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
+use tokio_util::codec::{BytesCodec, FramedRead};
+use ubyte::ToByteUnit;
 
 use crate::config::cmd::BaseAuth;
 use crate::config::userconfig::UserDockerConfig;
@@ -20,11 +24,11 @@ pub enum RegAuthType {
 }
 
 impl RegAuthType {
-    pub fn get_auth(self) -> Result<Option<RegistryAuth>> {
+    pub async fn get_auth(self) -> Result<Option<RegistryAuth>> {
         match self {
             RegAuthType::LocalDockerAuth { reg_host } => Ok(match home_dir() {
                 None => None,
-                Some(dir) => read_docker_config(dir.join(".docker/config.json"), &reg_host)?,
+                Some(dir) => read_docker_config(dir.join(".docker/config.json"), &reg_host).await?,
             }),
             RegAuthType::CustomPassword { username, password } => Ok(Some(RegistryAuth { username, password })),
         }
@@ -47,10 +51,13 @@ impl RegAuthType {
     }
 }
 
-fn read_docker_config(config_path: PathBuf, reg_host: &str) -> Result<Option<RegistryAuth>> {
+async fn read_docker_config(config_path: PathBuf, reg_host: &str) -> Result<Option<RegistryAuth>> {
     if config_path.is_file() {
-        let config_file = File::open(config_path)?;
-        let user_docker_config = serde_json::from_reader::<_, UserDockerConfig>(config_file)?;
+        let mut config_file = File::open(config_path).await?;
+        let file_size = config_file.metadata().await?.len();
+        let mut file_bytes = vec![0u8; file_size as usize];
+        config_file.read_to_end(&mut file_bytes).await?;
+        let user_docker_config = serde_json::from_slice::<UserDockerConfig>(&file_bytes)?;
         get_auth_from_dockerconfig(user_docker_config, reg_host)
     } else {
         Ok(None)

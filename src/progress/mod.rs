@@ -1,6 +1,6 @@
-use std::sync::Arc;
-use async_trait::async_trait;
 use anyhow::Result;
+use async_trait::async_trait;
+use std::sync::Arc;
 
 use crate::reg::BlobConfig;
 

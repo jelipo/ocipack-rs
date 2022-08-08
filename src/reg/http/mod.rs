@@ -4,9 +4,9 @@ use std::str::FromStr;
 use anyhow::Result;
 use bytes::Bytes;
 use futures_util::Stream;
+use reqwest::header::HeaderMap;
 use reqwest::{Body, Client, Request, Response};
 use reqwest::{Method, Url};
-use reqwest::header::HeaderMap;
 use serde::Serialize;
 use tokio::fs::File;
 use tokio::io::{AsyncRead, AsyncReadExt};
@@ -60,9 +60,7 @@ async fn do_request_raw_read<R: AsyncRead + Send + Sync + 'static>(
     body: Option<FramedRead<R, BytesCodec>>,
     size: u64,
 ) -> Result<Response> {
-    let request_body = body.map(|framed_read| {
-        RequestBody::Read(Body::wrap_stream(framed_read))
-    });
+    let request_body = body.map(|framed_read| RequestBody::Read(Body::wrap_stream(framed_read)));
     let request = build_request::<String>(client, url, method, http_auth_opt, accepts, request_body, None)?;
     let http_response = client.execute(request).await?;
     Ok(http_response)

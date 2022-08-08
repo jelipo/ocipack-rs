@@ -1,26 +1,18 @@
-use tokio::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
+use tokio::fs::File;
 
 use anyhow::Result;
 use bytes::Bytes;
 use sha2::digest::DynDigest;
 use sha2::{Digest, Sha256};
+use tokio::io::AsyncReadExt;
 
 pub fn _sha256(bytes: &Bytes) -> String {
     let mut hasher = Sha256::new();
     DynDigest::update(&mut hasher, bytes.as_ref());
     let sha256 = &hasher.finalize()[..];
     hex::encode(sha256)
-}
-
-/// 计算文件的sha256值,并返回Hex
-pub fn _file_sha256(file_path: &Path) -> Result<String> {
-    let mut file = File::open(file_path)?;
-    let mut sha256 = Sha256::new();
-    let _i = std::io::copy(&mut file, &mut sha256)?;
-    let sha256 = &sha256.finalize()[..];
-    Ok(hex::encode(sha256))
 }
 
 pub fn bytes_sha256(bytes: &[u8]) -> String {

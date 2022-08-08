@@ -154,7 +154,12 @@ impl MyImageManager {
         Ok((serde_json::from_str::<T>(&str_body)?, str_body))
     }
 
-    pub async fn layer_blob_download(&mut self, name: &str, blob_digest: &RegDigest, layer_size: Option<u64>) -> Result<RegDownloader> {
+    pub async fn layer_blob_download(
+        &mut self,
+        name: &str,
+        blob_digest: &RegDigest,
+        layer_size: Option<u64>,
+    ) -> Result<RegDownloader> {
         let url_path = format!("/v2/{}/blobs/{}", name, blob_digest.digest);
         let file_path = GLOBAL_CONFIG.home_dir.cache.blobs.download_ready(blob_digest);
         let file_name = blob_digest.sha256.clone();
@@ -423,7 +428,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -432,14 +437,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -462,7 +467,7 @@ impl ToString for CompressType {
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
         }
-            .to_string()
+        .to_string()
     }
 }
 

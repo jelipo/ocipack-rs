@@ -76,20 +76,23 @@ impl RegistryImageInfo {
     /// 获取
     async fn info(use_https: bool, image_info: ImageInfo, auth: RegAuthType, proxy: Option<ProxyInfo>) -> Result<ImageShowInfo> {
         let info = RegistryCreateInfo {
-            auth: auth.get_auth()?,
+            auth: auth.get_auth().await?,
             conn_timeout_second: 600,
             proxy,
         };
 
         let mut registry_client = Registry::open(use_https, &image_info.image_host, info)?;
         let image_manager = &mut registry_client.image_manager;
-        let (manifest, manifest_raw) = image_manager.manifests(&Reference {
-            image_name: &image_info.image_name,
-            reference: &image_info.reference,
-        }).await?;
+        let (manifest, manifest_raw) = image_manager
+            .manifests(&Reference {
+                image_name: &image_info.image_name,
+                reference: &image_info.reference,
+            })
+            .await?;
         let (config_blob_enum, config_blob_raw) = match &manifest {
             Manifest::OciV1(_) => {
-                let (blob, raw) = image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, manifest.config_digest()).await?;
+                let (blob, raw) =
+                    image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, manifest.config_digest()).await?;
                 (ConfigBlobEnum::OciV1(blob), raw)
             }
             Manifest::DockerV2S2(_) => {
