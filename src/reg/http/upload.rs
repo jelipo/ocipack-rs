@@ -191,7 +191,7 @@ impl AsyncRead for RegUploaderReader {
             .map_ok(|| {
                 let mut guard = self.status.status_core.lock().unwrap();
                 let core = guard.deref_mut();
-                core.curr_size += size as u64;
+                core.curr_size += buf.filled().len() as u64;
             });
         read
     }

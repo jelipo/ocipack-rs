@@ -24,7 +24,7 @@ sha2 = "0.10"
 hex-literal = "0.3"
 hex = "0.4"
 regex = "1.5"
-tar = "0.4"
+tar = { version = "0.4", features = ["default"] }
 flate2 = "1.0"
 rand = "0.8"
 url = "2.2"

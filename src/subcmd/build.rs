@@ -1,25 +1,25 @@
 use std::path::{Path, PathBuf};
-use tokio::fs::File;
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use futures_util::{stream, StreamExt};
 use log::info;
 use tar::Builder;
+use tokio::fs::File;
 
+use crate::{GLOBAL_CONFIG, HomeDir};
+use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
-use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
+use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::reg::home::{LocalLayer, TempLayerInfo};
 use crate::reg::manifest::Manifest;
 use crate::reg::proxy::ProxyInfo;
-use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
-use crate::util::sha::{Sha256Reader, Sha256Writer};
 use crate::util::{compress, random};
-use crate::{HomeDir, GLOBAL_CONFIG};
+use crate::util::sha::{Sha256Reader, Sha256Writer};
 
 pub struct BuildCommand {}
 
@@ -105,15 +105,16 @@ async fn handle(
         !build_cmds.allow_insecure,
         build_cmds.conn_timeout,
         proxy_info,
-    )
-        .await?;
+    ).await?;
     let compress_type = if use_zstd { CompressType::Zstd } else { CompressType::Tgz };
-    let option = build_top_tar(&build_info.copy_files, &home_dir).await?;
-    let temp_layer = build_top_tar(&build_info.copy_files, &home_dir).await?
-        .map(async move |tar_path| {
-            compress_layer_file(&tar_path, &home_dir, compress_type).await
-        })
-        .transpose()?;
+    let result = tokio::task::spawn_blocking(move || {
+        build_top_tar(&build_info.copy_files, &home_dir)
+    }).await??;
+    let home_dir = GLOBAL_CONFIG.home_dir.clone();
+    let temp_layer = match result {
+        None => None,
+        Some(tar_path) => Some(compress_layer_file(&tar_path, &home_dir, compress_type).await),
+    }.transpose()?;
     let temp_local_layer = if let Some(temp_layer) = &temp_layer {
         home_dir.cache.blobs.move_to_blob(
             &temp_layer.compress_layer_path,
@@ -157,14 +158,15 @@ async fn handle(
 }
 
 /// 构建一个tar layer
-async fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<PathBuf>> {
+fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<PathBuf>> {
     if copyfiles.is_empty() {
         return Ok(None);
     }
     info!("Building new tar...");
     let tar_file_name = random::random_str(10) + ".tar";
     let tar_temp_file_path = home_dir.cache.temp_dir.join(tar_file_name);
-    let tar_temp_file = File::create(tar_temp_file_path.as_path()).await?;
+    let tar_temp_file = std::fs::File::create(tar_temp_file_path.as_path())?;
+
     let mut tar_builder = Builder::new(tar_temp_file);
     for copyfile in copyfiles {
         for source_path_str in &copyfile.source_path {
@@ -180,7 +182,7 @@ async fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Opt
             if source_path.is_file() {
                 let file_name = source_path.file_name().ok_or_else(|| anyhow!("error file name"))?.to_string_lossy();
                 let dest_file_path = PathBuf::from(dest_path).join(file_name.to_string()).to_string_lossy().to_string();
-                let mut sourcefile = File::open(source_path).await?;
+                let mut sourcefile = std::fs::File::open(source_path)?;
                 tar_builder.append_file(dest_file_path, &mut sourcefile)?;
             } else if source_path.is_dir() {
                 tar_builder.append_dir(dest_path, source_path_str)?;

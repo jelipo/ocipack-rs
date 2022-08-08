@@ -57,10 +57,13 @@ async fn do_request_raw_read<R: AsyncRead + Send + Sync + 'static>(
     method: Method,
     http_auth_opt: Option<&HttpAuth>,
     accepts: &[RegContentType],
-    body: Option<FramedRead<R, BytesCodec>>,
+    body: Option<R>,
     size: u64,
 ) -> Result<Response> {
-    let request_body = body.map(|framed_read| RequestBody::Read(Body::wrap_stream(framed_read)));
+    let request_body = body.map(|async_read| {
+        let read = FramedRead::new(async_read, BytesCodec::new());
+        RequestBody::Read(Body::wrap_stream(read))
+    });
     let request = build_request::<String>(client, url, method, http_auth_opt, accepts, request_body, None)?;
     let http_response = client.execute(request).await?;
     Ok(http_response)
