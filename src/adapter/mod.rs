@@ -4,6 +4,8 @@ use crate::config::cmd::TargetFormat;
 
 pub mod docker;
 pub mod registry;
+pub mod containerd;
+
 
 pub struct ImageInfo {
     pub image_host: String,

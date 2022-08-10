@@ -119,7 +119,7 @@ impl Processor<UploadResult> for RegUploader {
                     let status_core = &mut status.status_core.lock().unwrap();
                     status_core.done = true;
                     if let Err(err) = &result {
-                        Err(anyhow!("{}\n{}", err, err.backtrace()))
+                        Err(anyhow!("{}", err))
                     } else {
                         Ok(UploadResult {
                             result_str: "succuss".to_string(),

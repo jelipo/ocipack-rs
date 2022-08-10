@@ -1,5 +1,6 @@
 #![feature(exclusive_range_pattern)]
 #![feature(once_cell)]
+#![feature(async_closure)]
 
 extern crate derive_builder;
 

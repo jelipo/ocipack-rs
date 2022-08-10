@@ -11,6 +11,9 @@ codegen-units = 1
 panic = "abort"
 strip = "debuginfo"
 
+[build-dependencies]
+tonic-build = "0.8"
+
 [dependencies]
 chrono = "0.4"
 reqwest = { version = "0.11", features = ["gzip", "blocking", "json", "deflate", "socks", "rustls-tls"], default-features = false }
@@ -37,3 +40,7 @@ zstd = "0.11"
 fantasy-util = "0.1.8"
 ubyte = "0.10"
 colored = "2"
+tonic = "0.8"
+prost = { version = "0.11" }
+prost-types = "0.11"
+tokio = { version = "1.20", features = ["full"] }

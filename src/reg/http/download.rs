@@ -98,7 +98,7 @@ impl Processor<DownloadResult> for RegDownloader {
             let status_core = &mut status.status_core.lock().unwrap();
             status_core.done = true;
             if let Err(err) = &result {
-                println!("{}\n{}", err, err.backtrace());
+                println!("{}", err);
             }
             Ok(DownloadResult {
                 file_path: Some(file_path),
