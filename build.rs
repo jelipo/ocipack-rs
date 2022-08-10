@@ -1,8 +1,8 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tonic_build::configure()
-        .out_dir("src/adapter/containerd-adapter")
-        .compile(&["proto/images.proto"], &["proto"])
-        .unwrap();
+    // tonic_build::configure()
+    //     .out_dir("src/adapter/containerd-adapter")
+    //     .compile(&["proto/images.proto"], &["proto"])
+    //     .unwrap();
     Ok(())
 }
 
