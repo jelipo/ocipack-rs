@@ -6,13 +6,9 @@ use tonic::metadata::{MetadataMap, MetadataValue};
 use tonic::transport::{Channel, Endpoint, Error, Server, Uri};
 use tower::service_fn;
 
-use crate::adapter::containerd::services::images::v1::{ListImagesRequest, ListImagesResponse};
+use crate::adapter::containerd::services::images::v1::{CreateImageRequest, CreateImageResponse, Image, ListImagesRequest, ListImagesResponse};
 use crate::adapter::containerd::services::images::v1::images_client::ImagesClient;
-
-pub struct ContainerdAdapter {
-    runtime: tokio::runtime::Runtime,
-    tonic_channel: Channel,
-}
+use crate::adapter::containerd::types::Descriptor;
 
 pub mod services {
     pub mod images {
@@ -26,6 +22,13 @@ pub mod types {
     include!("containerd-adapter/containerd.types.rs");
 }
 
+
+pub struct ContainerdAdapter {
+    runtime: tokio::runtime::Runtime,
+    tonic_channel: Channel,
+}
+
+const CONTAINERD_NAMESPACE_KEY: &str = "containerd-namespace";
 
 impl ContainerdAdapter {
     pub fn new_containerd_adapter() -> Result<ContainerdAdapter> {
@@ -49,8 +52,30 @@ impl ContainerdAdapter {
             let mut request = Request::new(ListImagesRequest {
                 filters: vec![]
             });
-            let x = request.metadata_mut().append("containerd-namespace", MetadataValue::try_from("k8s.io")?);
+            request.metadata_mut().append(CONTAINERD_NAMESPACE_KEY, MetadataValue::from_static("k8s.io"));
             Ok(ImagesClient::new(channel).list(request).await?)
+        })
+    }
+
+    pub fn create_image(&self, image_name: String) -> Result<Response<CreateImageResponse>> {
+        let channel = self.tonic_channel.clone();
+        self.runtime.block_on(async {
+            let mut request = Request::new(CreateImageRequest {
+                image: Some(Image {
+                    name: image_name,
+                    labels: Default::default(),
+                    target: Some(Descriptor{
+                        media_type: "".to_string(),
+                        digest: "".to_string(),
+                        size: 0,
+                        annotations: Default::default()
+                    }),
+                    created_at: None,
+                    updated_at: None,
+                }),
+            });
+            request.metadata_mut().append(CONTAINERD_NAMESPACE_KEY, MetadataValue::from_static("k8s.io"));
+            Ok(ImagesClient::new(channel).create(request).await?)
         })
     }
 }
