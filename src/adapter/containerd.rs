@@ -78,6 +78,10 @@ impl ContainerdAdapter {
             Ok(ImagesClient::new(channel).create(request).await?)
         })
     }
+
+    pub fn update_image(&self, image_name: String){
+
+    }
 }
 
 
