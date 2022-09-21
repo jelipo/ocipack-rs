@@ -10,6 +10,7 @@ use serde_json::{Map, Value};
 use url::Url;
 
 use manifest::Manifest;
+use crate::const_data::{DEFAULT_IMAGE_HOST, DOCKER_IO_HOST};
 
 use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::docker::DockerManifest;
@@ -90,6 +91,10 @@ pub struct RegistryCreateInfo {
 
 impl Registry {
     pub fn open(use_https: bool, host: &str, reg_cteate_info: RegistryCreateInfo) -> Result<Registry> {
+        let host = match host {
+            DOCKER_IO_HOST => DEFAULT_IMAGE_HOST,
+            host => host,
+        };
         let reg_addr = format!("{}{}", if use_https { "https://" } else { "http://" }, host);
         let client = RegistryHttpClient::new(
             reg_addr,
@@ -423,7 +428,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -432,14 +437,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -462,7 +467,7 @@ impl ToString for CompressType {
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
         }
-        .to_string()
+            .to_string()
     }
 }
 
