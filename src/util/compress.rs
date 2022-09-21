@@ -47,7 +47,7 @@ pub fn uncompress_gz<R: Read, W: ?Sized + Write>(input: R, output_writer: &mut W
 }
 
 pub fn compress_gz<R: Read, W: ?Sized + Write>(tar_input_reader: &mut R, output_writer: &mut W) -> Result<()> {
-    let mut encoder = GzEncoder::new(output_writer, Compression::default());
+    let mut encoder = GzEncoder::new(output_writer, Compression::fast());
     let _ = io::copy(tar_input_reader, &mut encoder)?;
     Ok(())
 }
