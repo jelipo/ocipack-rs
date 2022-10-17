@@ -9,7 +9,7 @@ use url::Url;
 use crate::reg::proxy::{ProxyAuth, ProxyInfo};
 
 #[derive(Parser)]
-#[clap(about = "Fast build docker/oci image", version, author = "jelipo (github.com/jelipo)")]
+#[clap(about = "Fast build docker/oci image", version, author = "jelipo (github.com/jelipo)", long_about = None)]
 pub enum CmdArgs {
     /// Build a new image and push to registry.
     Build(Box<BuildCmdArgs>),
@@ -28,7 +28,7 @@ pub enum CmdArgs {
 #[derive(clap::Args)]
 pub struct ShowInfoArgs {
     /// [OPTION] Allow insecure registry
-    #[clap(long, short, parse(from_flag))]
+    #[clap(long, short)]
     pub allow_insecure: bool,
 
     /// Support 'registry'
@@ -48,30 +48,30 @@ pub struct ShowInfoArgs {
 #[derive(clap::Args)]
 pub struct CleanCmdArgs {
     /// Clean all file.
-    #[clap(long, short, parse(from_flag))]
+    #[clap(long, short)]
     pub all: bool,
 
     /// Clean temp dir.
-    #[clap(long, short, parse(from_flag))]
+    #[clap(long, short)]
     pub temp: bool,
 
     /// Clean blob dir.
-    #[clap(long, short, parse(from_flag))]
+    #[clap(long, short)]
     pub blob: bool,
 
     /// Clean download dir.
-    #[clap(long, short, parse(from_flag))]
+    #[clap(long, short)]
     pub download: bool,
 }
 
 #[derive(clap::Args)]
 pub struct BuildCmdArgs {
     /// Allow insecure registry
-    #[clap(long, short, parse(from_flag))]
+    #[clap(long, short)]
     pub allow_insecure: bool,
 
     /// Allow target insecure registry
-    #[clap(long, parse(from_flag))]
+    #[clap(long)]
     pub target_allow_insecure: bool,
 
     /// Source type.
@@ -111,18 +111,18 @@ pub struct BuildCmdArgs {
     pub conn_timeout: u64,
 
     /// [OPTION] Compress files using zstd.
-    #[clap(long, parse(from_flag))]
+    #[clap(long)]
     pub use_zstd: bool,
 }
 
 #[derive(clap::Args)]
 pub struct TransformCmdArgs {
     /// Allow insecure registry
-    #[clap(long, short, parse(from_flag))]
+    #[clap(long, short)]
     pub allow_insecure: bool,
 
     /// Allow target insecure registry
-    #[clap(long, parse(from_flag))]
+    #[clap(long)]
     pub target_allow_insecure: bool,
 
     /// Source image.
@@ -179,6 +179,7 @@ impl FromStr for TargetFormat {
     }
 }
 
+#[derive(Clone)]
 pub enum SourceType {
     Dockerfile { path: String },
     Cmd { tag: String },
@@ -225,6 +226,7 @@ impl FromStr for ProxyInfo {
     }
 }
 
+#[derive(Clone)]
 pub enum TargetType {
     Registry(String),
 }
@@ -242,6 +244,7 @@ impl FromStr for TargetType {
     }
 }
 
+#[derive(Clone)]
 pub struct BaseAuth {
     pub username: String,
     pub password: String,
