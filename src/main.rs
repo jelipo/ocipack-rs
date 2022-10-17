@@ -1,8 +1,6 @@
 #![feature(exclusive_range_pattern)]
 #![feature(once_cell)]
 
-extern crate derive_builder;
-
 use std::ops::Deref;
 use std::sync::{Arc, LazyLock};
 
@@ -13,8 +11,8 @@ use home::home_dir;
 
 use crate::config::cmd::CmdArgs;
 use crate::config::global::GlobalAppConfig;
-use crate::reg::home::HomeDir;
 use crate::reg::CompressType;
+use crate::reg::home::HomeDir;
 use crate::subcmd::build::BuildCommand;
 use crate::subcmd::clean::CleanCommand;
 use crate::subcmd::show_info::ShowInfoCommand;
