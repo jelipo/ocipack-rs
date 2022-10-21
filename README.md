@@ -31,7 +31,6 @@
 ## Linux 和 MacOS
 
 ```
-
 curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.4.2/ocipack-0.4.2-amd64_$(uname).tar.gz | tar xzv
 
 # 把下载解压完成的 `ocipack` 放到 `/usr/local/bin/` （可选操作）
