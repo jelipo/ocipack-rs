@@ -17,6 +17,7 @@
 </div>
 
 ## 特性
+
 - 在没有`Docker/Containerd`等容器引擎环境下构建简单镜像
 - 兼容 Dockerfile 大部分配置项，降低上手难度
 - 支持 OCI 和 Docker 镜像格式，并支持互相转换
@@ -25,17 +26,15 @@
 - 支持 `Windows` `MacOS` `Linux` 三个平台的使用
 - 支持性能非常好的`zstd`解压缩算法
 
-## 下载
+## 下载和安装
 
-### Linux 和 MacOS
+## Linux 和 MacOS
 
 ```
+
 curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.4.2/ocipack-0.4.2-amd64_$(uname).tar.gz | tar xzv
-```
 
-把下载解压完成的 `ocipack` 放到 `/usr/local/bin/` （可选操作）
-
-```
+# 把下载解压完成的 `ocipack` 放到 `/usr/local/bin/` （可选操作）
 sudo cp ocipack /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack
 ```
 
@@ -52,11 +51,13 @@ tar -xf ocipack.zip
 作者在学习云原生和写代码的时候，经常需要构建一个简单的镜像，但是有时候会因为各种原因导致并不轻松。
 
 - 着急开发，但是没有`Docker/Containerd`等环境。
-- 居家办公需要连接VPN到组织的网络中，但是 Windows 和 MacOS 使用虚拟机运行`Docker`，这意味着虚拟机中的`Docker`无法通过宿主的VPN网络`Pull和Push`镜像。
+- 居家办公需要连接VPN到组织的网络中，但是 Windows 和 MacOS 使用虚拟机运行`Docker`，这意味着虚拟机中的`Docker`
+  无法通过宿主的VPN网络`Pull和Push`镜像。
 - `Linux`服务器上，`Docker`/`Containerd` 等引擎在构建时拉取公共镜像因为众所周知的原因速度非常慢。即使有`socks5/http`
   代理，但是服务器上可能还有正在运行的容器化进程，配置代理意味着可能要重启，且整个容器引擎都会走代理，一般是不可接受的，况且频繁配置也很麻烦。
 - `CI/CD`环境中，你可能可以使用`Docker多阶段构建`、`CI工具提供的环境`构建一个镜像并打包成`Image`并上传到`Registry`中。<br>
-  通常这是两个步骤:`构建产物`和`构建成镜像并Push`，但是有时候CI环境并不如我们的意(可能没有容器环境、只有`Docker in Docker`无法Push 等问题)，而且需要学习每个CI环境来完成我们的这两个步骤。<br>
+  通常这是两个步骤:`构建产物`和`构建成镜像并Push`，但是有时候CI环境并不如我们的意(可能没有容器环境、只有`Docker in Docker`
+  无法Push 等问题)，而且需要学习每个CI环境来完成我们的这两个步骤。<br>
   如果有一个通用的工具可以把`产物`构建成镜像并Push到`Registry`就可以大大提升我们对不同CI环境的兼容。
 
 针对以上问题，所以写了一个小工具去解决这些问题。<br>
@@ -66,7 +67,7 @@ tar -xf ocipack.zip
 
 因为本工具没有任何Runtime，所以Dockerfile配置项中需要Runtime支持的一律无法正常支持。<br>
 `为了便于上手使用，本工具只是使用常见的Dockerfile作为配置，降低使用门槛，但并不是完全兼容Dockerfile`<br>
-|  | Filed |
+| | Filed |
 | :---: | :---: |
 | 支持的配置项 | `FROM` `LABEL` `CMD` `COPY` `ENV` `USER` `WORKDIR` `EXPOSE` |
 | 暂不支持但未来会支持| `ADD`(可以暂时用COPY代替) `ENTRYPOINT` `VOLUME` |
@@ -75,20 +76,22 @@ tar -xf ocipack.zip
 
 <br>
 
-目前的Image Manifest主流为Docker，但是Docker Manifest格式也分为多个版本，本工具对于Docker格式只支持`Image Manifest V 2, Schema 2` ，对于老版本的`Image Manifest V 2, Schema 1` 不支持，也不计划进行支持。
+目前的Image Manifest主流为Docker，但是Docker
+Manifest格式也分为多个版本，本工具对于Docker格式只支持`Image Manifest V 2, Schema 2`
+，对于老版本的`Image Manifest V 2, Schema 1` 不支持，也不计划进行支持。
 
-| 版本 | 是否支持 |
-| :---: | :---: |
+|               版本               | 是否支持 |
+|:------------------------------:| :---: |
 | `Image Manifest V 2, Schema 2` | ✅  |
 | `Image Manifest V 2, Schema 1` | ❌ |
-| `OCI Image Manifest` | ✅ |
-
+|      `OCI Image Manifest`      | ✅ |
 
 ## 使用举例
 
 很多时候，我们需要的功能只是把文件COPY进`Base Image`，然后运行。
 
-创建一个`Dockerfile`文件，这个`Dockerfile`既是我们构建Image的配置文件，也是我们计划运行我们构建好的镜像时打印内容的文件。写入以下内容:
+创建一个`Dockerfile`文件，这个`Dockerfile`
+既是我们构建Image的配置文件，也是我们计划运行我们构建好的镜像时打印内容的文件。写入以下内容:
 
 ```
 FROM ubuntu:22.04
@@ -106,6 +109,7 @@ CMD cat /root/Dockerfile
 ```
 
 如果顺利，末尾将会输出:
+
 ```
 Build job successful!
 
@@ -113,10 +117,10 @@ Target image:
 my.harbor.com/jelipo/demo:v1
 
 ```
+
 当看到`Build job successful`字样时，说明我们已经构建完成并上传到了`Registry`。
 
-接下来我们执行`docker run -it --rm my.harbor.com/jelipo/demo:v1`时会输出我们的`Dockerfile`内容。
-
+接下来我们执行`docker run -it --rm my.harbor.com/jelipo/demo:v1`时会输出我们的`Dockerfile`文件的内容。
 
 ## 功能
 
@@ -163,7 +167,6 @@ my.harbor.com/jelipo/demo:v1
         [OPTION] Compress files using zstd
 ```
 
-
 ## 可能遇到的问题
 
 ### Base Image 拉取非常慢
@@ -175,14 +178,14 @@ my.harbor.com/jelipo/demo:v1
 
 目前大多数容器引擎或者工具都会默认使用`HTTPS`访问`Registry`，但是很多内网或者学习使用时会使用`HTTP`协议的 Registry 。
 
-当Pull镜像的Registry是`HTTP`协议添加`--allow-insecure`选项。
+当 Pull 镜像的Registry是`HTTP`协议，添加`--allow-insecure`选项。
 
-如果Push的Registry是`HTTP`协议，添加`--target-allow-insecure`选项。
+如果 Push 的Registry是`HTTP`协议，添加`--target-allow-insecure`选项。
 <br><br>
 
 ### 执行命令后，在Linux history中会显示我的密码
 
-工具支持从环境变量中读取密码，可以在`build`子命令的help中看`--source-auth`或者`--target-auth`的说明。
+本工具支持从环境变量中读取密码，可以在`build`子命令的help中看`--source-auth`或者`--target-auth`的说明。
 <br><br>
 
 ### 构建出来的Image是Docker Manifest格式的，想要OCI格式的
@@ -196,10 +199,11 @@ my.harbor.com/jelipo/demo:v1
 可以使用`ocipack transform -h`查看详情。<br><br>
 
 ## 清理缓存(Clean)
-因为无论Pull还是Push，都会需要暂存文件在本地中，一边下次Pull加速。
+
+因为无论 Pull 还是 Push ，都会需要缓存到本地，以便下次 Pull 时的加速。
 
 可以使用`ocipack clean`子命令清理本地的缓存文件夹，可以使用`ocipack clean -h`查看更多参数选项。
-<br>
+
 <br>
 
 ## 查看Image信息(Show Info)
@@ -207,14 +211,16 @@ my.harbor.com/jelipo/demo:v1
 当你想查看Registry中的Image信息，但是又无从下手的时候，可以使用此命令查看详细信息。
 
 例如`ocipack show-info -i registry:nginx:latest`查看nginx:latest的详细信息。
-<br>
+
 <br>
 
 ## 挖坑
+
 - 支持导出或者导入本地的容器引擎。
 - 更多的Dockerfile配置项。
 - 创建新Image时提供 使用`zstd`压缩所有layer。
-<br>
+  <br>
 
 ## 最后
-本工具目前属于个人开发使用阶段，虽然基本功能自测没有问题，但是还没有稳定，不建议在重要环境使用。
+
+感谢使用，如有问题请反馈。

@@ -3,6 +3,7 @@ use std::option::Option::Some;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Result};
+use chrono::Local;
 use fantasy_util::time::system_time::SystemLocalTime;
 use log::warn;
 use regex::Regex;
@@ -106,10 +107,19 @@ impl AuthenticateAdapter {
         let status = http_response.status();
         let response_text = http_response.text().unwrap_or_else(|_| String::new());
         if !status.is_success() {
-            return Err(anyhow!("get token failed,code: {}. response: {}", status.as_str(),&response_text));
+            return Err(anyhow!(
+                "get token failed,code: {}. response: {}",
+                status.as_str(),
+                &response_text
+            ));
         }
-        serde_json::from_str::<TokenResponse>(&response_text)
-            .map_err(|err| anyhow!("deserialization 'get token' response failed: {}. response: {}.",err,response_text))
+        serde_json::from_str::<TokenResponse>(&response_text).map_err(|err| {
+            anyhow!(
+                "deserialization 'get token' response failed: {}. response: {}.",
+                err,
+                response_text
+            )
+        })
     }
 }
 
