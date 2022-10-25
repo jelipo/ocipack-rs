@@ -10,20 +10,20 @@ use serde_json::{Map, Value};
 use url::Url;
 
 use manifest::Manifest;
-use crate::const_data::{DEFAULT_IMAGE_HOST, DOCKER_IO_HOST};
 
-use crate::reg::docker::image::DockerConfigBlob;
+use crate::const_data::{DEFAULT_IMAGE_HOST, DOCKER_IO_HOST};
+use crate::GLOBAL_CONFIG;
 use crate::reg::docker::DockerManifest;
+use crate::reg::docker::image::DockerConfigBlob;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::http::upload::RegUploader;
 use crate::reg::http::RegistryAuth;
+use crate::reg::http::upload::RegUploader;
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
 use crate::reg::proxy::ProxyInfo;
 use crate::util::sha::bytes_sha256;
-use crate::GLOBAL_CONFIG;
 
 pub mod docker;
 pub mod home;
