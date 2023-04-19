@@ -74,10 +74,7 @@ impl MultiBar {
             } else {
                 ""
             };
-            println!(
-                "{}{:>12} / {:<12} {:4}{}",
-                name, curr_size, full_size, done_str, bar_core.finished_info
-            );
+            println!("{}{:>12} / {:<12} {:4}{}", name, curr_size, full_size, done_str, bar_core.finished_info);
         }
     }
 }
