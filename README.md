@@ -8,11 +8,8 @@
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/jelipo/ocipack-rs)](https://github.com/jelipo/ocipack-rs/releases)
 [![GitHub all releases](https://img.shields.io/github/downloads/jelipo/ocipack-rs/total)](https://github.com/jelipo/ocipack-rs/releases)
 ![GitHub repo size](https://img.shields.io/github/repo-size/jelipo/ocipack-rs)
-[![Github Release Publish Status](https://img.shields.io/github/workflow/status/jelipo/ocipack-rs/Rust)](https://github.com/jelipo/ocipack-rs/actions)
+[![Github Release Publish Status](https://img.shields.io/github/actions/workflow/status/jelipo/ocipack-rs/rust.yml?branch=main)](https://github.com/jelipo/ocipack-rs/actions)
 [![License](https://img.shields.io/github/license/jelipo/ocipack-rs)](https://github.com/jelipo/ocipack-rs/blob/master/LICENSE)
-
-
-
 
 </div>
 
@@ -80,10 +77,10 @@ Manifest格式也分为多个版本，本工具对于Docker格式只支持`Image
 ，对于老版本的`Image Manifest V 2, Schema 1` 不支持，也不计划进行支持。
 
 |               版本               | 是否支持 |
-|:------------------------------:| :---: |
-| `Image Manifest V 2, Schema 2` | ✅  |
-| `Image Manifest V 2, Schema 1` | ❌ |
-|      `OCI Image Manifest`      | ✅ |
+|:------------------------------:|:----:|
+| `Image Manifest V 2, Schema 2` |  ✅   |
+| `Image Manifest V 2, Schema 1` |  ❌   |
+|      `OCI Image Manifest`      |  ✅   |
 
 ## 使用举例
 
