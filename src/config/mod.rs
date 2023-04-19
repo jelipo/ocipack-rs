@@ -2,6 +2,8 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
+use base64::engine::general_purpose;
+use base64::Engine;
 use home::home_dir;
 
 use crate::config::cmd::BaseAuth;
@@ -61,7 +63,7 @@ fn get_auth_from_dockerconfig(user_docker_config: UserDockerConfig, reg_host: &s
     if let Some(auth_map) = user_docker_config.auths {
         if let Some(auth) = auth_map.get(reg_host) {
             if let Some(base64_str) = &auth.auth {
-                let vec = base64::decode(base64_str)?;
+                let vec = general_purpose::STANDARD.decode(base64_str)?;
                 let decode_str = String::from_utf8(vec)?;
                 let mut split = decode_str.split(':');
                 let username = split.next().ok_or_else(|| anyhow!("error docker file"))?.to_string();

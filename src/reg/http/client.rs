@@ -6,18 +6,18 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use derive_builder::Builder;
-use reqwest::{Method, Proxy, StatusCode};
 use reqwest::blocking::{Client, Response};
 use reqwest::redirect::Policy;
+use reqwest::{Method, Proxy, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::reg::{BlobConfig, RegContentType};
-use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::reg::http::auth::{RegTokenHandler, TokenType};
 use crate::reg::http::download::RegDownloader;
 use crate::reg::http::upload::RegUploader;
+use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::reg::proxy::ProxyInfo;
+use crate::reg::{BlobConfig, RegContentType};
 use crate::util::sha;
 
 pub struct RegistryHttpClient {

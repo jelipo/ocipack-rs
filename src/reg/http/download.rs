@@ -179,17 +179,6 @@ fn check(response: &Response) -> Result<()> {
     Ok(())
 }
 
-fn _get_filepath(url: &str, filename_type: &DownloadFilenameType) -> Result<Box<Path>> {
-    let path_buf = match filename_type {
-        DownloadFilenameType::Auto(auto) => {
-            let ri = url.rfind('/').expect("URL error");
-            auto.dir_path.join(&url[ri..])
-        }
-        DownloadFilenameType::Custom(custom) => custom.dir_path.join(&custom.file_name),
-    };
-    Ok(path_buf.into_boxed_path())
-}
-
 pub struct RegDownloaderWriter {
     status: RegDownloaderStatus,
     file: File,
@@ -229,17 +218,6 @@ impl ProgressStatus for RegDownloaderStatus {
             is_done: core.done,
         }
     }
-}
-
-#[derive(Clone)]
-pub enum DownloadFilenameType {
-    Auto(AutoDownloadFileName),
-    Custom(CustomDownloadFileName),
-}
-
-#[derive(Clone)]
-pub struct AutoDownloadFileName {
-    dir_path: Box<Path>,
 }
 
 #[derive(Clone)]
