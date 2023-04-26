@@ -30,6 +30,11 @@ pub enum Manifest {
     DockerV2S2(DockerManifest),
 }
 
+#[derive(Clone, Debug)]
+pub enum ManifestIndex {
+    Oci
+}
+
 impl Manifest {
     pub fn to_oci_v1(self, config_blob_serialize: &ConfigBlobSerialize) -> Result<OciManifest> {
         let config_media_type = RegContentType::OCI_IMAGE_CONFIG.val();
@@ -101,7 +106,7 @@ impl Manifest {
                         CompressType::Tgz => RegContentType::OCI_LAYER_TGZ.val(),
                         CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val(),
                     }
-                    .to_string(),
+                        .to_string(),
                     size,
                     digest: reg_digest.digest,
                 },
