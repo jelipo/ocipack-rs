@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::config::cmd::TargetFormat;
+use crate::reg::Platform;
 
 pub mod docker;
 pub mod registry;
@@ -13,6 +14,7 @@ pub struct ImageInfo {
 
 pub struct SourceInfo {
     pub image_info: ImageInfo,
+    pub platform: Option<Platform>,
 }
 
 pub struct BuildInfo {

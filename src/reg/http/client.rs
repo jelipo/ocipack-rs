@@ -204,7 +204,7 @@ impl FullRegistryResponse {
 pub trait RegistryResponse {
     fn success(&self) -> bool;
 
-    fn content_type(&self) -> Option<&str>;
+    fn content_type(&self) -> Option<String>;
 
     fn status_code(&self) -> StatusCode;
 
@@ -221,10 +221,10 @@ impl RegistryResponse for RawRegistryResponse {
         self.response.status().is_success()
     }
 
-    fn content_type(&self) -> Option<&str> {
+    fn content_type(&self) -> Option<String> {
         let header_map = self.response.headers();
         header_map.get("content-type").map(|value| value.to_str()).and_then(|x| match x {
-            Ok(str) => Some(str),
+            Ok(str) => Some(str.to_string()),
             Err(_) => None,
         })
     }

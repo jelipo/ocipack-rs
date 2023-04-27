@@ -43,7 +43,7 @@ pub fn pull(
     };
     let mut from_registry = Registry::open(use_https, image_host, info)?;
     info!("Get source image manifest info.");
-    let (manifest, _) = from_registry.image_manager.manifests(&from_image_reference)?;
+    let (manifest, _) = from_registry.image_manager.manifests(&from_image_reference, source_info.platform.clone())?;
     info!("Source image type: {}", manifest.manifest_type());
     let config_digest = manifest.config_digest();
     let layers = manifest.layers();

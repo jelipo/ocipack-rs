@@ -38,11 +38,11 @@ pub struct OciManifestPlatform {
     pub architecture: String,
     pub os: String,
     #[serde(rename = "os.version")]
-    pub os_version: String,
+    pub os_version: Option<String>,
     #[serde(rename = "os.features")]
-    pub os_features: Vec<String>,
+    pub os_features: Option<Vec<String>>,
     pub variant: Option<String>,
-    pub features: Vec<String>,
+    pub features: Option<Vec<String>>,
 }
 
 impl LayerConvert for OciManifest {
@@ -60,8 +60,18 @@ impl LayerConvert for OciManifest {
 
 impl FindPlatform for OciManifestIndex {
     fn find_platform_digest(&self, platform: &Platform) -> Option<String> {
-        self.manifests.iter().find(|&item| {
-            item.platform.os == platform.os && item.platform.architecture == platform.arch
-        }).map(|item| item.digest)
+        self.manifests
+            .iter()
+            .find(|&item| {
+                let variant_match = match &platform.variant {
+                    None => item.platform.variant.is_none(),
+                    Some(variant) => match &item.platform.variant {
+                        None => false,
+                        Some(item_variant) => *item_variant == *variant,
+                    },
+                };
+                item.platform.os == platform.os && item.platform.architecture == platform.arch && variant_match
+            })
+            .map(|item| item.digest.clone())
     }
 }

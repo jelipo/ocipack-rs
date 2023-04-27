@@ -86,7 +86,14 @@ fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo
         image_info.image_name = format!("library/{}", image_name)
     }
     let source_reg_auth = RegAuthType::build_auth(image_info.image_host.clone(), build_args.source_auth.as_ref());
-    Ok((SourceInfo { image_info }, build_info, source_reg_auth))
+    Ok((
+        SourceInfo {
+            image_info,
+            platform: build_args.platform.clone(),
+        },
+        build_info,
+        source_reg_auth,
+    ))
 }
 
 fn handle(

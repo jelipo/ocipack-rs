@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
+use std::path::Path;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
@@ -14,6 +15,9 @@ pub struct DockerfileAdapter {}
 
 impl DockerfileAdapter {
     pub fn parse(path: &str) -> Result<(ImageInfo, BuildInfo)> {
+        if !Path::new(path).exists() {
+            return Err(anyhow!("Dockerfile not found:{}", path));
+        }
         let mut dockerfile_file = File::open(path)?;
         let mut str_body = String::new();
         let read_size = dockerfile_file.read_to_string(&mut str_body)?;

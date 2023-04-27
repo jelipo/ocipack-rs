@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::env;
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -13,18 +13,19 @@ use url::Url;
 use manifest::Manifest;
 
 use crate::const_data::{DEFAULT_IMAGE_HOST, DOCKER_IO_HOST};
-use crate::GLOBAL_CONFIG;
-use crate::reg::docker::DockerManifest;
 use crate::reg::docker::image::DockerConfigBlob;
+use crate::reg::docker::DockerManifest;
 use crate::reg::http::auth::TokenType;
 use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::reg::http::download::RegDownloader;
-use crate::reg::http::RegistryAuth;
 use crate::reg::http::upload::RegUploader;
-use crate::reg::oci::{OciManifest, OciManifestIndex};
+use crate::reg::http::RegistryAuth;
+use crate::reg::manifest::{ManifestList, Type};
 use crate::reg::oci::image::OciConfigBlob;
+use crate::reg::oci::OciManifest;
 use crate::reg::proxy::ProxyInfo;
 use crate::util::sha::bytes_sha256;
+use crate::GLOBAL_CONFIG;
 
 pub mod docker;
 pub mod home;
@@ -40,22 +41,25 @@ pub struct Reference<'a> {
     pub reference: &'a str,
 }
 
+#[derive(Debug, Clone)]
 pub struct Platform {
     pub os: String,
     pub arch: String,
+    pub variant: Option<String>,
 }
 
-impl ToString for Platform {
-    fn to_string(&self) -> String {
-        format!("{}/{}", self.os, self.arch)
+impl Display for Platform {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        format_args!("{}/{}", self.os, self.arch).fmt(f)
     }
 }
 
 impl Default for Platform {
     fn default() -> Self {
         Platform {
-            os: env::consts::OS.to_string(),
-            arch: env::consts::ARCH.to_string(),
+            os: String::from("linux"),
+            arch: String::from("amd64"),
+            variant: None,
         }
     }
 }
@@ -132,8 +136,6 @@ pub struct MyImageManager {
     reg_client: RegistryHttpClient,
 }
 
-pub fn select_platform() {}
-
 impl MyImageManager {
     pub fn new(client: RegistryHttpClient) -> MyImageManager {
         MyImageManager { reg_client: client }
@@ -141,41 +143,53 @@ impl MyImageManager {
 
     /// 获取Image的Manifest
     pub fn manifests(&mut self, refe: &Reference, platform: Option<Platform>) -> Result<(Manifest, String)> {
-        let accepts = &[RegContentType::OCI_MANIFEST, RegContentType::DOCKER_MANIFEST, RegContentType::DOCKER_MANIFEST_LIST, RegContentType::OCI_INDEX];
+        let accepts = &[
+            RegContentType::OCI_MANIFEST,
+            RegContentType::DOCKER_MANIFEST,
+            RegContentType::DOCKER_MANIFEST_LIST,
+            RegContentType::OCI_INDEX,
+        ];
         self.select_manifest(refe, platform, accepts)
     }
 
-    pub fn select_manifest(&mut self, refe: &Reference, platform: Option<Platform>, accepts: &[RegContentType]) -> Result<(Manifest, String)> {
+    pub fn select_manifest(
+        &mut self,
+        refe: &Reference,
+        platform: Option<Platform>,
+        accepts: &[RegContentType],
+    ) -> Result<(Manifest, String)> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&path, scope, accepts);
         let response = self.reg_client.simple_request(request)?;
         let content_type = response.content_type().ok_or_else(|| anyhow!("manifest content-type header not found"))?;
+        let response_body = response.string_body();
         if RegContentType::DOCKER_MANIFEST.val() == content_type {
-            let manifest_body = response.string_body();
-            let manifest = serde_json::from_str::<DockerManifest>(&manifest_body)?;
-            Ok((Manifest::DockerV2S2(manifest), manifest_body))
+            let manifest = serde_json::from_str::<DockerManifest>(&response_body)?;
+            Ok((Manifest::DockerV2S2(manifest), response_body))
         } else if RegContentType::OCI_MANIFEST.val() == content_type {
-            let manifest_body = response.string_body();
-            let manifest = serde_json::from_str::<OciManifest>(&manifest_body)?;
-            Ok((Manifest::OciV1(manifest), manifest_body))
-        } else if RegContentType::DOCKER_MANIFEST_LIST.val() == content_type {
-            let manifest_list_body = response.string_body();
-            let manifest = serde_json::from_str::<OciManifestIndex>(&manifest_body)?;
-
-            println!("{}", manifest_body);
-            Err(anyhow!(""))
-        } else if RegContentType::OCI_INDEX.val() == content_type {
-            let manifest_index_body = response.string_body();
-            let oci_manifest_index = serde_json::from_str::<OciManifestIndex>(&manifest_index_body)?;
-            oci_manifest_index.find_platform_digest(p)
-            Err(anyhow!(""))
+            let manifest = serde_json::from_str::<OciManifest>(&response_body)?;
+            Ok((Manifest::OciV1(manifest), response_body))
         } else {
-            Err(anyhow!(
-                "unknown content-type:{},body:{}",
-                content_type.to_string(),
-                response.string_body()
-            ))
+            let list = if RegContentType::DOCKER_MANIFEST_LIST.val() == content_type {
+                ManifestList::from(&response_body, Type::Docker)?
+            } else if RegContentType::OCI_INDEX.val() == content_type {
+                ManifestList::from(&response_body, Type::Oci)?
+            } else {
+                return Err(anyhow!("unsupported content-type:{},body:{}", content_type, response_body));
+            };
+            let pf = platform.unwrap_or_default();
+            match list.find_platform_digest(&pf) {
+                None => Err(anyhow!("platform '{}' not found from manifest", pf)),
+                Some(digest) => self.select_manifest(
+                    &Reference {
+                        image_name: refe.image_name,
+                        reference: digest.as_str(),
+                    },
+                    None,
+                    accepts,
+                ),
+            }
         }
     }
 
@@ -471,7 +485,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -480,14 +494,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -510,7 +524,7 @@ impl ToString for CompressType {
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
         }
-            .to_string()
+        .to_string()
     }
 }
 
