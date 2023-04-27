@@ -73,7 +73,14 @@ fn gen_source_info(transform_args: &TransformCmdArgs) -> Result<(SourceInfo, Bui
         image_info.image_name = format!("library/{}", image_name)
     }
     let source_reg_auth = RegAuthType::build_auth(image_info.image_host.clone(), transform_args.source_auth.as_ref());
-    Ok((SourceInfo { image_info }, build_info, source_reg_auth))
+    Ok((
+        SourceInfo {
+            image_info,
+            platform: None,
+        },
+        build_info,
+        source_reg_auth,
+    ))
 }
 
 pub fn transform_handle(

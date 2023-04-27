@@ -7,6 +7,7 @@ use clap::Parser;
 use url::Url;
 
 use crate::reg::proxy::{ProxyAuth, ProxyInfo};
+use crate::reg::Platform;
 
 #[derive(Parser)]
 #[clap(about = "Fast build docker/oci image", version, author = "jelipo (github.com/jelipo)", long_about = None)]
@@ -113,6 +114,10 @@ pub struct BuildCmdArgs {
     /// [OPTION] Compress files using zstd.
     #[clap(long)]
     pub use_zstd: bool,
+
+    /// [OPTION] Platform.If not specified and there are multiple platforms, the default is 'linux/amd64'.
+    #[clap(long)]
+    pub platform: Option<Platform>,
 }
 
 #[derive(clap::Args)]
@@ -159,6 +164,27 @@ pub struct TransformCmdArgs {
     /// [OPTION] Connection timeout in seconds.
     #[clap(long, default_value = "600")]
     pub conn_timeout: u64,
+}
+
+impl FromStr for Platform {
+    type Err = Error;
+
+    fn from_str(arg: &str) -> Result<Self, Self::Err> {
+        let splits = arg.split('/').collect::<Vec<_>>();
+        match splits.len() {
+            2 => Ok(Platform {
+                os: splits[0].to_string(),
+                arch: splits[1].to_string(),
+                variant: None,
+            }),
+            3 => Ok(Platform {
+                os: splits[0].to_string(),
+                arch: splits[1].to_string(),
+                variant: Some(splits[2].to_string()),
+            }),
+            _ => Err(anyhow!("unknown platform type: {}", arg)),
+        }
+    }
 }
 
 #[derive(Clone)]

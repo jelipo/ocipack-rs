@@ -3,10 +3,17 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::docker::DockerManifest;
-use crate::reg::oci::OciManifest;
-use crate::reg::{ConfigBlobSerialize, Layer, LayerConvert, RegContentType, RegDigest};
+use crate::reg::docker::{DockerManifest, DockerManifestList};
+use crate::reg::manifest::ManifestList::{Docker, Oci};
+use crate::reg::oci::{OciManifest, OciManifestIndex};
+use crate::reg::{ConfigBlobSerialize, FindPlatform, Layer, LayerConvert, Platform, RegContentType, RegDigest};
 use crate::CompressType;
+
+#[derive(Clone, Debug)]
+pub enum Type {
+    Docker,
+    Oci,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -170,4 +177,26 @@ fn set_config_blob(common_config: &mut CommonManifestConfig, config_blob_seriali
     common_config.media_type = media_type.to_string();
     common_config.digest = config_blob_serialize.digest.digest.clone();
     common_config.size = config_blob_serialize.size;
+}
+
+#[derive(Clone, Debug)]
+pub enum ManifestList {
+    Oci(OciManifestIndex),
+    Docker(DockerManifestList),
+}
+
+impl ManifestList {
+    pub fn find_platform_digest(&self, platform: &Platform) -> Option<String> {
+        match self {
+            Oci(oci) => oci.find_platform_digest(platform),
+            Docker(docker) => docker.find_platform_digest(platform),
+        }
+    }
+
+    pub fn from(manifest_index_body: &str, t: Type) -> Result<ManifestList> {
+        Ok(match t {
+            Type::Docker => Docker(serde_json::from_str::<DockerManifestList>(&manifest_index_body)?),
+            Type::Oci => Oci(serde_json::from_str::<OciManifestIndex>(&manifest_index_body)?),
+        })
+    }
 }

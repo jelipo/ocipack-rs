@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -19,6 +20,7 @@ use crate::reg::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpC
 use crate::reg::http::download::RegDownloader;
 use crate::reg::http::upload::RegUploader;
 use crate::reg::http::RegistryAuth;
+use crate::reg::manifest::{ManifestList, Type};
 use crate::reg::oci::image::OciConfigBlob;
 use crate::reg::oci::OciManifest;
 use crate::reg::proxy::ProxyInfo;
@@ -37,6 +39,29 @@ pub struct Reference<'a> {
     pub image_name: &'a str,
     /// 可以是TAG或者digest
     pub reference: &'a str,
+}
+
+#[derive(Debug, Clone)]
+pub struct Platform {
+    pub os: String,
+    pub arch: String,
+    pub variant: Option<String>,
+}
+
+impl Display for Platform {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        format_args!("{}/{}", self.os, self.arch).fmt(f)
+    }
+}
+
+impl Default for Platform {
+    fn default() -> Self {
+        Platform {
+            os: String::from("linux"),
+            arch: String::from("amd64"),
+            variant: None,
+        }
+    }
 }
 
 pub struct BlobConfig {
@@ -117,27 +142,54 @@ impl MyImageManager {
     }
 
     /// 获取Image的Manifest
-    pub fn manifests(&mut self, refe: &Reference) -> Result<(Manifest, String)> {
+    pub fn manifests(&mut self, refe: &Reference, platform: Option<Platform>) -> Result<(Manifest, String)> {
+        let accepts = &[
+            RegContentType::OCI_MANIFEST,
+            RegContentType::DOCKER_MANIFEST,
+            RegContentType::DOCKER_MANIFEST_LIST,
+            RegContentType::OCI_INDEX,
+        ];
+        self.select_manifest(refe, platform, accepts)
+    }
+
+    pub fn select_manifest(
+        &mut self,
+        refe: &Reference,
+        platform: Option<Platform>,
+        accepts: &[RegContentType],
+    ) -> Result<(Manifest, String)> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
-        let accepts = &[RegContentType::OCI_MANIFEST, RegContentType::DOCKER_MANIFEST];
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&path, scope, accepts);
         let response = self.reg_client.simple_request(request)?;
         let content_type = response.content_type().ok_or_else(|| anyhow!("manifest content-type header not found"))?;
+        let response_body = response.string_body();
         if RegContentType::DOCKER_MANIFEST.val() == content_type {
-            let manifest_body = response.string_body();
-            let manifest = serde_json::from_str::<DockerManifest>(&manifest_body)?;
-            Ok((Manifest::DockerV2S2(manifest), manifest_body))
+            let manifest = serde_json::from_str::<DockerManifest>(&response_body)?;
+            Ok((Manifest::DockerV2S2(manifest), response_body))
         } else if RegContentType::OCI_MANIFEST.val() == content_type {
-            let manifest_body = response.string_body();
-            let manifest = serde_json::from_str::<OciManifest>(&manifest_body)?;
-            Ok((Manifest::OciV1(manifest), manifest_body))
+            let manifest = serde_json::from_str::<OciManifest>(&response_body)?;
+            Ok((Manifest::OciV1(manifest), response_body))
         } else {
-            Err(anyhow!(
-                "unknown content-type:{},body:{}",
-                content_type.to_string(),
-                response.string_body()
-            ))
+            let list = if RegContentType::DOCKER_MANIFEST_LIST.val() == content_type {
+                ManifestList::from(&response_body, Type::Docker)?
+            } else if RegContentType::OCI_INDEX.val() == content_type {
+                ManifestList::from(&response_body, Type::Oci)?
+            } else {
+                return Err(anyhow!("unsupported content-type:{},body:{}", content_type, response_body));
+            };
+            let pf = platform.unwrap_or_default();
+            match list.find_platform_digest(&pf) {
+                None => Err(anyhow!("platform '{}' not found from manifest", pf)),
+                Some(digest) => self.select_manifest(
+                    &Reference {
+                        image_name: refe.image_name,
+                        reference: digest.as_str(),
+                    },
+                    None,
+                    accepts,
+                ),
+            }
         }
     }
 
@@ -247,6 +299,10 @@ fn exited(simple_response: &RawRegistryResponse) -> Result<bool> {
             Err(anyhow!(msg))
         }
     }
+}
+
+pub trait FindPlatform {
+    fn find_platform_digest(&self, platform: &Platform) -> Option<String>;
 }
 
 pub trait LayerConvert {
@@ -402,12 +458,13 @@ pub struct RegContentType(pub &'static str);
 impl RegContentType {
     /// Docker content-type
     pub const DOCKER_MANIFEST: Self = Self("application/vnd.docker.distribution.manifest.v2+json");
-    pub const _DOCKER_MANIFEST_LIST: Self = Self("application/vnd.docker.distribution.manifest.list.v2+json");
+    pub const DOCKER_MANIFEST_LIST: Self = Self("application/vnd.docker.distribution.manifest.list.v2+json");
     pub const DOCKER_FOREIGN_LAYER_TGZ: Self = Self("application/vnd.docker.image.rootfs.foreign.diff.tar.gzip");
     pub const DOCKER_LAYER_TGZ: Self = Self("application/vnd.docker.image.rootfs.diff.tar.gzip");
     pub const DOCKER_CONTAINER_IMAGE: Self = Self("application/vnd.docker.container.image.v1+json");
 
     /// OCI content-type
+    pub const OCI_INDEX: Self = Self("application/vnd.oci.image.index.v1+json");
     pub const OCI_MANIFEST: Self = Self("application/vnd.oci.image.manifest.v1+json");
     pub const OCI_LAYER_TAR: Self = Self("application/vnd.oci.image.layer.v1.tar");
     pub const OCI_LAYER_TGZ: Self = Self("application/vnd.oci.image.layer.v1.tar+gzip");

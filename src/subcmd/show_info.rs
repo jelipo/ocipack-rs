@@ -83,10 +83,13 @@ impl RegistryImageInfo {
 
         let mut registry_client = Registry::open(use_https, &image_info.image_host, info)?;
         let image_manager = &mut registry_client.image_manager;
-        let (manifest, manifest_raw) = image_manager.manifests(&Reference {
-            image_name: &image_info.image_name,
-            reference: &image_info.reference,
-        })?;
+        let (manifest, manifest_raw) = image_manager.manifests(
+            &Reference {
+                image_name: &image_info.image_name,
+                reference: &image_info.reference,
+            },
+            None,
+        )?;
         let (config_blob_enum, config_blob_raw) = match &manifest {
             Manifest::OciV1(_) => {
                 let (blob, raw) = image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, manifest.config_digest())?;
