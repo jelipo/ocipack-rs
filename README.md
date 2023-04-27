@@ -28,7 +28,7 @@
 ## Linux 和 MacOS
 
 ```
-curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.4.2/ocipack-0.4.2-amd64_$(uname).tar.gz | tar xzv
+curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.5.0/ocipack-0.5.0-amd64_$(uname).tar.gz | tar xzv
 
 # 把下载解压完成的 `ocipack` 放到 `/usr/local/bin/` （可选操作）
 sudo cp ocipack /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack
@@ -37,7 +37,7 @@ sudo cp ocipack /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack
 ### Windows
 
 ```
-curl.exe -L https://github.com/jelipo/ocipack-rs/releases/download/0.4.2/ocipack-0.4.2-amd64_windows.zip -o ocipack.zip
+curl.exe -L https://github.com/jelipo/ocipack-rs/releases/download/0.5.0/ocipack-0.5.0-amd64_windows.zip -o ocipack.zip
 
 tar -xf ocipack.zip
 ```
