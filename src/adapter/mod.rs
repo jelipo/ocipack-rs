@@ -5,6 +5,7 @@ use crate::reg::Platform;
 
 pub mod docker;
 pub mod registry;
+pub mod tar;
 
 pub struct ImageInfo {
     pub image_host: String,

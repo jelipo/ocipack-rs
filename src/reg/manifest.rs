@@ -3,16 +3,23 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::CompressType;
+use crate::reg::{ConfigBlobSerialize, FindPlatform, Layer, LayerConvert, Platform, RegContentType, RegDigest};
 use crate::reg::docker::{DockerManifest, DockerManifestList};
 use crate::reg::manifest::ManifestList::{Docker, Oci};
 use crate::reg::oci::{OciManifest, OciManifestIndex};
-use crate::reg::{ConfigBlobSerialize, FindPlatform, Layer, LayerConvert, Platform, RegContentType, RegDigest};
-use crate::CompressType;
 
 #[derive(Clone, Debug)]
 pub enum Type {
     Docker,
     Oci,
+}
+
+#[derive(Debug, Clone)]
+pub struct ManifestResult {
+    pub manifest: Manifest,
+    pub response_body: String,
+    pub manifest_list: Option<ManifestList>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -38,56 +45,65 @@ pub enum Manifest {
 }
 
 impl Manifest {
-    pub fn to_oci_v1(self, config_blob_serialize: &ConfigBlobSerialize) -> Result<OciManifest> {
+    pub fn to_oci_v1(&self, config_blob_serialize: &ConfigBlobSerialize) -> Result<OciManifest> {
         let config_media_type = RegContentType::OCI_IMAGE_CONFIG.val();
         Ok(match self {
-            Manifest::OciV1(mut oci) => {
+            Manifest::OciV1(source_oci) => {
+                let mut oci = source_oci.clone();
                 set_config_blob(&mut oci.config, config_blob_serialize, config_media_type);
                 oci
             }
-            Manifest::DockerV2S2(mut docker) => OciManifest {
-                schema_version: 2,
-                media_type: Some(RegContentType::OCI_MANIFEST.val().to_string()),
-                config: {
-                    set_config_blob(&mut docker.config, config_blob_serialize, config_media_type);
-                    docker.config
-                },
-                layers: docker
-                    .layers
-                    .into_iter()
-                    .map(|mut common_layer| {
-                        common_layer.media_type = dockerv2s2_to_ociv1(&common_layer.media_type)?;
-                        Ok(common_layer)
-                    })
-                    .collect::<Result<Vec<CommonManifestLayer>>>()?,
-            },
+            Manifest::DockerV2S2(source_docker) => {
+                let mut docker = source_docker.clone();
+                OciManifest {
+                    schema_version: 2,
+                    media_type: Some(RegContentType::OCI_MANIFEST.val().to_string()),
+                    config: {
+                        set_config_blob(&mut docker.config, config_blob_serialize, config_media_type);
+                        docker.config
+                    },
+                    layers: docker
+                        .layers
+                        .into_iter()
+                        .map(|mut common_layer| {
+                            common_layer.media_type = dockerv2s2_to_ociv1(&common_layer.media_type)?;
+                            Ok(common_layer)
+                        })
+                        .collect::<Result<Vec<CommonManifestLayer>>>()?,
+                }
+            }
         })
     }
 
-    pub fn to_docker_v2_s2(self, config_blob_serialize: &ConfigBlobSerialize) -> Result<DockerManifest> {
+    pub fn to_docker_v2_s2(&self, config_blob_serialize: &ConfigBlobSerialize) -> Result<DockerManifest> {
         let config_media_type = RegContentType::DOCKER_CONTAINER_IMAGE.val();
-        Ok(match self {
-            Manifest::OciV1(mut oci) => DockerManifest {
-                schema_version: 2,
-                media_type: RegContentType::DOCKER_MANIFEST.val().to_string(),
-                config: {
-                    set_config_blob(&mut oci.config, config_blob_serialize, config_media_type);
-                    oci.config
-                },
-                layers: oci
-                    .layers
-                    .into_iter()
-                    .map(|mut common_layer| {
-                        common_layer.media_type = ociv1_to_dockerv2s2(&common_layer.media_type)?;
-                        Ok(common_layer)
-                    })
-                    .collect::<Result<Vec<CommonManifestLayer>>>()?,
-            },
-            Manifest::DockerV2S2(mut docker) => {
+        let manifest = match self {
+            Manifest::OciV1(source_oci) => {
+                let mut oci = source_oci.clone();
+                DockerManifest {
+                    schema_version: 2,
+                    media_type: RegContentType::DOCKER_MANIFEST.val().to_string(),
+                    config: {
+                        set_config_blob(&mut oci.config, config_blob_serialize, config_media_type);
+                        oci.config
+                    },
+                    layers: oci
+                        .layers
+                        .into_iter()
+                        .map(|mut common_layer| {
+                            common_layer.media_type = ociv1_to_dockerv2s2(&common_layer.media_type)?;
+                            Ok(common_layer)
+                        })
+                        .collect::<Result<Vec<CommonManifestLayer>>>()?,
+                }
+            }
+            Manifest::DockerV2S2(source_docker) => {
+                let mut docker = source_docker.clone();
                 set_config_blob(&mut docker.config, config_blob_serialize, config_media_type);
                 docker
             }
-        })
+        };
+        Ok(manifest)
     }
 
     pub fn layers(&self) -> Vec<Layer> {
@@ -108,7 +124,7 @@ impl Manifest {
                         CompressType::Tgz => RegContentType::OCI_LAYER_TGZ.val(),
                         CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val(),
                     }
-                    .to_string(),
+                        .to_string(),
                     size,
                     digest: reg_digest.digest,
                 },

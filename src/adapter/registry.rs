@@ -85,8 +85,7 @@ impl RegistryTargetAdapter {
         let mut reg_uploader_vec = Vec::<Box<dyn Processor<UploadResult>>>::new();
         for manifest_layer in target_manifest.layers() {
             let layer_digest = RegDigest::new_with_digest(manifest_layer.digest.to_string());
-            let local_layer =
-                home_dir.cache.blobs.local_layer(&layer_digest).ok_or_else(|| anyhow!("local download file not found"))?;
+            let local_layer = home_dir.cache.blobs.local_layer(&layer_digest).ok_or_else(|| anyhow!("local file not found"))?;
             let layer_path = local_layer.layer_path();
             let reg_uploader = manager.layer_blob_upload(&target_info.image_info.image_name, &layer_digest, &layer_path)?;
             reg_uploader_vec.push(Box::new(reg_uploader))

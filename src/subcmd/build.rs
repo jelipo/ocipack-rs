@@ -12,7 +12,7 @@ use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
 use crate::reg::home::{LocalLayer, TempLayerInfo};
-use crate::reg::manifest::Manifest;
+use crate::reg::manifest::{Manifest, ManifestResult};
 use crate::reg::proxy::ProxyInfo;
 use crate::reg::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
@@ -52,9 +52,10 @@ Target image:
 "#,
             match &build_args.target {
                 TargetType::Registry(r) => r,
+                TargetType::Tar(path) => path
             }
         )
-        .green()
+            .green()
     );
 }
 
@@ -69,7 +70,7 @@ Build job failed!
 "#,
             err
         )
-        .red()
+            .red()
     );
 }
 
@@ -130,12 +131,12 @@ fn handle(
     };
     let target_config_blob =
         build_target_config_blob(build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
-    let source_manifest = pull_result.manifest;
+    let source_manifest_result = pull_result.manifest_result;
 
     let target_config_blob_serialize = target_config_blob.serialize()?;
     info!("Build a new target manifest.");
     let target_manifest = build_target_manifest(
-        source_manifest,
+        &source_manifest_result,
         &build_cmds.format,
         temp_local_layer,
         &target_config_blob_serialize,
@@ -154,6 +155,7 @@ fn handle(
             )?;
             registry_adapter.upload()?
         }
+        TargetType::Tar(tar_path) => {}
     }
     Ok(())
 }
@@ -251,14 +253,14 @@ pub fn build_target_config_blob(
 }
 
 pub fn build_target_manifest(
-    source_manifest: Manifest,
+    source_manifest_result: &ManifestResult,
     target_format: &TargetFormat,
     temp_local_layer: Option<LocalLayer>,
     target_config_blob_serialize: &ConfigBlobSerialize,
 ) -> Result<Manifest> {
     let mut target_manifest = match target_format {
-        TargetFormat::Docker => Manifest::DockerV2S2(source_manifest.to_docker_v2_s2(target_config_blob_serialize)?),
-        TargetFormat::Oci => Manifest::OciV1(source_manifest.to_oci_v1(target_config_blob_serialize)?),
+        TargetFormat::Docker => Manifest::DockerV2S2(source_manifest_result.manifest.to_docker_v2_s2(target_config_blob_serialize)?),
+        TargetFormat::Oci => Manifest::OciV1(source_manifest_result.manifest.to_oci_v1(target_config_blob_serialize)?),
     };
     if let Some(temp_layer) = temp_local_layer {
         let metadata = temp_layer.layer_file_path.metadata()?;

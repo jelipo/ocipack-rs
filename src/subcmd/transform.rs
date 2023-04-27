@@ -43,9 +43,10 @@ Target image:
 "#,
             match &build_args.target {
                 TargetType::Registry(r) => r,
+                TargetType::Tar(path) => path
             }
         )
-        .green()
+            .green()
     );
 }
 
@@ -60,7 +61,7 @@ Transform job failed!
 "#,
             err
         )
-        .red()
+            .red()
     );
 }
 
@@ -99,11 +100,11 @@ pub fn transform_handle(
         proxy_info,
     )?;
     let target_config_blob = build_target_config_blob(build_info, &pull_result.config_blob, None, &transform_cmds.format);
-    let source_manifest = pull_result.manifest;
+    let source_manifest_result = pull_result.manifest_result;
 
     let target_config_blob_serialize = target_config_blob.serialize()?;
     info!("Build a new target manifest.");
-    let target_manifest = build_target_manifest(source_manifest, &transform_cmds.format, None, &target_config_blob_serialize)?;
+    let target_manifest = build_target_manifest(&source_manifest_result, &transform_cmds.format, None, &target_config_blob_serialize)?;
     match &transform_cmds.target {
         TargetType::Registry(image) => {
             let registry_adapter = RegistryTargetAdapter::new(
@@ -117,6 +118,9 @@ pub fn transform_handle(
                 transform_cmds.target_proxy.clone(),
             )?;
             registry_adapter.upload()?
+        }
+        TargetType::Tar(path) => {
+            todo!()
         }
     }
     Ok(())

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::info;
 use serde_json::Value;
@@ -26,6 +26,7 @@ impl ShowInfoCommand {
                 info!("Request done.");
                 detail
             }
+            TargetType::Tar(_) => return Err(anyhow!("show tar info not support"))
         };
         print_image_detail(show_info)?;
         Ok(())
@@ -42,10 +43,7 @@ fn print_image_detail(info: ImageShowInfo) -> Result<()> {
         ("IMAGE_REFERENCE", info.reference.green()),
         ("MANIFEST_TYPE", info.manifest_type.green()),
         ("OS", info.os.map(|os| os.green()).unwrap_or_else(|| "NOT SET".yellow())),
-        (
-            "ARCH",
-            info.arch.map(|arch| arch.green()).unwrap_or_else(|| "NOT SET".yellow()),
-        ),
+        ("ARCH", info.arch.map(|arch| arch.green()).unwrap_or_else(|| "NOT SET".yellow())),
         ("CMD", cmd),
     ];
     println!("\n{}\n", "IMAGE DETAILS".cyan());
@@ -83,13 +81,14 @@ impl RegistryImageInfo {
 
         let mut registry_client = Registry::open(use_https, &image_info.image_host, info)?;
         let image_manager = &mut registry_client.image_manager;
-        let (manifest, manifest_raw) = image_manager.manifests(
+        let manifest_result = image_manager.manifests(
             &Reference {
                 image_name: &image_info.image_name,
                 reference: &image_info.reference,
             },
             None,
         )?;
+        let manifest = manifest_result.manifest;
         let (config_blob_enum, config_blob_raw) = match &manifest {
             Manifest::OciV1(_) => {
                 let (blob, raw) = image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, manifest.config_digest())?;
@@ -109,7 +108,7 @@ impl RegistryImageInfo {
             cmds: config_blob_enum.cmd().cloned(),
             os: config_blob_enum.os().map(|a| a.to_string()),
             manifest_type: manifest.manifest_type().to_string(),
-            manifest_raw,
+            manifest_raw: manifest_result.response_body,
             config_blob_raw,
         })
     }

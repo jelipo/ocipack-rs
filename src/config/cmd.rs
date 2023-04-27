@@ -255,6 +255,7 @@ impl FromStr for ProxyInfo {
 #[derive(Clone)]
 pub enum TargetType {
     Registry(String),
+    Tar(String),
 }
 
 impl FromStr for TargetType {
@@ -265,6 +266,7 @@ impl FromStr for TargetType {
         let target_type = &arg[..potion];
         Ok(match target_type {
             "registry" => TargetType::Registry(arg[potion + 1..].to_string()),
+            "tar" => TargetType::Tar(arg[potion + 1..].to_string()),
             _ => return Err(anyhow!("unknown target type: {}", target_type)),
         })
     }
