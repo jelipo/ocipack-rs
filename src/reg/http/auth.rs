@@ -74,6 +74,9 @@ impl AuthenticateAdapter {
     pub fn new_authenticate_adapter(registry_addr: &str, client: &Client) -> Result<AuthenticateAdapter> {
         let bearer_url = format!("{}/v2/", registry_addr);
         let http_response = do_request_raw::<u8>(client, bearer_url.as_str(), Method::GET, None, &[], None, None)?;
+        for (key, value) in http_response.headers() {
+            println!("debug: {}: {}", key.as_str(), value.to_str()?);
+        }
         let www_authenticate = get_header(http_response.headers(), "Www-Authenticate")
             .ok_or_else(|| anyhow!("'Www-Authenticate' header not found"))?;
         let regex = Regex::new("^Bearer realm=\"(?P<realm>.*)\",service=\"(?P<service>.*)\".*")?;

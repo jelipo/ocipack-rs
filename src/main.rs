@@ -26,6 +26,7 @@ mod progress;
 mod reg;
 mod subcmd;
 mod util;
+mod container;
 
 /// 全局共享的Config
 pub static GLOBAL_CONFIG: LazyLock<GlobalAppConfig> = LazyLock::new(init_config);
