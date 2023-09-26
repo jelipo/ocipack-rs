@@ -43,6 +43,7 @@ impl DockerfileAdapter {
             match instruction {
                 Instruction::From(from) => {
                     from_image = Some(ImageInfo {
+                        image_raw_name: Some(from.image.content),
                         image_host: from.image_parsed.registry.unwrap_or_else(|| DEFAULT_IMAGE_HOST.to_string()),
                         image_name: from.image_parsed.image,
                         reference: from

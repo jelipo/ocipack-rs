@@ -8,6 +8,7 @@ pub mod registry;
 pub mod tar;
 
 pub struct ImageInfo {
+    pub image_raw_name: Option<String>,
     pub image_host: String,
     pub image_name: String,
     pub reference: String,
