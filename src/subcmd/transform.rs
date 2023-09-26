@@ -7,7 +7,7 @@ use crate::adapter::registry::RegistryTargetAdapter;
 use crate::adapter::{BuildInfo, SourceInfo};
 use crate::config::cmd::{TargetType, TransformCmdArgs};
 use crate::config::RegAuthType;
-use crate::reg::proxy::ProxyInfo;
+use crate::container::proxy::ProxyInfo;
 use crate::subcmd::build::{build_target_config_blob, build_target_manifest};
 use crate::subcmd::pull::pull;
 use crate::GLOBAL_CONFIG;

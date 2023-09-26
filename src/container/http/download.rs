@@ -11,8 +11,8 @@ use reqwest::blocking::{Client, Response};
 use reqwest::Method;
 
 use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
-use crate::reg::http::{do_request_raw, get_header, HttpAuth};
-use crate::reg::BlobConfig;
+use crate::container::http::{do_request_raw, get_header, HttpAuth};
+use crate::container::BlobConfig;
 
 pub struct RegDownloader {
     finished: bool,

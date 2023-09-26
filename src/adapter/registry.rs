@@ -9,10 +9,10 @@ use crate::const_data::DEFAULT_IMAGE_HOST;
 use crate::progress::manager::ProcessorManager;
 use crate::progress::ProcessResult;
 use crate::progress::Processor;
-use crate::reg::http::upload::UploadResult;
-use crate::reg::manifest::Manifest;
-use crate::reg::proxy::ProxyInfo;
-use crate::reg::{ConfigBlobSerialize, Reference, RegDigest, Registry, RegistryCreateInfo};
+use crate::container::http::upload::UploadResult;
+use crate::container::manifest::Manifest;
+use crate::container::proxy::ProxyInfo;
+use crate::container::{ConfigBlobSerialize, Reference, RegDigest, Registry, RegistryCreateInfo};
 use crate::GLOBAL_CONFIG;
 
 pub struct RegistryTargetAdapter {
@@ -86,7 +86,7 @@ impl RegistryTargetAdapter {
         for manifest_layer in target_manifest.layers() {
             let layer_digest = RegDigest::new_with_digest(manifest_layer.digest.to_string());
             let local_layer =
-                home_dir.cache.blobs.local_layer(&layer_digest).ok_or_else(|| anyhow!("local download file not found"))?;
+                home_dir.cache.blobs.local_layer(&layer_digest).ok_or_else(|| anyhow!("local file not found {}",layer_digest.digest))?;
             let layer_path = local_layer.layer_path();
             let reg_uploader = manager.layer_blob_upload(&target_info.image_info.image_name, &layer_digest, &layer_path)?;
             reg_uploader_vec.push(Box::new(reg_uploader))

@@ -9,7 +9,7 @@ use home::home_dir;
 use crate::config::cmd::BaseAuth;
 use crate::config::userconfig::UserDockerConfig;
 use crate::const_data::{DEFAULT_IMAGE_HOST, DEFAULT_IMAGE_HUB_URI};
-use crate::reg::http::RegistryAuth;
+use crate::container::http::RegistryAuth;
 
 pub mod cmd;
 pub mod global;

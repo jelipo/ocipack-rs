@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 
-use crate::reg::{CompressType, RegDigest};
+use crate::container::{CompressType, RegDigest};
 use crate::util::random;
 
 pub struct HomeDir {

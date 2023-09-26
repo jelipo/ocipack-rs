@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use crate::config::cmd::TargetFormat;
-use crate::reg::Platform;
+use crate::container::Platform;
 
 pub mod docker;
 pub mod registry;
+pub mod tar;
 
 pub struct ImageInfo {
     pub image_host: String,

@@ -7,7 +7,7 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 use zstd::{stream, DEFAULT_COMPRESSION_LEVEL};
 
-use crate::reg::CompressType;
+use crate::container::CompressType;
 
 pub fn uncompress<R: Read, W: Write>(compress_type: CompressType, tar_input: &mut R, output_writer: &mut W) -> Result<()> {
     match compress_type {

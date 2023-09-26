@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::reg::home::HomeDir;
+use crate::container::home::HomeDir;
 use crate::CmdArgs;
 
 /// 全局App共享的config

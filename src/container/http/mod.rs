@@ -7,7 +7,7 @@ use reqwest::header::HeaderMap;
 use reqwest::{Method, Url};
 use serde::Serialize;
 
-use crate::reg::RegContentType;
+use crate::container::RegContentType;
 
 pub mod auth;
 pub mod client;

@@ -12,12 +12,12 @@ use reqwest::{Method, Proxy, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::reg::http::auth::{RegTokenHandler, TokenType};
-use crate::reg::http::download::RegDownloader;
-use crate::reg::http::upload::RegUploader;
-use crate::reg::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
-use crate::reg::proxy::ProxyInfo;
-use crate::reg::{BlobConfig, RegContentType};
+use crate::container::http::auth::{RegTokenHandler, TokenType};
+use crate::container::http::download::RegDownloader;
+use crate::container::http::upload::RegUploader;
+use crate::container::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
+use crate::container::proxy::ProxyInfo;
+use crate::container::{BlobConfig, RegContentType};
 use crate::util::sha;
 
 pub struct RegistryHttpClient {

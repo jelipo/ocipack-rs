@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
-use crate::reg::BlobConfig;
+use crate::container::BlobConfig;
 
 pub mod manager;
 

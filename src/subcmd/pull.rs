@@ -9,12 +9,12 @@ use crate::adapter::SourceInfo;
 use crate::config::RegAuthType;
 use crate::progress::manager::ProcessorManager;
 use crate::progress::Processor;
-use crate::reg::docker::image::DockerConfigBlob;
-use crate::reg::http::download::DownloadResult;
-use crate::reg::manifest::Manifest;
-use crate::reg::oci::image::OciConfigBlob;
-use crate::reg::proxy::ProxyInfo;
-use crate::reg::{ConfigBlobEnum, Layer, Reference, RegContentType, RegDigest, Registry, RegistryCreateInfo};
+use crate::container::docker::image::DockerConfigBlob;
+use crate::container::http::download::DownloadResult;
+use crate::container::manifest::Manifest;
+use crate::container::oci::image::OciConfigBlob;
+use crate::container::proxy::ProxyInfo;
+use crate::container::{ConfigBlobEnum, Layer, Reference, RegContentType, RegDigest, Registry, RegistryCreateInfo};
 use crate::util::compress::uncompress;
 use crate::GLOBAL_CONFIG;
 

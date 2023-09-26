@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::manifest::{CommonManifestConfig, CommonManifestLayer};
-use crate::reg::{FindPlatform, Layer, LayerConvert, Platform};
+use crate::container::manifest::{CommonManifestConfig, CommonManifestLayer};
+use crate::container::{FindPlatform, Layer, LayerConvert, Platform};
 
 pub mod image;
 

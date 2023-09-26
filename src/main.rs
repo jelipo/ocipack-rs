@@ -10,8 +10,8 @@ use home::home_dir;
 
 use crate::config::cmd::CmdArgs;
 use crate::config::global::GlobalAppConfig;
-use crate::reg::home::HomeDir;
-use crate::reg::CompressType;
+use crate::container::home::HomeDir;
+use crate::container::CompressType;
 use crate::subcmd::build::BuildCommand;
 use crate::subcmd::clean::CleanCommand;
 use crate::subcmd::show_info::ShowInfoCommand;
@@ -23,10 +23,9 @@ mod config;
 mod const_data;
 mod init;
 mod progress;
-mod reg;
+mod container;
 mod subcmd;
 mod util;
-mod container;
 
 /// 全局共享的Config
 pub static GLOBAL_CONFIG: LazyLock<GlobalAppConfig> = LazyLock::new(init_config);

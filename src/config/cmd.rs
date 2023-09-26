@@ -6,8 +6,8 @@ use anyhow::{anyhow, Error};
 use clap::Parser;
 use url::Url;
 
-use crate::reg::proxy::{ProxyAuth, ProxyInfo};
-use crate::reg::Platform;
+use crate::container::proxy::{ProxyAuth, ProxyInfo};
+use crate::container::Platform;
 
 #[derive(Parser)]
 #[clap(about = "Fast build docker/oci image", version, author = "jelipo (github.com/jelipo)", long_about = None)]
@@ -33,7 +33,7 @@ pub struct ShowInfoArgs {
     pub allow_insecure: bool,
 
     /// Support 'registry'
-    /// Example:'registry:my.reg.com/target/image:1.1'
+    /// Example:'registry:my.container.com/target/image:1.1'
     #[clap(long, short)]
     pub image: TargetType,
 
@@ -91,7 +91,7 @@ pub struct BuildCmdArgs {
 
     /// Target type.
     /// Support 'registry'
-    /// Example:'registry:my.reg.com/target/image:1.1'
+    /// Example:'registry:my.container.com/target/image:1.1'
     #[clap(long, short)]
     pub target: TargetType,
 
@@ -131,7 +131,7 @@ pub struct TransformCmdArgs {
     pub target_allow_insecure: bool,
 
     /// Source image.
-    /// Example:'my.reg.com/source/image:1.0'
+    /// Example:'my.container.com/source/image:1.0'
     #[clap(long, short)]
     pub source_image: String,
 
@@ -145,7 +145,7 @@ pub struct TransformCmdArgs {
 
     /// Target type.
     /// Support 'registry'
-    /// Example:'registry:my.reg.com/target/image:1.1'
+    /// Example:'registry:my.container.com/target/image:1.1'
     #[clap(long, short)]
     pub target: TargetType,
 

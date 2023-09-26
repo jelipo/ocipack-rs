@@ -147,7 +147,7 @@ my.harbor.com/jelipo/demo:v1
         Example:'socks5://127.0.0.1:1080','http://name:pass@example:8080'
  # Target Image的信息
 -t, --target <TARGET>
-        Target type. Support 'registry' Example:'registry:my.reg.com/target/image:1.1'
+        Target type. Support 'registry' Example:'registry:my.container.com/target/image:1.1'
 # 当Target Image的Registry为http而非https时需要启用
     --target-allow-insecure
         Allow target insecure registry 

@@ -3,10 +3,10 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::reg::docker::{DockerManifest, DockerManifestList};
-use crate::reg::manifest::ManifestList::{Docker, Oci};
-use crate::reg::oci::{OciManifest, OciManifestIndex};
-use crate::reg::{ConfigBlobSerialize, FindPlatform, Layer, LayerConvert, Platform, RegContentType, RegDigest};
+use crate::container::docker::{DockerManifest, DockerManifestList};
+use crate::container::manifest::ManifestList::{Docker, Oci};
+use crate::container::oci::{OciManifest, OciManifestIndex};
+use crate::container::{ConfigBlobSerialize, FindPlatform, Layer, LayerConvert, Platform, RegContentType, RegDigest};
 use crate::CompressType;
 
 #[derive(Clone, Debug)]
@@ -23,7 +23,7 @@ pub struct CommonManifestLayer {
     pub digest: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommonManifestConfig {
     pub media_type: String,
@@ -108,7 +108,7 @@ impl Manifest {
                         CompressType::Tgz => RegContentType::OCI_LAYER_TGZ.val(),
                         CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val(),
                     }
-                    .to_string(),
+                        .to_string(),
                     size,
                     digest: reg_digest.digest,
                 },

@@ -7,11 +7,11 @@ use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::ImageInfo;
 use crate::config::cmd::{BaseAuth, ShowInfoArgs, TargetType};
 use crate::config::RegAuthType;
-use crate::reg::docker::image::DockerConfigBlob;
-use crate::reg::manifest::Manifest;
-use crate::reg::oci::image::OciConfigBlob;
-use crate::reg::proxy::ProxyInfo;
-use crate::reg::{ConfigBlobEnum, Reference, Registry, RegistryCreateInfo};
+use crate::container::docker::image::DockerConfigBlob;
+use crate::container::manifest::Manifest;
+use crate::container::oci::image::OciConfigBlob;
+use crate::container::proxy::ProxyInfo;
+use crate::container::{ConfigBlobEnum, Reference, Registry, RegistryCreateInfo};
 
 pub struct ShowInfoCommand {}
 
