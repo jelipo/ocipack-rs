@@ -28,7 +28,7 @@
 ## Linux 和 MacOS
 
 ```
-curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.5.0/ocipack-0.5.0-amd64_$(uname).tar.gz | tar xzv
+curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.6.0/ocipack-0.6.0-amd64_$(uname).tar.gz | tar xzv
 
 # 把下载解压完成的 `ocipack` 放到 `/usr/local/bin/` （可选操作）
 sudo cp ocipack /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack
@@ -37,7 +37,7 @@ sudo cp ocipack /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack
 ### Windows
 
 ```
-curl.exe -L https://github.com/jelipo/ocipack-rs/releases/download/0.5.0/ocipack-0.5.0-amd64_windows.zip -o ocipack.zip
+curl.exe -L https://github.com/jelipo/ocipack-rs/releases/download/0.6.0/ocipack-0.6.0-amd64_windows.zip -o ocipack.zip
 
 tar -xf ocipack.zip
 ```
@@ -118,6 +118,17 @@ my.harbor.com/jelipo/demo:v1
 
 接下来我们执行`docker run -it --rm my.harbor.com/jelipo/demo:v1`时会输出我们的`Dockerfile`文件的内容。
 
+### 将镜像打包成文件
+
+如果只需要下载镜像保存到文件，可以把 `--target`参数改为 `tgz:file_path`，顺便使用socks5代理访问。
+
+```bash
+./ocipack build \
+  --source=registry:redis:latest \
+  --target=tgz:redis.tgz \
+  --source-proxy=socks5://127.0.0.1:1080
+```
+
 ## 功能
 
 ## 构建（Build）
@@ -147,7 +158,7 @@ my.harbor.com/jelipo/demo:v1
         Example:'socks5://127.0.0.1:1080','http://name:pass@example:8080'
  # Target Image的信息
 -t, --target <TARGET>
-        Target type. Support 'registry' Example:'registry:my.container.com/target/image:1.1'
+        Target type. Support registry/tar/tgz. Example:'registry:my.container.com/target/image:1.1','tgz:image.tgz'
 # 当Target Image的Registry为http而非https时需要启用
     --target-allow-insecure
         Allow target insecure registry 

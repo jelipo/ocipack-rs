@@ -1,13 +1,13 @@
 use std::env;
 use std::str::FromStr;
 
-use anyhow::Result;
 use anyhow::{anyhow, Error};
+use anyhow::Result;
 use clap::Parser;
 use url::Url;
 
-use crate::container::proxy::{ProxyAuth, ProxyInfo};
 use crate::container::Platform;
+use crate::container::proxy::{ProxyAuth, ProxyInfo};
 
 #[derive(Parser)]
 #[clap(about = "Fast build docker/oci image", version, author = "jelipo (github.com/jelipo)", long_about = None)]
@@ -76,8 +76,8 @@ pub struct BuildCmdArgs {
     pub target_allow_insecure: bool,
 
     /// Source type.
-    /// Support dockerfile type
-    /// Example:'dockerfile:/path/to/.Dockerfile'
+    /// Support dockerfile/registry type
+    /// Example:'dockerfile:/path/to/.Dockerfile','registry:redis:latest'
     #[clap(long, short)]
     pub source: SourceType,
 
@@ -90,7 +90,7 @@ pub struct BuildCmdArgs {
     pub source_proxy: Option<ProxyInfo>,
 
     /// Target type.
-    /// Support registry/tar/tgz'.
+    /// Support registry/tar/tgz.
     /// Example:'registry:my.container.com/target/image:1.1','tgz:image.tgz'
     #[clap(long, short)]
     pub target: TargetType,
@@ -208,6 +208,7 @@ impl FromStr for TargetFormat {
 #[derive(Clone)]
 pub enum SourceType {
     Dockerfile { path: String },
+    Registry { image: String },
     Cmd { tag: String },
 }
 
@@ -220,6 +221,9 @@ impl FromStr for SourceType {
         Ok(match source_type {
             "dockerfile" => SourceType::Dockerfile {
                 path: arg[potion + 1..].to_string(),
+            },
+            "registry" => SourceType::Registry {
+                image: arg[potion + 1..].to_string()
             },
             "cmd" => SourceType::Cmd {
                 tag: arg[potion + 1..].to_string(),
