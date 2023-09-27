@@ -118,9 +118,9 @@ my.harbor.com/jelipo/demo:v1
 
 接下来我们执行`docker run -it --rm my.harbor.com/jelipo/demo:v1`时会输出我们的`Dockerfile`文件的内容。
 
-### 将镜像打包成文件
+#### 拉取镜像并打包成文件
 
-如果只需要下载镜像保存到文件，可以把 `--target`参数改为 `tgz:file_path`，顺便使用socks5代理访问。
+如果只需要下载镜像保存到文件，可以把 `--target`参数改为 `tgz:file_path`，还可以使用socks5代理访问。
 
 ```bash
 ./ocipack build \

@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Result};
 use fantasy_util::time::system_time::SystemLocalTime;
-use log::warn;
+use log::{debug, warn};
 use regex::Regex;
 use reqwest::blocking::Client;
 use reqwest::Method;
@@ -75,7 +75,7 @@ impl AuthenticateAdapter {
         let bearer_url = format!("{}/v2/", registry_addr);
         let http_response = do_request_raw::<u8>(client, bearer_url.as_str(), Method::GET, None, &[], None, None)?;
         for (key, value) in http_response.headers() {
-            println!("debug: {}: {}", key.as_str(), value.to_str()?);
+            debug!("debug: {}: {}", key.as_str(), value.to_str()?);
         }
         let www_authenticate = get_header(http_response.headers(), "Www-Authenticate")
             .ok_or_else(|| anyhow!("'Www-Authenticate' header not found"))?;
