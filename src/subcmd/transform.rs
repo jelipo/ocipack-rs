@@ -1,9 +1,11 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::info;
+use std::path::PathBuf;
 
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
+use crate::adapter::tar::TarTargetAdapter;
 use crate::adapter::{BuildInfo, SourceInfo};
 use crate::config::cmd::{TargetType, TransformCmdArgs};
 use crate::config::RegAuthType;
@@ -42,7 +44,8 @@ Target image:
 {}
 "#,
             match &build_args.target {
-                TargetType::Registry(r) => r,
+                TargetType::Registry(r) => (*r).clone(),
+                TargetType::Tar(tar_arg) => format!("Path: {}", tar_arg.path),
             }
         )
         .green()
@@ -100,7 +103,7 @@ pub fn transform_handle(
     )?;
     let target_config_blob = build_target_config_blob(build_info, &pull_result.config_blob, None, &transform_cmds.format);
     let source_manifest = pull_result.manifest;
-
+    let source_manifest_raw = pull_result.manifest_raw;
     let target_config_blob_serialize = target_config_blob.serialize()?;
     info!("Build a new target manifest.");
     let target_manifest = build_target_manifest(source_manifest, &transform_cmds.format, None, &target_config_blob_serialize)?;
@@ -117,6 +120,18 @@ pub fn transform_handle(
                 transform_cmds.target_proxy.clone(),
             )?;
             registry_adapter.upload()?
+        }
+        TargetType::Tar(tar_arg) => {
+            let image_raw_name = source_info.image_info.image_raw_name.ok_or_else(|| anyhow!("must set a raw name"))?;
+            let adapter = TarTargetAdapter {
+                image_raw_name,
+                target_manifest,
+                manifest_raw: source_manifest_raw,
+                target_config_blob_serialize,
+                save_path: PathBuf::from(tar_arg.path.clone()),
+                use_gzip: tar_arg.usb_gzip,
+            };
+            adapter.save()?;
         }
     }
     Ok(())

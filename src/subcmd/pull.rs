@@ -7,14 +7,14 @@ use sha2::{Digest, Sha256};
 
 use crate::adapter::SourceInfo;
 use crate::config::RegAuthType;
-use crate::progress::manager::ProcessorManager;
-use crate::progress::Processor;
 use crate::container::docker::image::DockerConfigBlob;
 use crate::container::http::download::DownloadResult;
 use crate::container::manifest::Manifest;
 use crate::container::oci::image::OciConfigBlob;
 use crate::container::proxy::ProxyInfo;
 use crate::container::{ConfigBlobEnum, Layer, Reference, RegContentType, RegDigest, Registry, RegistryCreateInfo};
+use crate::progress::manager::ProcessorManager;
+use crate::progress::Processor;
 use crate::util::compress::uncompress;
 use crate::GLOBAL_CONFIG;
 
@@ -43,7 +43,7 @@ pub fn pull(
     };
     let mut from_registry = Registry::open(use_https, image_host, info)?;
     info!("Get source image manifest info.");
-    let (manifest, _) = from_registry.image_manager.manifests(&from_image_reference, source_info.platform.clone())?;
+    let (manifest, manifest_raw) = from_registry.image_manager.manifests(&from_image_reference, source_info.platform.clone())?;
     info!("Source image type: {}", manifest.manifest_type());
     let config_digest = manifest.config_digest();
     let layers = manifest.layers();
@@ -91,6 +91,7 @@ pub fn pull(
     Ok(PullResult {
         config_blob: config_blob_enum,
         manifest,
+        manifest_raw,
     })
 }
 
@@ -105,4 +106,5 @@ fn layer_to_map<'a>(layers: &'a [Layer]) -> HashMap<&'a str, &'a Layer<'a>> {
 pub struct PullResult {
     pub config_blob: ConfigBlobEnum,
     pub manifest: Manifest,
+    pub manifest_raw: String,
 }

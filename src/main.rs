@@ -1,5 +1,6 @@
 #![feature(exclusive_range_pattern)]
 #![feature(lazy_cell)]
+#![feature(seek_stream_len)]
 
 use std::ops::Deref;
 use std::sync::{Arc, LazyLock};
@@ -21,9 +22,9 @@ mod adapter;
 mod bar;
 mod config;
 mod const_data;
+mod container;
 mod init;
 mod progress;
-mod container;
 mod subcmd;
 mod util;
 

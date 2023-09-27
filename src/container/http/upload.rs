@@ -10,9 +10,9 @@ use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use reqwest::Method;
 
-use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
 use crate::container::http::{do_request_raw_read, HttpAuth};
 use crate::container::BlobConfig;
+use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
 
 pub struct RegUploader {
     reg_uploader_enum: RegUploaderEnum,

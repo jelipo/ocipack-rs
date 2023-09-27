@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::info;
 use serde_json::Value;
@@ -17,17 +17,16 @@ pub struct ShowInfoCommand {}
 
 impl ShowInfoCommand {
     pub fn show(show_info_args: &ShowInfoArgs) -> Result<()> {
-        let show_info = match &show_info_args.image {
-            TargetType::Registry(image) => {
-                let proxy = show_info_args.proxy.clone();
-                let (image_info, auth) = RegistryImageInfo::gen_image_info(image, show_info_args.auth.as_ref())?;
-                info!("Requesting registry...");
-                let detail = RegistryImageInfo::info(!show_info_args.allow_insecure, image_info, auth, proxy)?;
-                info!("Request done.");
-                detail
-            }
-        };
-        print_image_detail(show_info)?;
+        if let TargetType::Registry(image) = &show_info_args.image {
+            let proxy = show_info_args.proxy.clone();
+            let (image_info, auth) = RegistryImageInfo::gen_image_info(image, show_info_args.auth.as_ref())?;
+            info!("Requesting registry...");
+            let detail = RegistryImageInfo::info(!show_info_args.allow_insecure, image_info, auth, proxy)?;
+            info!("Request done.");
+            print_image_detail(detail)?;
+        } else {
+            return Err(anyhow!("not support {:?}", show_info_args.image));
+        }
         Ok(())
     }
 }

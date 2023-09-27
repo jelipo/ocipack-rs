@@ -108,7 +108,7 @@ impl Manifest {
                         CompressType::Tgz => RegContentType::OCI_LAYER_TGZ.val(),
                         CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val(),
                     }
-                        .to_string(),
+                    .to_string(),
                     size,
                     digest: reg_digest.digest,
                 },

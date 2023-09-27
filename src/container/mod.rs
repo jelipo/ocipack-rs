@@ -13,19 +13,19 @@ use url::Url;
 use manifest::Manifest;
 
 use crate::const_data::{DEFAULT_IMAGE_HOST, DOCKER_IO_HOST};
-use crate::container::docker::DockerManifest;
 use crate::container::docker::image::DockerConfigBlob;
+use crate::container::docker::DockerManifest;
 use crate::container::http::auth::TokenType;
 use crate::container::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::container::http::download::RegDownloader;
-use crate::container::http::RegistryAuth;
 use crate::container::http::upload::RegUploader;
+use crate::container::http::RegistryAuth;
 use crate::container::manifest::{ManifestList, Type};
 use crate::container::oci::image::OciConfigBlob;
 use crate::container::oci::OciManifest;
 use crate::container::proxy::ProxyInfo;
-use crate::GLOBAL_CONFIG;
 use crate::util::sha::bytes_sha256;
+use crate::GLOBAL_CONFIG;
 
 pub mod docker;
 pub mod home;
@@ -485,7 +485,7 @@ impl RegContentType {
             RegContentType::OCI_LAYER_TAR.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tar)
         } else if [
@@ -494,14 +494,14 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [
             RegContentType::OCI_LAYER_ZSTD.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Zstd)
         } else {
@@ -524,7 +524,7 @@ impl ToString for CompressType {
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
         }
-            .to_string()
+        .to_string()
     }
 }
 

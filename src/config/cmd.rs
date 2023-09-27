@@ -90,8 +90,8 @@ pub struct BuildCmdArgs {
     pub source_proxy: Option<ProxyInfo>,
 
     /// Target type.
-    /// Support 'registry'
-    /// Example:'registry:my.container.com/target/image:1.1'
+    /// Support registry/tar/tgz'.
+    /// Example:'registry:my.container.com/target/image:1.1','tgz:image.tgz'
     #[clap(long, short)]
     pub target: TargetType,
 
@@ -144,8 +144,8 @@ pub struct TransformCmdArgs {
     pub source_proxy: Option<ProxyInfo>,
 
     /// Target type.
-    /// Support 'registry'
-    /// Example:'registry:my.container.com/target/image:1.1'
+    /// Support 'registry','tar','tgz'
+    /// Example:'registry:my.container.com/target/image:1.1', 'tgz:./image.tgz'
     #[clap(long, short)]
     pub target: TargetType,
 
@@ -252,9 +252,16 @@ impl FromStr for ProxyInfo {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum TargetType {
     Registry(String),
+    Tar(TarArg),
+}
+
+#[derive(Clone, Debug)]
+pub struct TarArg {
+    pub path: String,
+    pub usb_gzip: bool,
 }
 
 impl FromStr for TargetType {
@@ -263,8 +270,17 @@ impl FromStr for TargetType {
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
         let potion = arg.chars().position(|c| c == ':').ok_or_else(|| anyhow!("error source"))?;
         let target_type = &arg[..potion];
+        let second = arg[potion + 1..].to_string();
         Ok(match target_type {
-            "registry" => TargetType::Registry(arg[potion + 1..].to_string()),
+            "registry" => TargetType::Registry(second),
+            "tar" => TargetType::Tar(TarArg {
+                path: second,
+                usb_gzip: false,
+            }),
+            "tgz" => TargetType::Tar(TarArg {
+                path: second,
+                usb_gzip: true,
+            }),
             _ => return Err(anyhow!("unknown target type: {}", target_type)),
         })
     }
