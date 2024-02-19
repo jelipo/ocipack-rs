@@ -32,7 +32,7 @@ home = "0.5"
 base64 = "0.21"
 clap = { version = "4.4", features = ["derive"] }
 dockerfile-parser = "0.9.0-alpha.1"
-derive_builder = "0.12.0"
+derive_builder = "0.20.0"
 zstd = "0.13"
 fantasy-util = "0.1.8"
 ubyte = "0.10"
