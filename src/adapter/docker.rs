@@ -117,7 +117,7 @@ impl DockerfileAdapter {
                     }
                     "EXPOSE" => {
                         if let BreakableStringComponent::String(ports_str) = misc.arguments.components.remove(0) {
-                            for str in ports_str.content.trim().split_whitespace() {
+                            for str in ports_str.content.split_whitespace() {
                                 let expose = if str.ends_with("/tcp") || str.ends_with("/udp") {
                                     let _port_num = u16::from_str(&str[..str.len() - 4])?;
                                     str.to_string()

@@ -56,7 +56,7 @@ Target image:
                 TargetType::Tar(tar_arg) => format!("Path: {}", tar_arg.path),
             }
         )
-            .green()
+        .green()
     );
 }
 
@@ -71,7 +71,7 @@ Build job failed!
 "#,
             err
         )
-            .red()
+        .red()
     );
 }
 
@@ -84,7 +84,7 @@ fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo
         SourceType::Registry { image } => {
             let fake_dockerfile_body = format!("FROM {}", image);
             DockerfileAdapter::parse_from_str(&fake_dockerfile_body)?
-        },
+        }
     };
     // add library
     let image_name = &image_info.image_name;

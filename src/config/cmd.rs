@@ -1,13 +1,13 @@
 use std::env;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Error};
 use anyhow::Result;
+use anyhow::{anyhow, Error};
 use clap::Parser;
 use url::Url;
 
-use crate::container::Platform;
 use crate::container::proxy::{ProxyAuth, ProxyInfo};
+use crate::container::Platform;
 
 #[derive(Parser)]
 #[clap(about = "Fast build docker/oci image", version, author = "jelipo (github.com/jelipo)", long_about = None)]
@@ -223,7 +223,7 @@ impl FromStr for SourceType {
                 path: arg[potion + 1..].to_string(),
             },
             "registry" => SourceType::Registry {
-                image: arg[potion + 1..].to_string()
+                image: arg[potion + 1..].to_string(),
             },
             "cmd" => SourceType::Cmd {
                 tag: arg[potion + 1..].to_string(),

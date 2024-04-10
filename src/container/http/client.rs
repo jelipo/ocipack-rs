@@ -1,23 +1,22 @@
 use std::io::Read;
-use std::option::Option::Some;
 use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use derive_builder::Builder;
+use reqwest::{Method, Proxy, StatusCode};
 use reqwest::blocking::{Client, Response};
 use reqwest::redirect::Policy;
-use reqwest::{Method, Proxy, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use crate::container::{BlobConfig, RegContentType};
+use crate::container::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::container::http::auth::{RegTokenHandler, TokenType};
 use crate::container::http::download::RegDownloader;
 use crate::container::http::upload::RegUploader;
-use crate::container::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::container::proxy::ProxyInfo;
-use crate::container::{BlobConfig, RegContentType};
 use crate::util::sha;
 
 pub struct RegistryHttpClient {
@@ -95,7 +94,7 @@ impl RegistryHttpClient {
     fn do_request<T: Serialize + ?Sized>(&mut self, request: ClientRequest<T>) -> Result<FullRegistryResponse> {
         let http_response = self.do_request_raw(request)?;
         let response = FullRegistryResponse::new_registry_response(http_response)?;
-        return if response.is_success() {
+        if response.is_success() {
             Ok(response)
         } else {
             Err(anyhow!(match response.get_content_type() {
@@ -107,7 +106,7 @@ impl RegistryHttpClient {
                     response.body_str()
                 ),
             }))
-        };
+        }
     }
 
     pub fn download(

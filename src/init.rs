@@ -4,7 +4,6 @@ use anyhow::Result;
 use chrono::Local;
 use colored::Colorize;
 use env_logger::Env;
-use env_logger::fmt::Color;
 use log::Level;
 
 /// 整个App初始化方法
@@ -19,19 +18,19 @@ fn log_init() {
     let env = Env::default().default_filter_or("info");
     env_logger::Builder::from_env(env)
         .format(|fmt, record| {
+            let level = record.level();
+            let level_str = level.as_str();
             let level_color = match record.level() {
-                Level::Error => Color::Red,
-                Level::Warn => Color::Yellow,
-                Level::Info => Color::Green,
-                Level::Debug | Level::Trace => Color::Cyan,
+                Level::Error => level_str.red(),
+                Level::Warn => level_str.yellow(),
+                Level::Info => level_str.green(),
+                Level::Debug | Level::Trace => level_str.cyan(),
             };
-            let mut level_style = fmt.style();
-            level_style.set_color(level_color);
             writeln!(
                 fmt,
                 "[{} {}] {}",
                 Local::now().format("%H:%M:%S%.3f"),
-                level_style.value(record.level()),
+                level_color,
                 &record.args()
             )
         })
