@@ -66,7 +66,11 @@ impl TarTargetAdapter {
             .iter()
             .map(|comm_layer| {
                 let digest = RegDigest::new_with_digest(comm_layer.digest.clone());
-                let layer = GLOBAL_CONFIG.home_dir.cache.blobs.local_layer(&digest)
+                let layer = GLOBAL_CONFIG
+                    .home_dir
+                    .cache
+                    .blobs
+                    .local_layer(&digest)
                     .ok_or_else(|| anyhow!("can not found this layer: {}", digest.sha256))?;
                 let layer_file = File::open(layer.layer_file_path)?;
                 let (size, layer_reader) = match layer.compress_type {
