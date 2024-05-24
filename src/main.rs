@@ -1,4 +1,3 @@
-#![feature(exclusive_range_pattern)]
 #![feature(lazy_cell)]
 #![feature(seek_stream_len)]
 

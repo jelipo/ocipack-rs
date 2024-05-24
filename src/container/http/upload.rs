@@ -37,7 +37,7 @@ struct RegUploaderCore {
 }
 
 enum RegUploaderEnum {
-    Finished { file_size: u64, finished_reason: String },
+    Finished { _file_size: u64, finished_reason: String },
     Run(RegUploaderCore),
 }
 
@@ -67,7 +67,7 @@ impl RegUploader {
         };
         RegUploader {
             reg_uploader_enum: RegUploaderEnum::Finished {
-                file_size,
+                _file_size: file_size,
                 finished_reason,
             },
             blob_config: blob_config_arc,
@@ -97,7 +97,7 @@ impl Processor<UploadResult> for RegUploader {
     fn start(&self) -> Box<dyn ProcessorAsync<UploadResult>> {
         return match &self.reg_uploader_enum {
             RegUploaderEnum::Finished {
-                file_size: _,
+                _file_size: _,
                 finished_reason,
             } => Box::new(RegFinishedUploader {
                 upload_result: UploadResult {

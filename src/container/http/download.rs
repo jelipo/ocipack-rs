@@ -80,7 +80,7 @@ impl Processor<DownloadResult> for RegDownloader {
             return Box::new(RegFinishedDownloader {
                 result: DownloadResult {
                     file_path: Some(file_path.clone()),
-                    file_size: file_path.metadata().unwrap().len(),
+                    _file_size: file_path.metadata().unwrap().len(),
                     blob_config,
                     local_existed: true,
                     result_str: "local exists".to_string(),
@@ -102,7 +102,7 @@ impl Processor<DownloadResult> for RegDownloader {
             }
             Ok(DownloadResult {
                 file_path: Some(file_path),
-                file_size: status_core.file_size,
+                _file_size: status_core.file_size,
                 blob_config: blob_config.clone(),
                 local_existed: false,
                 result_str: "complete".to_string(),
@@ -220,15 +220,9 @@ impl ProgressStatus for RegDownloaderStatus {
     }
 }
 
-#[derive(Clone)]
-pub struct CustomDownloadFileName {
-    pub dir_path: Box<Path>,
-    pub file_name: String,
-}
-
 pub struct DownloadResult {
     pub file_path: Option<Box<Path>>,
-    pub file_size: u64,
+    pub _file_size: u64,
     pub blob_config: Arc<BlobConfig>,
     pub local_existed: bool,
     pub result_str: String,
