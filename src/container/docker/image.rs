@@ -65,9 +65,9 @@ pub struct Rootfs {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct History {
-    pub created: String,
+    pub created: Option<String>,
     #[serde(rename = "created_by")]
-    pub created_by: String,
+    pub created_by: Option<String>,
     #[serde(rename = "empty_layer")]
     pub empty_layer: Option<bool>,
 }
