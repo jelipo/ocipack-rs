@@ -134,18 +134,12 @@ fn handle(
     } else {
         None
     };
-    let target_config_blob =
-        build_target_config_blob(build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
+    let target_config_blob = build_target_config_blob(build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
     let source_manifest = pull_result.manifest;
     let source_manifest_raw = pull_result.manifest_raw;
     let target_config_blob_serialize = target_config_blob.serialize()?;
     info!("Build a new target manifest.");
-    let target_manifest = build_target_manifest(
-        source_manifest,
-        &build_cmds.format,
-        temp_local_layer,
-        &target_config_blob_serialize,
-    )?;
+    let target_manifest = build_target_manifest(source_manifest, &build_cmds.format, temp_local_layer, &target_config_blob_serialize)?;
     match &build_cmds.target {
         TargetType::Registry(image) => {
             let registry_adapter = RegistryTargetAdapter::new(

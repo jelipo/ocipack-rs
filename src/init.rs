@@ -26,13 +26,7 @@ fn log_init() {
                 Level::Info => level_str.green(),
                 Level::Debug | Level::Trace => level_str.cyan(),
             };
-            writeln!(
-                fmt,
-                "[{} {}] {}",
-                Local::now().format("%H:%M:%S%.3f"),
-                level_color,
-                &record.args()
-            )
+            writeln!(fmt, "[{} {}] {}", Local::now().format("%H:%M:%S%.3f"), level_color, &record.args())
         })
         .init();
 }

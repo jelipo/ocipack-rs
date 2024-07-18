@@ -41,10 +41,7 @@ fn print_image_detail(info: ImageShowInfo) -> Result<()> {
         ("IMAGE_REFERENCE", info.reference.green()),
         ("MANIFEST_TYPE", info.manifest_type.green()),
         ("OS", info.os.map(|os| os.green()).unwrap_or_else(|| "NOT SET".yellow())),
-        (
-            "ARCH",
-            info.arch.map(|arch| arch.green()).unwrap_or_else(|| "NOT SET".yellow()),
-        ),
+        ("ARCH", info.arch.map(|arch| arch.green()).unwrap_or_else(|| "NOT SET".yellow())),
         ("CMD", cmd),
     ];
     println!("\n{}\n", "IMAGE DETAILS".cyan());
@@ -95,8 +92,7 @@ impl RegistryImageInfo {
                 (ConfigBlobEnum::OciV1(blob), raw)
             }
             Manifest::DockerV2S2(_) => {
-                let (blob, raw) =
-                    image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, manifest.config_digest())?;
+                let (blob, raw) = image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, manifest.config_digest())?;
                 (ConfigBlobEnum::DockerV2S2(blob), raw)
             }
         };

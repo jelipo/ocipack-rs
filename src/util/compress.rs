@@ -18,11 +18,7 @@ pub fn uncompress<R: Read, W: Write>(compress_type: CompressType, tar_input: &mu
     Ok(())
 }
 
-pub fn compress<R: Read, W: ?Sized + Write>(
-    compress_type: CompressType,
-    tar_input_reader: &mut R,
-    output_writer: &mut W,
-) -> Result<()> {
+pub fn compress<R: Read, W: ?Sized + Write>(compress_type: CompressType, tar_input_reader: &mut R, output_writer: &mut W) -> Result<()> {
     match compress_type {
         CompressType::Tar => io::copy(tar_input_reader, output_writer).map(|_| ())?,
         CompressType::Tgz => compress_gz(tar_input_reader, output_writer)?,

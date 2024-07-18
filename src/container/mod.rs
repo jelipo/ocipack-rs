@@ -481,12 +481,7 @@ impl RegContentType {
     }
 
     pub fn compress_type(media_type: &str) -> Result<CompressType> {
-        if [
-            RegContentType::OCI_LAYER_TAR.0,
-            RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0,
-        ]
-        .contains(&media_type)
-        {
+        if [RegContentType::OCI_LAYER_TAR.0, RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.0].contains(&media_type) {
             Ok(CompressType::Tar)
         } else if [
             RegContentType::DOCKER_FOREIGN_LAYER_TGZ.0,
@@ -497,12 +492,7 @@ impl RegContentType {
         .contains(&media_type)
         {
             Ok(CompressType::Tgz)
-        } else if [
-            RegContentType::OCI_LAYER_ZSTD.0,
-            RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0,
-        ]
-        .contains(&media_type)
-        {
+        } else if [RegContentType::OCI_LAYER_ZSTD.0, RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0].contains(&media_type) {
             Ok(CompressType::Zstd)
         } else {
             Err(anyhow!("not a layer media type"))

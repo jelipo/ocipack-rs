@@ -77,8 +77,8 @@ impl AuthenticateAdapter {
         for (key, value) in http_response.headers() {
             debug!("debug: {}: {}", key.as_str(), value.to_str()?);
         }
-        let www_authenticate = get_header(http_response.headers(), "Www-Authenticate")
-            .ok_or_else(|| anyhow!("'Www-Authenticate' header not found"))?;
+        let www_authenticate =
+            get_header(http_response.headers(), "Www-Authenticate").ok_or_else(|| anyhow!("'Www-Authenticate' header not found"))?;
         let regex = Regex::new("^Bearer realm=\"(?P<realm>.*)\",service=\"(?P<service>.*)\".*")?;
         let captures = regex
             .captures(www_authenticate.as_str())
@@ -109,19 +109,10 @@ impl AuthenticateAdapter {
         let status = http_response.status();
         let response_text = http_response.text().unwrap_or_else(|_| String::new());
         if !status.is_success() {
-            return Err(anyhow!(
-                "get token failed,code: {}. response: {}",
-                status.as_str(),
-                &response_text
-            ));
+            return Err(anyhow!("get token failed,code: {}. response: {}", status.as_str(), &response_text));
         }
-        serde_json::from_str::<TokenResponse>(&response_text).map_err(|err| {
-            anyhow!(
-                "deserialization 'get token' response failed: {}. response: {}.",
-                err,
-                response_text
-            )
-        })
+        serde_json::from_str::<TokenResponse>(&response_text)
+            .map_err(|err| anyhow!("deserialization 'get token' response failed: {}. response: {}.", err, response_text))
     }
 }
 

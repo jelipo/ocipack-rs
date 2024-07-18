@@ -136,20 +136,12 @@ impl Processor<UploadResult> for RegUploader {
     }
 }
 
-fn uploading(
-    status: RegUploaderStatus,
-    file_path: &str,
-    reg_http_uploader: RegHttpUploader,
-    blob_config: Arc<BlobConfig>,
-) -> Result<()> {
+fn uploading(status: RegUploaderStatus, file_path: &str, reg_http_uploader: RegHttpUploader, blob_config: Arc<BlobConfig>) -> Result<()> {
     //检查本地是否存在已有
     let file_path = Path::new(file_path);
     let local_file = File::open(file_path)?;
     let file_size = local_file.metadata()?.len();
-    let reader = RegUploaderReader {
-        status,
-        file: local_file,
-    };
+    let reader = RegUploaderReader { status, file: local_file };
     let mut response = do_request_raw_read::<RegUploaderReader>(
         &reg_http_uploader.client,
         reg_http_uploader.url.as_str(),

@@ -152,9 +152,7 @@ pub fn ociv1_to_dockerv2s2(media_type: &str) -> Result<String> {
         RegContentType::DOCKER_LAYER_TGZ
     } else if media_type == RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.val() {
         RegContentType::DOCKER_FOREIGN_LAYER_TGZ
-    } else if media_type == RegContentType::OCI_LAYER_TAR.val()
-        || media_type == RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.val()
-    {
+    } else if media_type == RegContentType::OCI_LAYER_TAR.val() || media_type == RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TAR.val() {
         return Err(anyhow!("docker not support tar layer,source type:{}", media_type));
     } else {
         return Err(anyhow!("error oci layer type:{}", media_type));

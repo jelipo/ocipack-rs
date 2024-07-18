@@ -239,10 +239,7 @@ impl FromStr for ProxyInfo {
     fn from_str(arg: &str) -> Result<Self, Self::Err> {
         let url = Url::parse(arg)?;
         let auth_opt = if !url.username().eq("") {
-            Some(ProxyAuth::new(
-                url.username().to_string(),
-                url.password().unwrap_or("").to_string(),
-            ))
+            Some(ProxyAuth::new(url.username().to_string(), url.password().unwrap_or("").to_string()))
         } else {
             None
         };

@@ -5,18 +5,18 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use derive_builder::Builder;
-use reqwest::{Method, Proxy, StatusCode};
 use reqwest::blocking::{Client, Response};
 use reqwest::redirect::Policy;
+use reqwest::{Method, Proxy, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::container::{BlobConfig, RegContentType};
-use crate::container::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::container::http::auth::{RegTokenHandler, TokenType};
 use crate::container::http::download::RegDownloader;
 use crate::container::http::upload::RegUploader;
+use crate::container::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::container::proxy::ProxyInfo;
+use crate::container::{BlobConfig, RegContentType};
 use crate::util::sha;
 
 pub struct RegistryHttpClient {
@@ -109,13 +109,7 @@ impl RegistryHttpClient {
         }
     }
 
-    pub fn download(
-        &mut self,
-        path: &str,
-        blob_down_config: BlobConfig,
-        scope: &str,
-        layer_size: Option<u64>,
-    ) -> Result<RegDownloader> {
+    pub fn download(&mut self, path: &str, blob_down_config: BlobConfig, scope: &str, layer_size: Option<u64>) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
         let token = self.reg_token_handler.token(Some(scope), TokenType::Pull)?;
         let downloader = RegDownloader::new_reg(

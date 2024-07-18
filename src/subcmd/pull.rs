@@ -50,8 +50,7 @@ pub fn pull(
     let mut reg_downloader_vec = Vec::<Box<dyn Processor<DownloadResult>>>::new();
     for layer in &layers {
         let digest = RegDigest::new_with_digest(layer.digest.to_string());
-        let downloader =
-            from_registry.image_manager.layer_blob_download(from_image_reference.image_name, &digest, Some(layer.size))?;
+        let downloader = from_registry.image_manager.layer_blob_download(from_image_reference.image_name, &digest, Some(layer.size))?;
         reg_downloader_vec.push(Box::new(downloader))
     }
     let manager = ProcessorManager::new_processor_manager(reg_downloader_vec)?;
@@ -62,8 +61,7 @@ pub fn pull(
         if download_result.local_existed {
             continue;
         }
-        let manifest_layer =
-            layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str()).expect("internal error");
+        let manifest_layer = layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str()).expect("internal error");
         let layer_compress_type = RegContentType::compress_type(manifest_layer.media_type)?;
         let digest = RegDigest::new_with_digest(manifest_layer.digest.to_string());
         let download_path = download_result.file_path.as_ref().ok_or_else(|| anyhow!("can not found download file"))?;
