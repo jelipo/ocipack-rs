@@ -3,11 +3,11 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::CompressType;
-use crate::container::{ConfigBlobSerialize, FindPlatform, Layer, LayerConvert, Platform, RegContentType, RegDigest};
 use crate::container::image::docker::{DockerManifest, DockerManifestList};
 use crate::container::image::oci::{OciManifest, OciManifestIndex};
 use crate::container::manifest::ManifestList::{Docker, Oci};
+use crate::container::{ConfigBlobSerialize, FindPlatform, Layer, LayerConvert, Platform, RegContentType, RegDigest};
+use crate::CompressType;
 
 #[derive(Clone, Debug)]
 pub enum Type {
@@ -108,7 +108,7 @@ impl Manifest {
                         CompressType::Tgz => RegContentType::OCI_LAYER_TGZ.val(),
                         CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val(),
                     }
-                        .to_string(),
+                    .to_string(),
                     size,
                     digest: reg_digest.digest,
                 },
@@ -191,6 +191,35 @@ impl ManifestList {
         }
     }
 
+    pub fn platforms(&self) -> Vec<Platform> {
+        match self {
+            Oci(oci) => oci
+                .manifests
+                .iter()
+                .map(|item| {
+                    let platform = &item.platform;
+                    Platform {
+                        os: platform.os.clone(),
+                        arch: platform.architecture.clone(),
+                        variant: platform.variant.clone(),
+                    }
+                })
+                .collect(),
+            Docker(docker) => docker
+                .manifests
+                .iter()
+                .map(|item| {
+                    let platform = &item.platform;
+                    Platform {
+                        os: platform.os.clone(),
+                        arch: platform.architecture.clone(),
+                        variant: platform.variant.clone(),
+                    }
+                })
+                .collect(),
+        }
+    }
+
     pub fn from(manifest_index_body: &str, t: Type) -> Result<ManifestList> {
         Ok(match t {
             Type::Docker => Docker(serde_json::from_str::<DockerManifestList>(&manifest_index_body)?),
@@ -222,7 +251,7 @@ impl ManifestResponse {
     pub fn manifest(&self) -> &ManifestResponseEnum {
         &self.manifest
     }
-    
+
     pub fn content_type(&self) -> &str {
         &self.content_type
     }
@@ -232,7 +261,6 @@ pub enum ManifestResponseEnum {
     Manifest(Manifest),
     ManifestList(ManifestList),
 }
-
 
 impl ManifestResponseEnum {
     pub fn from(content_type: String, response_body: &str) -> Result<ManifestResponseEnum> {

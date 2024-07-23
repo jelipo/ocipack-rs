@@ -17,20 +17,20 @@ use crate::const_data::{DEFAULT_IMAGE_HOST, DOCKER_IO_HOST};
 use crate::container::http::auth::TokenType;
 use crate::container::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::container::http::download::RegDownloader;
-use crate::container::http::RegistryAuth;
 use crate::container::http::upload::RegUploader;
+use crate::container::http::RegistryAuth;
 use crate::container::image::docker::{DockerConfigBlob, DockerManifest};
 use crate::container::image::oci::{OciConfigBlob, OciManifest};
 use crate::container::manifest::{ManifestList, ManifestResponse, ManifestResponseEnum};
 use crate::container::proxy::ProxyInfo;
-use crate::GLOBAL_CONFIG;
 use crate::util::sha::bytes_sha256;
+use crate::GLOBAL_CONFIG;
 
 pub mod home;
 pub mod http;
+pub mod image;
 pub mod manifest;
 pub mod proxy;
-pub mod image;
 
 pub struct Reference<'a> {
     /// Image的名称
@@ -39,7 +39,7 @@ pub struct Reference<'a> {
     pub reference: &'a str,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Platform {
     pub os: String,
     pub arch: String,
@@ -61,6 +61,21 @@ impl Default for Platform {
             os: String::from("linux"),
             arch: String::from("amd64"),
             variant: None,
+        }
+    }
+}
+
+impl Platform {
+    /// 所有可能性的variant
+    /// https://github.com/containerd/containerd/blob/v1.4.3/platforms/database.go#L83
+    fn possible_variant(&self) -> Vec<String> {
+        match &self.variant {
+            None => match self.arch.as_str() {
+                "arm64" => vec!["".to_string(), "8".to_string(), "v8".to_string()],
+                "arm" => vec!["".to_string(), "v7".to_string()],
+                _ => vec!["".to_string()],
+            },
+            Some(variant) => vec![variant.clone()],
         }
     }
 }
@@ -168,14 +183,19 @@ impl MyImageManager {
     }
 
     pub fn select_manifest(&mut self, refe: &Reference, manifest_list: &ManifestList, platform: Platform) -> Result<(Manifest, String)> {
-        let digest = manifest_list.find_platform_digest(&platform)
-            .ok_or_else(|| anyhow!("platform '{}' not found from manifest list", platform))?;
+        let digest =
+            manifest_list.find_platform_digest(&platform).ok_or_else(|| anyhow!("platform '{}' not found from manifest list", platform))?;
         let accepts = [RegContentType::OCI_MANIFEST, RegContentType::DOCKER_MANIFEST];
-        let reference = Reference { image_name: refe.image_name, reference: digest.as_str() };
+        let reference = Reference {
+            image_name: refe.image_name,
+            reference: digest.as_str(),
+        };
         let response = self.request_manifest(&reference, &accepts)?;
         return if let ManifestResponseEnum::Manifest(manifest) = response.manifest() {
             Ok((manifest.clone(), response.raw_body().to_string()))
-        } else { Err(anyhow!("accept: {:?}, but get '{}'",accepts,response.content_type())) };
+        } else {
+            Err(anyhow!("accept: {:?}, but get '{}'", accepts, response.content_type()))
+        };
     }
 
     pub fn request_manifest(&mut self, refe: &Reference, accepts: &[RegContentType]) -> Result<ManifestResponse> {
@@ -488,7 +508,7 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-            .contains(&media_type)
+        .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [RegContentType::OCI_LAYER_ZSTD.0, RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0].contains(&media_type) {
@@ -512,7 +532,8 @@ impl ToString for CompressType {
             CompressType::Tar => "TAR",
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 

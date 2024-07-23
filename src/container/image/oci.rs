@@ -62,16 +62,10 @@ impl LayerConvert for OciManifest {
 
 impl FindPlatform for OciManifestIndex {
     fn find_platform_digest(&self, platform: &Platform) -> Option<String> {
-        self.manifests.iter().find(|&item| {
-            let variant_match = match &platform.variant {
-                None => item.platform.variant.is_none(),
-                Some(variant) => match &item.platform.variant {
-                    None => false,
-                    Some(item_variant) => *item_variant == *variant,
-                },
-            };
-            item.platform.os == platform.os && item.platform.architecture == platform.arch && variant_match
-        }).map(|item| item.digest.clone())
+        let mut filter =
+            self.manifests.iter().filter(|&item| item.platform.os == platform.os && item.platform.architecture == platform.arch);
+        let possible_variants = platform.possible_variant();
+        filter.find(|&item| possible_variants.contains(&item.platform.variant.clone().unwrap_or_default())).map(|item| item.digest.clone())
     }
 }
 
