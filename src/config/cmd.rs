@@ -44,6 +44,10 @@ pub struct ShowInfoArgs {
     /// [OPTION] Proxy of get image info. Example:'socks5://127.0.0.1:1080','http://name:pass@example:8080'
     #[clap(long)]
     pub proxy: Option<ProxyInfo>,
+
+    /// [OPTION] Platform.If not specified and there are multiple platforms, the default is 'linux/amd64'.
+    #[clap(long)]
+    pub platform: Option<Platform>,
 }
 
 #[derive(clap::Args)]

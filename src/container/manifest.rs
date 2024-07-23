@@ -3,11 +3,11 @@ use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::container::docker::{DockerManifest, DockerManifestList};
-use crate::container::manifest::ManifestList::{Docker, Oci};
-use crate::container::oci::{OciManifest, OciManifestIndex};
-use crate::container::{ConfigBlobSerialize, FindPlatform, Layer, LayerConvert, Platform, RegContentType, RegDigest};
 use crate::CompressType;
+use crate::container::{ConfigBlobSerialize, FindPlatform, Layer, LayerConvert, Platform, RegContentType, RegDigest};
+use crate::container::image::docker::{DockerManifest, DockerManifestList};
+use crate::container::image::oci::{OciManifest, OciManifestIndex};
+use crate::container::manifest::ManifestList::{Docker, Oci};
 
 #[derive(Clone, Debug)]
 pub enum Type {
@@ -108,7 +108,7 @@ impl Manifest {
                         CompressType::Tgz => RegContentType::OCI_LAYER_TGZ.val(),
                         CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val(),
                     }
-                    .to_string(),
+                        .to_string(),
                     size,
                     digest: reg_digest.digest,
                 },
@@ -196,5 +196,59 @@ impl ManifestList {
             Type::Docker => Docker(serde_json::from_str::<DockerManifestList>(&manifest_index_body)?),
             Type::Oci => Oci(serde_json::from_str::<OciManifestIndex>(&manifest_index_body)?),
         })
+    }
+}
+
+pub struct ManifestResponse {
+    manifest: ManifestResponseEnum,
+    content_type: String,
+    response_body: String,
+}
+
+impl ManifestResponse {
+    pub fn from(content_type: String, response_body: String) -> Result<ManifestResponse> {
+        let manifest = ManifestResponseEnum::from(content_type.clone(), &response_body)?;
+        Ok(ManifestResponse {
+            manifest,
+            content_type,
+            response_body,
+        })
+    }
+
+    pub fn raw_body(&self) -> &str {
+        &self.response_body
+    }
+
+    pub fn manifest(&self) -> &ManifestResponseEnum {
+        &self.manifest
+    }
+    
+    pub fn content_type(&self) -> &str {
+        &self.content_type
+    }
+}
+
+pub enum ManifestResponseEnum {
+    Manifest(Manifest),
+    ManifestList(ManifestList),
+}
+
+
+impl ManifestResponseEnum {
+    pub fn from(content_type: String, response_body: &str) -> Result<ManifestResponseEnum> {
+        let response = if RegContentType::DOCKER_MANIFEST.val() == content_type {
+            let manifest = serde_json::from_str::<DockerManifest>(response_body)?;
+            ManifestResponseEnum::Manifest(Manifest::DockerV2S2(manifest))
+        } else if RegContentType::OCI_MANIFEST.val() == content_type {
+            let manifest = serde_json::from_str::<OciManifest>(response_body)?;
+            ManifestResponseEnum::Manifest(Manifest::OciV1(manifest))
+        } else if RegContentType::DOCKER_MANIFEST_LIST.val() == content_type {
+            ManifestResponseEnum::ManifestList(ManifestList::from(response_body, Type::Docker)?)
+        } else if RegContentType::OCI_INDEX.val() == content_type {
+            ManifestResponseEnum::ManifestList(ManifestList::from(response_body, Type::Oci)?)
+        } else {
+            return Err(anyhow!("unsupported content-type:{},body:{}", content_type, response_body));
+        };
+        Ok(response)
     }
 }
