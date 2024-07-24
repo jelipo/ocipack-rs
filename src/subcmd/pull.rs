@@ -7,10 +7,10 @@ use sha2::{Digest, Sha256};
 
 use crate::adapter::SourceInfo;
 use crate::config::RegAuthType;
-use crate::container::docker::image::DockerConfigBlob;
 use crate::container::http::download::DownloadResult;
+use crate::container::image::docker::DockerConfigBlob;
+use crate::container::image::oci::OciConfigBlob;
 use crate::container::manifest::Manifest;
-use crate::container::oci::image::OciConfigBlob;
 use crate::container::proxy::ProxyInfo;
 use crate::container::{ConfigBlobEnum, Layer, Reference, RegContentType, RegDigest, Registry, RegistryCreateInfo};
 use crate::progress::manager::ProcessorManager;

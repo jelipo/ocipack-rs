@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Error, Result};
-use log::debug;
+use colored::Colorize;
+use log::{debug, info};
 use reqwest::{Method, StatusCode};
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
@@ -13,25 +14,22 @@ use url::Url;
 use manifest::Manifest;
 
 use crate::const_data::{DEFAULT_IMAGE_HOST, DOCKER_IO_HOST};
-use crate::container::docker::image::DockerConfigBlob;
-use crate::container::docker::DockerManifest;
 use crate::container::http::auth::TokenType;
 use crate::container::http::client::{ClientRequest, RawRegistryResponse, RegistryHttpClient, RegistryResponse};
 use crate::container::http::download::RegDownloader;
 use crate::container::http::upload::RegUploader;
 use crate::container::http::RegistryAuth;
-use crate::container::manifest::{ManifestList, Type};
-use crate::container::oci::image::OciConfigBlob;
-use crate::container::oci::OciManifest;
+use crate::container::image::docker::{DockerConfigBlob, DockerManifest};
+use crate::container::image::oci::{OciConfigBlob, OciManifest};
+use crate::container::manifest::{ManifestList, ManifestResponse, ManifestResponseEnum};
 use crate::container::proxy::ProxyInfo;
 use crate::util::sha::bytes_sha256;
 use crate::GLOBAL_CONFIG;
 
-pub mod docker;
 pub mod home;
 pub mod http;
+pub mod image;
 pub mod manifest;
-pub mod oci;
 pub mod proxy;
 
 pub struct Reference<'a> {
@@ -41,7 +39,7 @@ pub struct Reference<'a> {
     pub reference: &'a str,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Platform {
     pub os: String,
     pub arch: String,
@@ -50,7 +48,10 @@ pub struct Platform {
 
 impl Display for Platform {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        format_args!("{}/{}", self.os, self.arch).fmt(f)
+        match &self.variant {
+            None => format_args!("{}/{}", self.os, self.arch).fmt(f),
+            Some(variant) => format_args!("{}/{}/{}", self.os, self.arch, variant).fmt(f),
+        }
     }
 }
 
@@ -60,6 +61,21 @@ impl Default for Platform {
             os: String::from("linux"),
             arch: String::from("amd64"),
             variant: None,
+        }
+    }
+}
+
+impl Platform {
+    /// 所有可能性的variant
+    /// https://github.com/containerd/containerd/blob/v1.4.3/platforms/database.go#L83
+    fn possible_variant(&self) -> Vec<String> {
+        match &self.variant {
+            None => match self.arch.as_str() {
+                "arm64" => vec!["".to_string(), "8".to_string(), "v8".to_string()],
+                "arm" => vec!["".to_string(), "v7".to_string()],
+                _ => vec!["".to_string()],
+            },
+            Some(variant) => vec![variant.clone()],
         }
     }
 }
@@ -149,48 +165,47 @@ impl MyImageManager {
             RegContentType::DOCKER_MANIFEST_LIST,
             RegContentType::OCI_INDEX,
         ];
-        self.select_manifest(refe, platform, accepts)
+        let response = self.request_manifest(refe, accepts)?;
+        let result = match response.manifest() {
+            ManifestResponseEnum::Manifest(manifest) => (manifest.clone(), response.raw_body().to_string()),
+            ManifestResponseEnum::ManifestList(manifest_list) => {
+                info!("Get a manifest list");
+                let pf = platform.unwrap_or_else(|| {
+                    let platform = Platform::default();
+                    info!("Platform is not set, use default platform {}.", platform.to_string().green());
+                    platform
+                });
+                // 根据Manifest List选择对应的Manifest，并请求该Manifest
+                self.select_manifest(refe, manifest_list, pf)?
+            }
+        };
+        Ok(result)
     }
 
-    pub fn select_manifest(
-        &mut self,
-        refe: &Reference,
-        platform: Option<Platform>,
-        accepts: &[RegContentType],
-    ) -> Result<(Manifest, String)> {
+    pub fn select_manifest(&mut self, refe: &Reference, manifest_list: &ManifestList, platform: Platform) -> Result<(Manifest, String)> {
+        let digest =
+            manifest_list.find_platform_digest(&platform).ok_or_else(|| anyhow!("platform '{}' not found from manifest list", platform))?;
+        let accepts = [RegContentType::OCI_MANIFEST, RegContentType::DOCKER_MANIFEST];
+        let reference = Reference {
+            image_name: refe.image_name,
+            reference: digest.as_str(),
+        };
+        let response = self.request_manifest(&reference, &accepts)?;
+        return if let ManifestResponseEnum::Manifest(manifest) = response.manifest() {
+            Ok((manifest.clone(), response.raw_body().to_string()))
+        } else {
+            Err(anyhow!("accept: {:?}, but get '{}'", accepts, response.content_type()))
+        };
+    }
+
+    pub fn request_manifest(&mut self, refe: &Reference, accepts: &[RegContentType]) -> Result<ManifestResponse> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
         let scope = Some(refe.image_name);
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&path, scope, accepts);
         let response = self.reg_client.simple_request(request)?;
         let content_type = response.content_type().ok_or_else(|| anyhow!("manifest content-type header not found"))?;
         let response_body = response.string_body();
-        if RegContentType::DOCKER_MANIFEST.val() == content_type {
-            let manifest = serde_json::from_str::<DockerManifest>(&response_body)?;
-            Ok((Manifest::DockerV2S2(manifest), response_body))
-        } else if RegContentType::OCI_MANIFEST.val() == content_type {
-            let manifest = serde_json::from_str::<OciManifest>(&response_body)?;
-            Ok((Manifest::OciV1(manifest), response_body))
-        } else {
-            let list = if RegContentType::DOCKER_MANIFEST_LIST.val() == content_type {
-                ManifestList::from(&response_body, Type::Docker)?
-            } else if RegContentType::OCI_INDEX.val() == content_type {
-                ManifestList::from(&response_body, Type::Oci)?
-            } else {
-                return Err(anyhow!("unsupported content-type:{},body:{}", content_type, response_body));
-            };
-            let pf = platform.unwrap_or_default();
-            match list.find_platform_digest(&pf) {
-                None => Err(anyhow!("platform '{}' not found from manifest", pf)),
-                Some(digest) => self.select_manifest(
-                    &Reference {
-                        image_name: refe.image_name,
-                        reference: digest.as_str(),
-                    },
-                    None,
-                    accepts,
-                ),
-            }
-        }
+        ManifestResponse::from(content_type, response_body)
     }
 
     /// Image blobs是否存在
@@ -307,10 +322,6 @@ pub trait FindPlatform {
 
 pub trait LayerConvert {
     fn get_layers(&self) -> Vec<Layer>;
-}
-
-pub trait ManifestRaw {
-    fn raw(&self) -> &str;
 }
 
 pub struct Layer<'a> {
@@ -445,6 +456,13 @@ impl ConfigBlobEnum {
             ConfigBlobEnum::DockerV2S2(docker) => docker.config.cmd.as_ref(),
         }
     }
+
+    pub fn entrypoint(&self) -> Option<&Vec<String>> {
+        match self {
+            ConfigBlobEnum::OciV1(oci) => oci.config.entrypoint.as_ref(),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.config.entrypoint.as_ref(),
+        }
+    }
 }
 
 pub struct ConfigBlobSerialize {
@@ -453,6 +471,7 @@ pub struct ConfigBlobSerialize {
     pub size: u64,
 }
 
+#[derive(Debug)]
 pub struct RegContentType(pub &'static str);
 
 impl RegContentType {
