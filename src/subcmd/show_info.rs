@@ -54,7 +54,7 @@ fn print_image_detail(info: ImageShowInfo) -> Result<()> {
         ),
         (
             "ENTRYPOINT",
-            info.entrypoints.map(|v| format!("{:?}", v).green()).unwrap_or_else(|| "NONE".yellow()),
+            info.entrypoint.map(|v| format!("{:?}", v).green()).unwrap_or_else(|| "NONE".yellow()),
         ),
     ];
     println!("\n{}\n", "IMAGE DETAILS".cyan());
@@ -67,7 +67,7 @@ fn print_image_detail(info: ImageShowInfo) -> Result<()> {
         println!(
             "{:16}:\n{}\n",
             "MANIFEST_LIST_PLATFORMS".blue(),
-            platforms.iter().map(|platform| platform.to_string()).collect::<Vec<String>>().join(", ").green()
+            platforms.iter().map(|platform| platform.to_string()).collect::<Vec<String>>().join("\n").green()
         );
     }
     if let Some(manifest_list_raw_str) = info.manifest_list_raw {
@@ -130,7 +130,9 @@ impl RegistryImageInfo {
             ManifestResponseEnum::Manifest(manifest) => (manifest.clone(), response.raw_body().to_string()),
             ManifestResponseEnum::ManifestList(manifest_list) => {
                 manifest_list_raw = Some(response.raw_body().to_string());
-                manifest_list_platforms = Some(manifest_list.platforms());
+                manifest_list_platforms = Some(manifest_list.platforms().into_iter()
+                    .filter(|platform| !platform.is_unknown())
+                    .collect());
                 let pf = platform.unwrap_or_else(|| {
                     let pf = Platform::default();
                     info!("Platform is not set, use default platform {}.", pf.to_string().green());
@@ -155,7 +157,7 @@ impl RegistryImageInfo {
             reference: image_info.reference,
             arch: config_blob_enum.arch().map(|a| a.to_string()),
             cmds: config_blob_enum.cmd().cloned(),
-            entrypoints: config_blob_enum.entrypoint().cloned(),
+            entrypoint: config_blob_enum.entrypoint().cloned(),
             os: config_blob_enum.os().map(|a| a.to_string()),
             manifest_list_raw,
             manifest_type: manifest.manifest_type().to_string(),
@@ -172,7 +174,7 @@ struct ImageShowInfo {
     reference: String,
     arch: Option<String>,
     cmds: Option<Vec<String>>,
-    entrypoints: Option<Vec<String>>,
+    entrypoint: Option<Vec<String>>,
     os: Option<String>,
     manifest_list_raw: Option<String>,
     manifest_type: String,

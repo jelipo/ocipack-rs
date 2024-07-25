@@ -68,7 +68,7 @@ impl Default for Platform {
 impl Platform {
     /// 所有可能性的variant
     /// https://github.com/containerd/containerd/blob/v1.4.3/platforms/database.go#L83
-    fn possible_variant(&self) -> Vec<String> {
+    pub fn possible_variant(&self) -> Vec<String> {
         match &self.variant {
             None => match self.arch.as_str() {
                 "arm64" => vec!["".to_string(), "8".to_string(), "v8".to_string()],
@@ -77,6 +77,11 @@ impl Platform {
             },
             Some(variant) => vec![variant.clone()],
         }
+    }
+
+    /// 是否是unknown
+    pub fn is_unknown(&self) -> bool {
+        self.os == "unknown" && self.arch == "unknown"
     }
 }
 
@@ -508,7 +513,7 @@ impl RegContentType {
             RegContentType::DOCKER_LAYER_TGZ.0,
             RegContentType::OCI_LAYER_NONDISTRIBUTABLE_TGZ.0,
         ]
-        .contains(&media_type)
+            .contains(&media_type)
         {
             Ok(CompressType::Tgz)
         } else if [RegContentType::OCI_LAYER_ZSTD.0, RegContentType::OCI_LAYER_NONDISTRIBUTABLE_ZSTD.0].contains(&media_type) {
@@ -533,7 +538,7 @@ impl ToString for CompressType {
             CompressType::Tgz => "TGZ",
             CompressType::Zstd => "ZSTD",
         }
-        .to_string()
+            .to_string()
     }
 }
 
