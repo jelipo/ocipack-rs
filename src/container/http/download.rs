@@ -170,10 +170,15 @@ impl RegHttpDownloader {
     }
 }
 
+const OCTET_STREAM_TYPE: [&str; 2] = [
+    "binary/octet-stream", // quay.io registry use this type
+    "application/octet-stream",
+];
+
 fn check(response: &Response) -> Result<()> {
     let headers = response.headers();
     let content_type = get_header(headers, "content-type").ok_or_else(|| anyhow!("content-type not found"))?;
-    if !content_type.contains("application/octet-stream") {
+    if !OCTET_STREAM_TYPE.contains(&content_type.as_str()) {
         return Err(anyhow!("Not support the content type:{}", content_type));
     }
     Ok(())

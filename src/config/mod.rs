@@ -2,8 +2,8 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
-use base64::engine::general_purpose;
 use base64::Engine;
+use base64::engine::general_purpose;
 use home::home_dir;
 
 use crate::config::cmd::BaseAuth;
@@ -35,13 +35,13 @@ impl RegAuthType {
     pub fn build_auth(image_host: String, base_auth: Option<&BaseAuth>) -> RegAuthType {
         match base_auth.as_ref() {
             None => RegAuthType::LocalDockerAuth {
-                reg_host: if image_host.eq(DEFAULT_IMAGE_HOST) {
+                reg_host: if !image_host.eq(DEFAULT_IMAGE_HOST) {
                     image_host
                 } else {
                     DEFAULT_IMAGE_HUB_URI.to_string()
                 },
             },
-            Some(auth) => RegAuthType::CustomPassword {
+            Some(&auth) => RegAuthType::CustomPassword {
                 username: auth.username.clone(),
                 password: auth.password.clone(),
             },
