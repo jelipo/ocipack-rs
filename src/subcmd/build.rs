@@ -6,26 +6,54 @@ use colored::Colorize;
 use log::info;
 use tar::Builder;
 
+use crate::{GLOBAL_CONFIG, HomeDir};
+use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
 use crate::adapter::tar::TarTargetAdapter;
-use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
-use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
+use crate::config::cmd::{BaseAuth, BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
+use crate::container::{CompressType, ConfigBlobEnum, ConfigBlobSerialize, Platform};
 use crate::container::home::{LocalLayer, TempLayerInfo};
 use crate::container::manifest::Manifest;
 use crate::container::proxy::ProxyInfo;
-use crate::container::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
-use crate::util::sha::{Sha256Reader, Sha256Writer};
 use crate::util::{compress, random};
-use crate::{HomeDir, GLOBAL_CONFIG};
+use crate::util::sha::{Sha256Reader, Sha256Writer};
 
 pub struct BuildCommand {}
 
+fn build_source_info(source: &SourceType, source_auth: Option<&BaseAuth>, platform: Option<Platform>) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
+    let (mut image_info, build_info) = match source {
+        SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
+        SourceType::Cmd { tag: _ } => {
+            todo!()
+        }
+        SourceType::Registry { image } => {
+            let fake_dockerfile_body = format!("FROM {}", image);
+            DockerfileAdapter::parse_from_str(&fake_dockerfile_body)?
+        }
+    };
+    // add library
+    let image_name = &image_info.image_name;
+    if !image_name.contains('/') {
+        image_info.image_name = format!("library/{}", image_name)
+    }
+    let source_reg_auth = RegAuthType::build_auth(image_info.image_host.clone(), source_auth);
+    Ok((
+        SourceInfo {
+            image_info,
+            platform: platform.clone(),
+        },
+        build_info,
+        source_reg_auth,
+    ))
+}
+
 impl BuildCommand {
     pub fn build(build_args: &BuildCmdArgs) -> Result<()> {
-        let (source_info, build_info, source_auth) = build_source_info(build_args)?;
+        let (source_info, build_info, source_auth) =
+            build_source_info(&build_args.source, build_args.source_auth.as_ref(), build_args.platform.clone())?;
         match handle(
             source_info,
             build_info,
@@ -56,7 +84,7 @@ Target image:
                 TargetType::Tar(tar_arg) => format!("Path: {}", tar_arg.path),
             }
         )
-        .green()
+            .green()
     );
 }
 
@@ -71,35 +99,8 @@ Build job failed!
 "#,
             err
         )
-        .red()
+            .red()
     );
-}
-
-fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
-    let (mut image_info, build_info) = match &build_args.source {
-        SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
-        SourceType::Cmd { tag: _ } => {
-            todo!()
-        }
-        SourceType::Registry { image } => {
-            let fake_dockerfile_body = format!("FROM {}", image);
-            DockerfileAdapter::parse_from_str(&fake_dockerfile_body)?
-        }
-    };
-    // add library
-    let image_name = &image_info.image_name;
-    if !image_name.contains('/') {
-        image_info.image_name = format!("library/{}", image_name)
-    }
-    let source_reg_auth = RegAuthType::build_auth(image_info.image_host.clone(), build_args.source_auth.as_ref());
-    Ok((
-        SourceInfo {
-            image_info,
-            platform: build_args.platform.clone(),
-        },
-        build_info,
-        source_reg_auth,
-    ))
 }
 
 fn handle(

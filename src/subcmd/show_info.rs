@@ -7,32 +7,33 @@ use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::ImageInfo;
 use crate::config::cmd::{BaseAuth, ShowInfoArgs, TargetType};
 use crate::config::RegAuthType;
+use crate::container::{ConfigBlobEnum, Platform, Reference, RegContentType, Registry, RegistryCreateInfo};
 use crate::container::image::docker::DockerConfigBlob;
 use crate::container::image::oci::OciConfigBlob;
 use crate::container::manifest::{Manifest, ManifestResponseEnum};
 use crate::container::proxy::ProxyInfo;
-use crate::container::{ConfigBlobEnum, Platform, Reference, RegContentType, Registry, RegistryCreateInfo};
+use crate::subcmd::gen_image_info;
 
 pub struct ShowInfoCommand {}
 
 impl ShowInfoCommand {
     pub fn show(show_info_args: &ShowInfoArgs) -> Result<()> {
-        if let TargetType::Registry(image) = &show_info_args.image {
-            let proxy = show_info_args.proxy.clone();
-            let (image_info, auth) = RegistryImageInfo::gen_image_info(image, show_info_args.auth.as_ref())?;
-            info!("Requesting registry...");
-            let detail = RegistryImageInfo::info(
-                !show_info_args.allow_insecure,
-                image_info,
-                auth,
-                proxy,
-                show_info_args.platform.clone(),
-            )?;
-            info!("Request done.");
-            print_image_detail(detail)?;
-        } else {
-            return Err(anyhow!("not support {:?}", show_info_args.image));
-        }
+        let image = match &show_info_args.image {
+            TargetType::Registry(image) => image,
+            _ => return Err(anyhow!("not support {:?}", show_info_args.image)),
+        };
+        let proxy = show_info_args.proxy.clone();
+        let (image_info, auth) = gen_image_info(image, show_info_args.auth.as_ref())?;
+        info!("Requesting registry...");
+        let detail = RegistryImageInfo::info(
+            !show_info_args.allow_insecure,
+            image_info,
+            auth,
+            proxy,
+            show_info_args.platform.clone(),
+        )?;
+        info!("Request done.");
+        print_image_detail(detail)?;
         Ok(())
     }
 }
@@ -82,19 +83,6 @@ fn print_image_detail(info: ImageShowInfo) -> Result<()> {
 pub struct RegistryImageInfo {}
 
 impl RegistryImageInfo {
-    /// 根据Image和Auth生成基本信息
-    fn gen_image_info(image_name: &str, auth: Option<&BaseAuth>) -> Result<(ImageInfo, RegAuthType)> {
-        let fake_dockerfile_body = format!("FROM {}", image_name);
-        let (mut image_info, _) = DockerfileAdapter::parse_from_str(&fake_dockerfile_body)?;
-        // add library
-        let image_name = &image_info.image_name;
-        if !image_name.contains('/') {
-            image_info.image_name = format!("library/{}", image_name)
-        }
-        let reg_auth = RegAuthType::build_auth(image_info.image_host.clone(), auth);
-        Ok((image_info, reg_auth))
-    }
-
     /// 获取
     fn info(
         https: bool,

@@ -40,6 +40,7 @@ fn main() -> Result<()> {
         CmdArgs::Transform(transform_args) => TransformCommand::transform(transform_args)?,
         CmdArgs::Clean(clean_args) => CleanCommand::clean(clean_args)?,
         CmdArgs::ShowInfo(show_info_args) => ShowInfoCommand::show(show_info_args)?,
+        CmdArgs::Sync(sync_arg) =>  SyncInfoCommand::sync(sync_arg)?,
     }
     Ok(())
 }

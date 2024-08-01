@@ -24,6 +24,9 @@ pub enum CmdArgs {
 
     /// Show Image info.
     ShowInfo(ShowInfoArgs),
+
+    /// Sync Image
+    Sync(SyncCmdArgs),
 }
 
 #[derive(clap::Args)]
@@ -209,7 +212,7 @@ impl FromStr for TargetFormat {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum SourceType {
     Dockerfile { path: String },
     Registry { image: String },
@@ -318,8 +321,49 @@ fn value_or_env(param: &str) -> Result<String> {
     Ok(value)
 }
 
-#[test]
-fn it_works() -> Result<()> {
-    println!("{:?}", value_or_env("${PATH}")?);
-    Ok(())
+
+pub struct SyncCmdArgs {
+    /// Allow insecure registry
+    #[clap(long, short)]
+    pub allow_insecure: bool,
+
+    /// Allow target insecure registry
+    #[clap(long)]
+    pub target_allow_insecure: bool,
+
+    /// Source type.
+    /// Support dockerfile/registry type
+    /// Example:'dockerfile:/path/to/.Dockerfile','registry:redis:latest'
+    #[clap(long, short)]
+    pub source: SourceType,
+
+    /// [OPTION] Auth of pull source image. Example:'myname:mypass','myname:${MY_PASSWORD_ENV}'
+    #[clap(long)]
+    pub source_auth: Option<BaseAuth>,
+
+    /// [OPTION] Proxy of pull source image. Example:'socks5://127.0.0.1:1080','http://name:pass@example:8080'
+    #[clap(long)]
+    pub source_proxy: Option<ProxyInfo>,
+
+    /// Target type.
+    /// Support registry/tar/tgz.
+    /// Example:'registry:my.container.com/target/image:1.1','tgz:image.tgz'
+    #[clap(long, short)]
+    pub target: TargetType,
+
+    /// [OPTION] Auth of push target image. Example:'myname:mypass','myname:${MY_PASSWORD_ENV}'
+    #[clap(long)]
+    pub target_auth: Option<BaseAuth>,
+
+    /// [OPTION] Proxy of push target image. Example:'socks5://127.0.0.1:1080','http://name:pass@example:8080'
+    #[clap(long)]
+    pub target_proxy: Option<ProxyInfo>,
+
+    /// [OPTION] Connection timeout in seconds.
+    #[clap(long, default_value = "600")]
+    pub conn_timeout: u64,
+
+    /// [OPTION] Platform.If not specified and there are multiple platforms, the default is 'linux/amd64'.
+    #[clap(long)]
+    pub platform: Option<Platform>,
 }
