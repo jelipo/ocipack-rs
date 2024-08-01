@@ -31,7 +31,8 @@ pub static GLOBAL_CONFIG: LazyLock<GlobalAppConfig> = LazyLock::new(init_config)
 
 pub static CACHE_DIR_NAME: &str = "pack_cache";
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     init::init()?;
     let global_config = GLOBAL_CONFIG.deref();
     init::print_logo();

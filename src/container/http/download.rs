@@ -1,15 +1,17 @@
 use std::borrow::BorrowMut;
-use std::fs::File;
-use std::io::Write;
+use std::io::Error;
+use tokio::io::{AsyncWrite, Write};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::thread::JoinHandle;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
 
 use anyhow::{anyhow, Result};
-use reqwest::blocking::{Client, Response};
+use reqwest::{Client, Response};
 use reqwest::Method;
-
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use tokio::sync::Mutex;
 use crate::container::http::{do_request_raw, get_header, HttpAuth};
 use crate::container::BlobConfig;
 use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
@@ -72,7 +74,7 @@ impl RegDownloader {
 }
 
 impl Processor<DownloadResult> for RegDownloader {
-    fn start(&self) -> Box<dyn ProcessorAsync<DownloadResult>> {
+    async fn start(&self) -> Box<dyn ProcessorAsync<DownloadResult>> {
         let blob_config = self.blob_down_config.clone();
         let file_path = blob_config.file_path.clone();
         let status = self.temp.clone();
@@ -137,7 +139,7 @@ impl ProcessorAsync<DownloadResult> for RegFinishedDownloader {
     }
 }
 
-fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloader: RegHttpDownloader) -> Result<()> {
+async fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloader: RegHttpDownloader) -> Result<()> {
     //检查本地是否存在已有
     let parent_path = file_path.parent().expect("find file parent dir failed");
     if !parent_path.exists() {
@@ -150,7 +152,7 @@ fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloade
         let mut status_core = status.status_core.lock().expect("lock failed");
         status_core.borrow_mut().file_size = len;
     }
-    let file = File::create(file_path)?;
+    let file = File::create(file_path).await?;
     let mut writer = RegDownloaderWriter { status, file };
     let _copy_size = std::io::copy(&mut http_response, &mut writer)?;
     writer.flush()?;
@@ -164,7 +166,7 @@ struct RegHttpDownloader {
 }
 
 impl RegHttpDownloader {
-    fn do_request_raw(&self) -> Result<Response> {
+    async fn do_request_raw(&self) -> Result<Response> {
         let url = self.url.as_str();
         do_request_raw::<u8>(&self.client, url, Method::GET, self.auth.as_ref(), &[], None, None)
     }
@@ -189,15 +191,28 @@ pub struct RegDownloaderWriter {
     file: File,
 }
 
-impl Write for RegDownloaderWriter {
+impl AsyncWrite for RegDownloaderWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let status_core = &mut self.status.status_core.lock().unwrap();
         status_core.curr_size += buf.len() as u64;
         self.file.write_all(buf)?;
         Ok(buf.len())
     }
-    fn flush(&mut self) -> std::io::Result<()> {
+    fn flush(&mut self) -> std::io::Result<()> {}
+
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::result::Result<usize, Error>> {
+        let status_core = &mut self.status.status_core.lock().unwrap();
+        status_core.curr_size += buf.len() as u64;
+        let poll = self.file.poll_write(cx, buf);
+        Pin::new(&mut self.file).poll_write(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Error>> {
         self.file.flush()
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Error>> {
+        todo!()
     }
 }
 

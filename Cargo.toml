@@ -38,3 +38,4 @@ fantasy-util = "0.1.8"
 ubyte = "0.10"
 colored = "2"
 tempfile = "3"
+tokio = { version = "1.39.2", features = ["full"] }
