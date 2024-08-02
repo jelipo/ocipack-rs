@@ -86,7 +86,7 @@ fn gen_source_info(transform_args: &TransformCmdArgs) -> Result<(SourceInfo, Bui
     ))
 }
 
-pub fn transform_handle(
+pub async fn transform_handle(
     source_info: SourceInfo,
     build_info: BuildInfo,
     source_auth: RegAuthType,
@@ -119,7 +119,7 @@ pub fn transform_handle(
                 transform_cmds.conn_timeout,
                 transform_cmds.target_proxy.clone(),
             )?;
-            registry_adapter.upload()?
+            registry_adapter.upload().await?
         }
         TargetType::Tar(tar_arg) => {
             let image_raw_name = source_info.image_info.image_raw_name.ok_or_else(|| anyhow!("must set a raw name"))?;

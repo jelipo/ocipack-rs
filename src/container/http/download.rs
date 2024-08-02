@@ -1,6 +1,5 @@
 use std::borrow::BorrowMut;
 use std::io::Error;
-use tokio::io::{AsyncWrite, Write};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -10,11 +9,14 @@ use anyhow::{anyhow, Result};
 use reqwest::{Client, Response};
 use reqwest::Method;
 use tokio::fs::File;
+use tokio::io::AsyncWrite;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
-use crate::container::http::{do_request_raw, get_header, HttpAuth};
+use tokio::task::JoinHandle;
+
 use crate::container::BlobConfig;
-use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
+use crate::container::http::{do_request_raw, get_header, HttpAuth};
+use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
 
 pub struct RegDownloader {
     finished: bool,
@@ -94,28 +96,30 @@ impl Processor<DownloadResult> for RegDownloader {
             auth: self.auth.clone(),
             client: self.client.as_ref().unwrap().clone(),
         };
-        let handle = thread::spawn::<_, Result<DownloadResult>>(move || {
-            let downloader = reg_http_downloader;
-            let result = downloading(status.clone(), &file_path, downloader);
-            let status_core = &mut status.status_core.lock().unwrap();
-            status_core.done = true;
-            if let Err(err) = &result {
-                println!("{}\n{}", err, err.backtrace());
-            }
-            Ok(DownloadResult {
-                file_path: Some(file_path),
-                _file_size: status_core.file_size,
-                blob_config: blob_config.clone(),
-                local_existed: false,
-                result_str: "complete".to_string(),
-            })
-        });
+        let handle = tokio::spawn(download_result(status, reg_http_downloader, file_path, blob_config.clone()));
         Box::new(RegDownloadHandler { join: handle })
     }
 
-    fn process_status(&self) -> Box<dyn ProgressStatus> {
+    async fn process_status(&self) -> Box<dyn ProgressStatus> {
         Box::new(self.temp.clone())
     }
+}
+
+async fn download_result(status: RegDownloaderStatus, reg_http_downloader: RegHttpDownloader, file_path: Box<Path>, blob_config: Arc<BlobConfig>) -> Result<DownloadResult> {
+    let downloader = reg_http_downloader;
+    let result = downloading(status.clone(), &file_path, downloader).await;
+    let status_core = &mut status.status_core.lock().await;
+    status_core.done = true;
+    if let Err(err) = &result {
+        println!("{}\n{}", err, err.backtrace());
+    }
+    Ok(DownloadResult {
+        file_path: Some(file_path),
+        _file_size: status_core.file_size,
+        blob_config,
+        local_existed: false,
+        result_str: "complete".to_string(),
+    })
 }
 
 pub struct RegDownloadHandler {
@@ -123,8 +127,8 @@ pub struct RegDownloadHandler {
 }
 
 impl ProcessorAsync<DownloadResult> for RegDownloadHandler {
-    fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
-        let result = self.join.join();
+    async fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
+        let result = self.join.await;
         result.unwrap()
     }
 }
@@ -134,7 +138,7 @@ pub struct RegFinishedDownloader {
 }
 
 impl ProcessorAsync<DownloadResult> for RegFinishedDownloader {
-    fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
+    async fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
         Ok(self.result)
     }
 }
@@ -146,7 +150,7 @@ async fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_dow
         let _create_result = std::fs::create_dir(parent_path);
     }
     // 请求HTTP下载
-    let mut http_response = reg_http_downloader.do_request_raw()?;
+    let mut http_response = reg_http_downloader.do_request_raw().await?;
     check(&http_response)?;
     if let Some(len) = http_response.content_length() {
         let mut status_core = status.status_core.lock().expect("lock failed");
@@ -192,27 +196,22 @@ pub struct RegDownloaderWriter {
 }
 
 impl AsyncWrite for RegDownloaderWriter {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let status_core = &mut self.status.status_core.lock().unwrap();
-        status_core.curr_size += buf.len() as u64;
-        self.file.write_all(buf)?;
-        Ok(buf.len())
-    }
-    fn flush(&mut self) -> std::io::Result<()> {}
-
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::result::Result<usize, Error>> {
-        let status_core = &mut self.status.status_core.lock().unwrap();
-        status_core.curr_size += buf.len() as u64;
-        let poll = self.file.poll_write(cx, buf);
-        Pin::new(&mut self.file).poll_write(cx, buf)
+        match self.status.status_core.lock().poll(cx) {
+            Poll::Ready(mut core) => {
+                core.borrow_mut().curr_size += buf.len() as u64;
+                Pin::new(&mut self.file).poll_write(cx, buf)
+            }
+            Poll::Pending => Poll::Pending,
+        }
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Error>> {
-        self.file.flush()
+        Pin::new(&self.file).poll_flush(cx)
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Error>> {
-        todo!()
+        Pin::new(&self.file).poll_shutdown(cx)
     }
 }
 
@@ -229,8 +228,8 @@ struct RegDownloaderStatusCore {
 }
 
 impl ProgressStatus for RegDownloaderStatus {
-    fn status(&self) -> CoreStatus {
-        let core = &self.status_core.lock().unwrap();
+    async fn status(&self) -> CoreStatus {
+        let core = &self.status_core.lock().await;
         CoreStatus {
             blob_config: core.blob_config.clone(),
             full_size: core.file_size,

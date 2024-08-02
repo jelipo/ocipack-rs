@@ -102,7 +102,7 @@ fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo
     ))
 }
 
-fn handle(
+async fn handle(
     source_info: SourceInfo,
     build_info: BuildInfo,
     source_auth: RegAuthType,
@@ -152,7 +152,7 @@ fn handle(
                 build_cmds.conn_timeout,
                 build_cmds.target_proxy.clone(),
             )?;
-            registry_adapter.upload()?
+            registry_adapter.upload().await?
         }
         TargetType::Tar(tar_arg) => {
             let image_raw_name = source_info.image_info.image_raw_name.ok_or_else(|| anyhow!("must set a raw name"))?;

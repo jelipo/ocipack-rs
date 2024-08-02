@@ -18,7 +18,7 @@ use crate::progress::Processor;
 use crate::util::compress::uncompress;
 use crate::GLOBAL_CONFIG;
 
-pub fn pull(
+pub async fn pull(
     source_info: &SourceInfo,
     source_auth: RegAuthType,
     use_https: bool,
@@ -53,7 +53,7 @@ pub fn pull(
         let downloader = from_registry.image_manager.layer_blob_download(from_image_reference.image_name, &digest, Some(layer.size))?;
         reg_downloader_vec.push(Box::new(downloader))
     }
-    let manager = ProcessorManager::new_processor_manager(reg_downloader_vec)?;
+    let manager = ProcessorManager::new_processor_manager(reg_downloader_vec).await?;
     info!("Start pulling... (total={})", manager.size());
     let download_results = manager.wait_all_done()?;
     let layer_digest_map = layer_to_map(&layers);

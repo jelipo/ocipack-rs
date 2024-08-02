@@ -1,11 +1,11 @@
-use std::io::Read;
 use std::str::FromStr;
 
 use anyhow::Result;
-use reqwest::blocking::{Body, Client, Request, Response};
-use reqwest::header::HeaderMap;
+use reqwest::{Body, Client, Request, Response};
 use reqwest::{Method, Url};
+use reqwest::header::{CONTENT_LENGTH, HeaderMap, HeaderValue};
 use serde::Serialize;
+use tokio::io::AsyncRead;
 
 use crate::container::RegContentType;
 
@@ -31,7 +31,7 @@ pub enum RequestBody<'a, T: Serialize + ?Sized> {
     Read(Body),
 }
 
-fn do_request_raw<T: Serialize + ?Sized>(
+async fn do_request_raw<T: Serialize + ?Sized>(
     client: &Client,
     url: &str,
     method: Method,
@@ -42,11 +42,11 @@ fn do_request_raw<T: Serialize + ?Sized>(
 ) -> Result<Response> {
     let request_body = body.map(|json| RequestBody::Json(json));
     let request = build_request::<T>(client, url, method, http_auth_opt, accepts, request_body, content_type)?;
-    let http_response = client.execute(request)?;
+    let http_response = client.execute(request).await?;
     Ok(http_response)
 }
 
-fn do_request_raw_read<R: Read + Send + 'static>(
+async fn do_request_raw_read<R: AsyncRead + Send>(
     client: &Client,
     url: &str,
     method: Method,
@@ -55,10 +55,11 @@ fn do_request_raw_read<R: Read + Send + 'static>(
     body: Option<R>,
     size: u64,
 ) -> Result<Response> {
-    let request_body = body.map(|read| RequestBody::Read(Body::sized(read, size)));
+    let request_body = body.map(|read| RequestBody::Read(Body::wrap_stream(read)));
 
-    let request = build_request::<String>(client, url, method, http_auth_opt, accepts, request_body, None)?;
-    let http_response = client.execute(request)?;
+    let mut request = build_request::<String>(client, url, method, http_auth_opt, accepts, request_body, None)?;
+    request.headers_mut().insert(CONTENT_LENGTH, HeaderValue::from(size));
+    let http_response = client.execute(request).await?;
     Ok(http_response)
 }
 
@@ -95,7 +96,7 @@ fn build_request<T: Serialize + ?Sized>(
             let json_str = serde_json::to_string(json_body)?;
             builder = builder.body(json_str)
         }
-        Some(RequestBody::Read(read)) => builder = builder.body(read),
+        Some(RequestBody::Read(body)) => builder = builder.body(body),
     }
     Ok(builder.build()?)
 }

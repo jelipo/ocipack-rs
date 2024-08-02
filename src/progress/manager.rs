@@ -12,14 +12,14 @@ pub struct ProcessorManager<R: ProcessResult> {
 }
 
 impl<R: ProcessResult> ProcessorManager<R> {
-    pub fn new_processor_manager(processors: Vec<Box<dyn Processor<R>>>) -> Result<ProcessorManager<R>> {
+    pub async fn new_processor_manager(processors: Vec<Box<dyn Processor<R>>>) -> Result<ProcessorManager<R>> {
         let mut mb = MultiBar::new_multi_bar();
         let status = processors
             .iter()
-            .map(|processor| {
-                let async_processor = processor.start();
-                let status = processor.process_status();
-                let status_core = status.status();
+            .map(|processor| async {
+                let async_processor = processor.start().await;
+                let status = processor.process_status().await;
+                let status_core = status.status().await;
                 let name = status_core.blob_config.short_hash.clone();
                 let bar = mb.add_new_bar(name, status_core.full_size);
                 (async_processor, status, bar)
@@ -35,7 +35,7 @@ impl<R: ProcessResult> ProcessorManager<R> {
         self.statuses.len()
     }
 
-    pub fn wait_all_done(mut self) -> Result<Vec<R>> {
+    pub async fn wait_all_done(mut self) -> Result<Vec<R>> {
         println!();
         let mut statuses = self.statuses;
         let mut result_infos = Vec::<R>::new();
@@ -45,7 +45,7 @@ impl<R: ProcessResult> ProcessorManager<R> {
                 let status = &progress_status.status();
                 bar.set_size(status.now_size, status.full_size);
                 if status.is_done {
-                    let process_result = processor.wait_result()?;
+                    let process_result = processor.wait_result().await?;
                     let finished_info = process_result.finished_info();
                     bar.finish(true, finished_info);
                     result_infos.push(process_result);

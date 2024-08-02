@@ -1,18 +1,20 @@
-use std::fs::File;
-use std::io::Read;
 use std::ops::DerefMut;
 use std::path::Path;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll};
 use std::thread;
 use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
-use reqwest::blocking::Client;
+use reqwest::Client;
 use reqwest::Method;
+use tokio::fs::File;
+use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
 
-use crate::container::http::{do_request_raw_read, HttpAuth};
 use crate::container::BlobConfig;
-use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
+use crate::container::http::{do_request_raw_read, HttpAuth};
+use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
 
 pub struct RegUploader {
     reg_uploader_enum: RegUploaderEnum,
@@ -25,7 +27,7 @@ pub struct RegFinishedUploader {
 }
 
 impl ProcessorAsync<UploadResult> for RegFinishedUploader {
-    fn wait_result(self: Box<Self>) -> Result<UploadResult> {
+    async fn wait_result(self: Box<Self>) -> Result<UploadResult> {
         Ok(self.upload_result)
     }
 }
@@ -94,7 +96,7 @@ impl RegUploader {
 }
 
 impl Processor<UploadResult> for RegUploader {
-    fn start(&self) -> Box<dyn ProcessorAsync<UploadResult>> {
+    async fn start(&self) -> Box<dyn ProcessorAsync<UploadResult>> {
         return match &self.reg_uploader_enum {
             RegUploaderEnum::Finished {
                 _file_size: _,
@@ -131,12 +133,12 @@ impl Processor<UploadResult> for RegUploader {
         };
     }
 
-    fn process_status(&self) -> Box<dyn ProgressStatus> {
+    async fn process_status(&self) -> Box<dyn ProgressStatus> {
         Box::new(self.temp.clone())
     }
 }
 
-fn uploading(status: RegUploaderStatus, file_path: &str, reg_http_uploader: RegHttpUploader, blob_config: Arc<BlobConfig>) -> Result<()> {
+async fn uploading(status: RegUploaderStatus, file_path: &str, reg_http_uploader: RegHttpUploader, blob_config: Arc<BlobConfig>) -> Result<()> {
     //检查本地是否存在已有
     let file_path = Path::new(file_path);
     let local_file = File::open(file_path)?;
@@ -150,7 +152,7 @@ fn uploading(status: RegUploaderStatus, file_path: &str, reg_http_uploader: RegH
         &[],
         Some(reader),
         file_size,
-    )?;
+    ).await?;
     let short_hash = &blob_config.short_hash;
     if response.status().is_success() {
         let mut response_string = String::new();
@@ -169,9 +171,15 @@ pub struct RegUploaderReader {
     file: File,
 }
 
-impl Read for RegUploaderReader {
+impl AsyncRead for RegUploaderReader {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.file).poll_read(cx, buf)
+    }
+}
+
+impl AsyncReadExt for RegUploaderReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let size = self.file.read(buf)?;
+        let size = self.file.read(buf).await?;
         let mut guard = self.status.status_core.lock().unwrap();
         let core = guard.deref_mut();
         core.curr_size += size as u64;
@@ -184,7 +192,7 @@ pub struct RegUploadHandler {
 }
 
 impl ProcessorAsync<UploadResult> for RegUploadHandler {
-    fn wait_result(self: Box<Self>) -> Result<UploadResult> {
+    async fn wait_result(self: Box<Self>) -> Result<UploadResult> {
         self.join.join().map_err(|_| anyhow!("join failed."))?
     }
 }

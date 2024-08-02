@@ -69,7 +69,7 @@ impl RegistryTargetAdapter {
         })
     }
 
-    pub fn upload(self) -> Result<()> {
+    pub async fn upload(self) -> Result<()> {
         let home_dir = GLOBAL_CONFIG.home_dir.clone();
         let target_info = self.info;
         let reg_auth = self.target_auth.get_auth()?;
@@ -101,9 +101,9 @@ impl RegistryTargetAdapter {
             manager.layer_blob_upload(&target_info.image_info.image_name, &serialize.digest, &config_blob_path_str)?;
         reg_uploader_vec.push(Box::new(config_blob_uploader));
         //
-        let process_manager = ProcessorManager::new_processor_manager(reg_uploader_vec)?;
+        let process_manager = ProcessorManager::new_processor_manager(reg_uploader_vec).await?;
         info!("Start pushing... (total={})", process_manager.size());
-        let upload_results = process_manager.wait_all_done()?;
+        let upload_results = process_manager.wait_all_done().await?;
         for upload_result in upload_results {
             debug!("Upload done: {}", &upload_result.finished_info());
         }

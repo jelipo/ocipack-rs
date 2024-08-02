@@ -5,12 +5,12 @@ use std::time::Duration;
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use derive_builder::Builder;
-use reqwest::blocking::{Client, Response};
+use reqwest::{Client, Response};
 use reqwest::redirect::Policy;
 use reqwest::{Method, Proxy, StatusCode};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-
+use tokio::io::AsyncReadExt;
 use crate::container::http::auth::{RegTokenHandler, TokenType};
 use crate::container::http::download::RegDownloader;
 use crate::container::http::upload::RegUploader;
@@ -32,7 +32,7 @@ impl RegistryHttpClient {
         conn_timeout_second: u64,
         proxy_info: Option<ProxyInfo>,
     ) -> Result<RegistryHttpClient> {
-        let mut builder = reqwest::blocking::ClientBuilder::new();
+        let mut builder = reqwest::ClientBuilder::new();
         if let Some(info) = proxy_info {
             let mut proxy_reqwest = Proxy::all(info.addr)?;
             if let Some(auth) = info.auth {
@@ -75,9 +75,9 @@ impl RegistryHttpClient {
         Ok(RawRegistryResponse { response: http_response })
     }
 
-    fn do_request_raw<B: Serialize + ?Sized>(&mut self, request: ClientRequest<B>) -> Result<Response> {
+    async fn do_request_raw<B: Serialize + ?Sized>(&mut self, request: ClientRequest<'_, B>) -> Result<Response> {
         let url = self.registry_addr.clone() + request.path;
-        let token = self.reg_token_handler.token(request.scope, request.token_type)?;
+        let token = self.reg_token_handler.token(request.scope, request.token_type).await?;
         let auth = Some(HttpAuth::BearerToken { token });
         let http_response = do_request_raw(
             &self.client,
@@ -87,13 +87,13 @@ impl RegistryHttpClient {
             request.accept,
             request.body,
             request.request_content_type,
-        )?;
+        ).await?;
         Ok(http_response)
     }
 
-    fn do_request<T: Serialize + ?Sized>(&mut self, request: ClientRequest<T>) -> Result<FullRegistryResponse> {
-        let http_response = self.do_request_raw(request)?;
-        let response = FullRegistryResponse::new_registry_response(http_response)?;
+    async fn do_request<T: Serialize + ?Sized>(&mut self, request: ClientRequest<'_, T>) -> Result<FullRegistryResponse> {
+        let http_response = self.do_request_raw(request).await?;
+        let response = FullRegistryResponse::new_registry_response(http_response).await?;
         if response.is_success() {
             Ok(response)
         } else {
@@ -144,13 +144,13 @@ pub struct FullRegistryResponse {
 
 /// Registry的Response包装
 impl FullRegistryResponse {
-    pub fn new_registry_response(http_response: Response) -> Result<FullRegistryResponse> {
+    pub async fn new_registry_response(http_response: Response) -> Result<FullRegistryResponse> {
         let headers = http_response.headers();
         let content_type_opt = get_header(headers, "content-type");
         let docker_content_digest_opt = get_header(headers, "Docker-Content-Digest");
         let location_header = get_header(headers, "Location");
         let code = http_response.status();
-        let body_bytes = http_response.bytes()?;
+        let body_bytes = http_response.bytes().await?;
         Ok(FullRegistryResponse {
             body_bytes,
             content_type: content_type_opt,
