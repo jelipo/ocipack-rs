@@ -28,7 +28,7 @@ Now you can also:
 ### Linux / MacOS
 
 ```
-curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.7.1/ocipack-0.7.1-amd64_$(uname).tar.gz | tar xzv
+curl -L https://github.com/jelipo/ocipack-rs/releases/download/0.7.2/ocipack-0.7.2-amd64_$(uname).tar.gz | tar xzv
 
 # [Option] Move to /usr/local/bin/
 sudo cp ocipack /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack
@@ -37,7 +37,7 @@ sudo cp ocipack /usr/local/bin/ &&  sudo chmod +x /usr/local/bin/ocipack
 ### Windows
 
 ```
-curl.exe -L https://github.com/jelipo/ocipack-rs/releases/download/0.7.1/ocipack-0.7.1-amd64_windows.zip -o ocipack.zip
+curl.exe -L https://github.com/jelipo/ocipack-rs/releases/download/0.7.2/ocipack-0.7.2-amd64_windows.zip -o ocipack.zip
 
 tar -xf ocipack.zip
 ```
