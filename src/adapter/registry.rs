@@ -89,7 +89,7 @@ impl RegistryTargetAdapter {
             let local_layer =
                 home_dir.cache.blobs.local_layer(&layer_digest).ok_or_else(|| anyhow!("local file not found {}", layer_digest.digest))?;
             let layer_path = local_layer.layer_path();
-            let reg_uploader = manager.layer_blob_upload(&target_info.image_info.image_name, &layer_digest, &layer_path)?;
+            let reg_uploader = manager.layer_blob_upload(&target_info.image_info.image_name, &layer_digest, &layer_path).await?;
             reg_uploader_vec.push(Box::new(reg_uploader))
         }
         let serialize = self.target_config_blob_serialize;
@@ -98,14 +98,14 @@ impl RegistryTargetAdapter {
         let config_blob_path = home_dir.cache.write_temp_file(config_blob_str)?;
         let config_blob_path_str = config_blob_path.to_string_lossy().to_string();
         let config_blob_uploader =
-            manager.layer_blob_upload(&target_info.image_info.image_name, &serialize.digest, &config_blob_path_str)?;
+            manager.layer_blob_upload(&target_info.image_info.image_name, &serialize.digest, &config_blob_path_str).await?;
         reg_uploader_vec.push(Box::new(config_blob_uploader));
         //
         let process_manager = ProcessorManager::new_processor_manager(reg_uploader_vec).await?;
         info!("Start pushing... (total={})", process_manager.size());
         let upload_results = process_manager.wait_all_done().await?;
         for upload_result in upload_results {
-            debug!("Upload done: {}", &upload_result.finished_info());
+            debug!("Upload done: {}", upload_result.finished_info().await);
         }
         info!("Putting manifest...");
         let (status_code, body) = manager.put_manifest(
@@ -114,7 +114,7 @@ impl RegistryTargetAdapter {
                 reference: target_info.image_info.reference.as_str(),
             },
             target_manifest,
-        )?;
+        ).await?;
         if status_code.is_success() {
             info!("Upload image finished.");
             Ok(())

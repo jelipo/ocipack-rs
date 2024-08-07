@@ -16,10 +16,10 @@ use crate::container::{ConfigBlobEnum, Platform, Reference, RegContentType, Regi
 pub struct ShowInfoCommand {}
 
 impl ShowInfoCommand {
-    pub fn show(show_info_args: &ShowInfoArgs) -> Result<()> {
+    pub async fn show(show_info_args: &ShowInfoArgs) -> Result<()> {
         if let TargetType::Registry(image) = &show_info_args.image {
             let proxy = show_info_args.proxy.clone();
-            let (image_info, auth) = RegistryImageInfo::gen_image_info(image, show_info_args.auth.as_ref())?;
+            let (image_info, auth) = RegistryImageInfo::gen_image_info(image, show_info_args.auth.as_ref()).await?;
             info!("Requesting registry...");
             let detail = RegistryImageInfo::info(
                 !show_info_args.allow_insecure,
@@ -27,7 +27,7 @@ impl ShowInfoCommand {
                 auth,
                 proxy,
                 show_info_args.platform.clone(),
-            )?;
+            ).await?;
             info!("Request done.");
             print_image_detail(detail)?;
         } else {
@@ -83,7 +83,7 @@ pub struct RegistryImageInfo {}
 
 impl RegistryImageInfo {
     /// 根据Image和Auth生成基本信息
-    fn gen_image_info(image_name: &str, auth: Option<&BaseAuth>) -> Result<(ImageInfo, RegAuthType)> {
+    async fn gen_image_info(image_name: &str, auth: Option<&BaseAuth>) -> Result<(ImageInfo, RegAuthType)> {
         let fake_dockerfile_body = format!("FROM {}", image_name);
         let (mut image_info, _) = DockerfileAdapter::parse_from_str(&fake_dockerfile_body)?;
         // add library
@@ -96,7 +96,7 @@ impl RegistryImageInfo {
     }
 
     /// 获取
-    fn info(
+    async fn info(
         https: bool,
         image_info: ImageInfo,
         auth: RegAuthType,
@@ -123,7 +123,7 @@ impl RegistryImageInfo {
                 RegContentType::DOCKER_MANIFEST_LIST,
                 RegContentType::OCI_INDEX,
             ],
-        )?;
+        ).await?;
         let mut manifest_list_raw: Option<String> = None;
         let mut manifest_list_platforms: Option<Vec<Platform>> = None;
         let (manifest, manifest_raw) = match response.manifest() {
@@ -138,16 +138,16 @@ impl RegistryImageInfo {
                     info!("Platform is not set, use default platform {}.", pf.to_string().green());
                     pf
                 });
-                image_manager.select_manifest(&reference, manifest_list, pf)?
+                image_manager.select_manifest(&reference, &manifest_list, pf).await?
             }
         };
         let (config_blob_enum, config_blob_raw) = match &manifest {
             Manifest::OciV1(_) => {
-                let (blob, raw) = image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, manifest.config_digest())?;
+                let (blob, raw) = image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, manifest.config_digest()).await?;
                 (ConfigBlobEnum::OciV1(blob), raw)
             }
             Manifest::DockerV2S2(_) => {
-                let (blob, raw) = image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, manifest.config_digest())?;
+                let (blob, raw) = image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, manifest.config_digest()).await?;
                 (ConfigBlobEnum::DockerV2S2(blob), raw)
             }
         };

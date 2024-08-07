@@ -1,12 +1,15 @@
+use std::io::{Error, ErrorKind};
 use std::str::FromStr;
 
 use anyhow::Result;
+use bytes::Bytes;
+use futures::{Stream, TryStreamExt};
 use reqwest::{Body, Client, Request, Response};
 use reqwest::{Method, Url};
 use reqwest::header::{CONTENT_LENGTH, HeaderMap, HeaderValue};
 use serde::Serialize;
 use tokio::io::AsyncRead;
-
+use tokio_util::io::ReaderStream;
 use crate::container::RegContentType;
 
 pub mod auth;
@@ -46,7 +49,7 @@ async fn do_request_raw<T: Serialize + ?Sized>(
     Ok(http_response)
 }
 
-async fn do_request_raw_read<R: AsyncRead + Send>(
+async fn do_request_raw_read<R>(
     client: &Client,
     url: &str,
     method: Method,
@@ -54,8 +57,16 @@ async fn do_request_raw_read<R: AsyncRead + Send>(
     accepts: &[RegContentType],
     body: Option<R>,
     size: u64,
-) -> Result<Response> {
-    let request_body = body.map(|read| RequestBody::Read(Body::wrap_stream(read)));
+) -> Result<Response>
+where
+    R: AsyncRead + Send + Sync + 'static,
+{
+    let request_body = body.map(|read| {
+        let stream = ReaderStream::new(read).map_ok(|bytes| Bytes::from(bytes))
+            .map_err(|e| Error::new(ErrorKind::Other, e));
+        let body = Body::wrap_stream(stream);
+        RequestBody::Read(body)
+    });
 
     let mut request = build_request::<String>(client, url, method, http_auth_opt, accepts, request_body, None)?;
     request.headers_mut().insert(CONTENT_LENGTH, HeaderValue::from(size));

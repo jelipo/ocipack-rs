@@ -24,7 +24,7 @@ use crate::{HomeDir, GLOBAL_CONFIG};
 pub struct BuildCommand {}
 
 impl BuildCommand {
-    pub fn build(build_args: &BuildCmdArgs) -> Result<()> {
+    pub async fn build(build_args: &BuildCmdArgs) -> Result<()> {
         let (source_info, build_info, source_auth) = build_source_info(build_args)?;
         match handle(
             source_info,
@@ -33,7 +33,7 @@ impl BuildCommand {
             build_args,
             build_args.source_proxy.clone(),
             build_args.use_zstd,
-        ) {
+        ).await {
             Ok(_) => print_build_success(build_args),
             Err(err) => print_build_failed(err),
         }
@@ -56,7 +56,7 @@ Target image:
                 TargetType::Tar(tar_arg) => format!("Path: {}", tar_arg.path),
             }
         )
-        .green()
+            .green()
     );
 }
 
@@ -71,7 +71,7 @@ Build job failed!
 "#,
             err
         )
-        .red()
+            .red()
     );
 }
 
@@ -117,7 +117,7 @@ async fn handle(
         !build_cmds.allow_insecure,
         build_cmds.conn_timeout,
         proxy_info,
-    )?;
+    ).await?;
     let compress_type = if use_zstd { CompressType::Zstd } else { CompressType::Tgz };
     let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?
         .map(|tar_path| compress_layer_file(&tar_path, &home_dir, compress_type))

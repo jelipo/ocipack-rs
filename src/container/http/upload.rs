@@ -1,17 +1,15 @@
-use std::ops::DerefMut;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
-use std::thread;
-use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use reqwest::Client;
 use reqwest::Method;
 use tokio::fs::File;
-use tokio::io::{AsyncRead, AsyncReadExt, ReadBuf};
-
+use tokio::io::{AsyncRead, ReadBuf};
+use tokio::task::JoinHandle;
 use crate::container::BlobConfig;
 use crate::container::http::{do_request_raw_read, HttpAuth};
 use crate::progress::{CoreStatus, Processor, ProcessorAsync, ProcessResult, ProgressStatus};
@@ -26,6 +24,7 @@ pub struct RegFinishedUploader {
     upload_result: UploadResult,
 }
 
+#[async_trait]
 impl ProcessorAsync<UploadResult> for RegFinishedUploader {
     async fn wait_result(self: Box<Self>) -> Result<UploadResult> {
         Ok(self.upload_result)
@@ -95,6 +94,7 @@ impl RegUploader {
     }
 }
 
+#[async_trait]
 impl Processor<UploadResult> for RegUploader {
     async fn start(&self) -> Box<dyn ProcessorAsync<UploadResult>> {
         return match &self.reg_uploader_enum {
@@ -115,19 +115,7 @@ impl Processor<UploadResult> for RegUploader {
                 };
                 let file_path_clone = self.blob_config.file_path.to_str().unwrap().to_string();
                 let blob_config_arc = self.blob_config.clone();
-                let handle = thread::spawn::<_, Result<UploadResult>>(move || {
-                    let uploader = reg_http_uploader;
-                    let result = uploading(status.clone(), file_path_clone.clone().as_str(), uploader, blob_config_arc);
-                    let status_core = &mut status.status_core.lock().unwrap();
-                    status_core.done = true;
-                    if let Err(err) = &result {
-                        Err(anyhow!("{}\n{}", err, err.backtrace()))
-                    } else {
-                        Ok(UploadResult {
-                            result_str: "succuss".to_string(),
-                        })
-                    }
-                });
+                let handle = tokio::spawn(upload(reg_http_uploader, status, file_path_clone, blob_config_arc));
                 Box::new(RegUploadHandler { join: handle })
             }
         };
@@ -138,13 +126,27 @@ impl Processor<UploadResult> for RegUploader {
     }
 }
 
+async fn upload(reg_http_uploader: RegHttpUploader, status: RegUploaderStatus, file_path_clone: String, blob_config_arc: Arc<BlobConfig>) -> Result<UploadResult> {
+    let uploader = reg_http_uploader;
+    let result = uploading(status.clone(), file_path_clone.clone().as_str(), uploader, blob_config_arc).await;
+    let status_core = &mut status.status_core.lock().unwrap();
+    status_core.done = true;
+    if let Err(err) = &result {
+        Err(anyhow!("{}\n{}", err, err.backtrace()))
+    } else {
+        Ok(UploadResult {
+            result_str: "succuss".to_string(),
+        })
+    }
+}
+
 async fn uploading(status: RegUploaderStatus, file_path: &str, reg_http_uploader: RegHttpUploader, blob_config: Arc<BlobConfig>) -> Result<()> {
     //检查本地是否存在已有
     let file_path = Path::new(file_path);
-    let local_file = File::open(file_path)?;
-    let file_size = local_file.metadata()?.len();
+    let local_file = File::open(file_path).await?;
+    let file_size = local_file.metadata().await?.len();
     let reader = RegUploaderReader { status, file: local_file };
-    let mut response = do_request_raw_read::<RegUploaderReader>(
+    let response = do_request_raw_read::<RegUploaderReader>(
         &reg_http_uploader.client,
         reg_http_uploader.url.as_str(),
         Method::PUT,
@@ -154,15 +156,12 @@ async fn uploading(status: RegUploaderStatus, file_path: &str, reg_http_uploader
         file_size,
     ).await?;
     let short_hash = &blob_config.short_hash;
-    if response.status().is_success() {
-        let mut response_string = String::new();
-        let _read_size = response.read_to_string(&mut response_string)?;
-        Ok(())
+    if !response.status().is_success() {
+        let status_code = response.status().to_string();
+        let response_string = response.text().await.unwrap_or_default();
+        Err(anyhow!("{} upload request failed. status_code: {} body: {}",status_code, short_hash, response_string))
     } else {
-        let _status_code = response.status().as_str();
-        let mut response_string = String::new();
-        let _read_size = response.read_to_string(&mut response_string)?;
-        Err(anyhow!("{} upload request failed. {}", short_hash, response_string))
+        Ok(())
     }
 }
 
@@ -172,18 +171,8 @@ pub struct RegUploaderReader {
 }
 
 impl AsyncRead for RegUploaderReader {
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
         Pin::new(&mut self.file).poll_read(cx, buf)
-    }
-}
-
-impl AsyncReadExt for RegUploaderReader {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let size = self.file.read(buf).await?;
-        let mut guard = self.status.status_core.lock().unwrap();
-        let core = guard.deref_mut();
-        core.curr_size += size as u64;
-        Ok(size)
     }
 }
 
@@ -191,14 +180,16 @@ pub struct RegUploadHandler {
     join: JoinHandle<Result<UploadResult>>,
 }
 
+#[async_trait]
 impl ProcessorAsync<UploadResult> for RegUploadHandler {
     async fn wait_result(self: Box<Self>) -> Result<UploadResult> {
-        self.join.join().map_err(|_| anyhow!("join failed."))?
+        self.join.await.map_err(|_| anyhow!("join failed."))?
     }
 }
 
+#[async_trait]
 impl ProgressStatus for RegUploaderStatus {
-    fn status(&self) -> CoreStatus {
+    async fn status(&self) -> CoreStatus {
         let core = &self.status_core.lock().unwrap();
         CoreStatus {
             blob_config: core.blob_config.clone(),
@@ -219,8 +210,9 @@ pub struct UploadResult {
     pub result_str: String,
 }
 
+#[async_trait]
 impl ProcessResult for UploadResult {
-    fn finished_info(&self) -> &str {
+    async fn finished_info(&self) -> &str {
         &self.result_str
     }
 }

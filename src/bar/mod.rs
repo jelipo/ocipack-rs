@@ -30,6 +30,7 @@ struct BarCore {
     finished_info: String,
 }
 
+#[derive(Clone)]
 pub struct MultiBar {
     /// name,total,core
     bar_vec: Vec<(String, Rc<RefCell<BarCore>>)>,

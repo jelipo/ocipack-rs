@@ -8,7 +8,7 @@ pub mod manager;
 
 #[async_trait]
 pub trait Processor<R> {
-    async fn start(&self) -> Box<dyn ProcessorAsync<R>>;
+    async fn start(&self) -> Box<dyn ProcessorAsync<R> >;
 
     async fn process_status(&self) -> Box<dyn ProgressStatus>;
 }

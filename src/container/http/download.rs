@@ -6,13 +6,17 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use futures::TryStreamExt;
 use reqwest::{Client, Response};
 use reqwest::Method;
 use tokio::fs::File;
+use tokio::io;
 use tokio::io::AsyncWrite;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 use crate::container::BlobConfig;
 use crate::container::http::{do_request_raw, get_header, HttpAuth};
@@ -75,6 +79,7 @@ impl RegDownloader {
     }
 }
 
+#[async_trait]
 impl Processor<DownloadResult> for RegDownloader {
     async fn start(&self) -> Box<dyn ProcessorAsync<DownloadResult>> {
         let blob_config = self.blob_down_config.clone();
@@ -126,6 +131,7 @@ pub struct RegDownloadHandler {
     join: JoinHandle<Result<DownloadResult>>,
 }
 
+#[async_trait]
 impl ProcessorAsync<DownloadResult> for RegDownloadHandler {
     async fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
         let result = self.join.await;
@@ -137,6 +143,7 @@ pub struct RegFinishedDownloader {
     result: DownloadResult,
 }
 
+#[async_trait]
 impl ProcessorAsync<DownloadResult> for RegFinishedDownloader {
     async fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
         Ok(self.result)
@@ -150,16 +157,21 @@ async fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_dow
         let _create_result = std::fs::create_dir(parent_path);
     }
     // 请求HTTP下载
-    let mut http_response = reg_http_downloader.do_request_raw().await?;
+    let http_response = reg_http_downloader.do_request_raw().await?;
+
     check(&http_response)?;
     if let Some(len) = http_response.content_length() {
-        let mut status_core = status.status_core.lock().expect("lock failed");
+        let mut status_core = status.status_core.lock().await;
         status_core.borrow_mut().file_size = len;
     }
     let file = File::create(file_path).await?;
     let mut writer = RegDownloaderWriter { status, file };
-    let _copy_size = std::io::copy(&mut http_response, &mut writer)?;
-    writer.flush()?;
+
+    let stream = http_response.bytes_stream()
+        .map_err(|e| Error::new(io::ErrorKind::Other, e));
+    let mut read = stream.into_async_read().compat();
+    let _copy_size = tokio::io::copy(&mut read, &mut writer).await?;
+    writer.flush().await?;
     Ok(())
 }
 
@@ -172,7 +184,7 @@ struct RegHttpDownloader {
 impl RegHttpDownloader {
     async fn do_request_raw(&self) -> Result<Response> {
         let url = self.url.as_str();
-        do_request_raw::<u8>(&self.client, url, Method::GET, self.auth.as_ref(), &[], None, None)
+        do_request_raw::<u8>(&self.client, url, Method::GET, self.auth.as_ref(), &[], None, None).await
     }
 }
 
@@ -197,11 +209,18 @@ pub struct RegDownloaderWriter {
 
 impl AsyncWrite for RegDownloaderWriter {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::result::Result<usize, Error>> {
-        match self.status.status_core.lock().poll(cx) {
-            Poll::Ready(mut core) => {
-                core.borrow_mut().curr_size += buf.len() as u64;
-                Pin::new(&mut self.file).poll_write(cx, buf)
+        let mut pinned_file = Pin::new(&mut self.file);
+        match pinned_file.poll_write(cx, buf) {
+            Poll::Ready(Ok(size)) => {
+                let status_clone = Arc::clone(&self.status);
+                let fut = async move {
+                    let mut status = status_clone.lock().await;
+                    status.bytes_written += size;
+                };
+                tokio::spawn(fut);
+                Poll::Ready(Ok(size))
             }
+            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
             Poll::Pending => Poll::Pending,
         }
     }
@@ -227,6 +246,7 @@ struct RegDownloaderStatusCore {
     pub done: bool,
 }
 
+#[async_trait]
 impl ProgressStatus for RegDownloaderStatus {
     async fn status(&self) -> CoreStatus {
         let core = &self.status_core.lock().await;
@@ -247,8 +267,9 @@ pub struct DownloadResult {
     pub result_str: String,
 }
 
+#[async_trait]
 impl ProcessResult for DownloadResult {
-    fn finished_info(&self) -> &str {
+    async fn finished_info(&self) -> &str {
         &self.result_str
     }
 }

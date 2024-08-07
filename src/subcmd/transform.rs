@@ -17,7 +17,7 @@ use crate::GLOBAL_CONFIG;
 pub struct TransformCommand {}
 
 impl TransformCommand {
-    pub fn transform(transform_args: &TransformCmdArgs) -> Result<()> {
+    pub async fn transform(transform_args: &TransformCmdArgs) -> Result<()> {
         let (source_info, build_info, source_auth) = gen_source_info(transform_args)?;
         match transform_handle(
             source_info,
@@ -25,7 +25,7 @@ impl TransformCommand {
             source_auth,
             transform_args,
             transform_args.source_proxy.clone(),
-        ) {
+        ).await {
             Ok(_) => print_transform_success(transform_args),
             Err(err) => print_transform_failed(err),
         }
@@ -100,7 +100,7 @@ pub async fn transform_handle(
         !transform_cmds.allow_insecure,
         transform_cmds.conn_timeout,
         proxy_info,
-    )?;
+    ).await?;
     let target_config_blob = build_target_config_blob(build_info, &pull_result.config_blob, None, &transform_cmds.format);
     let source_manifest = pull_result.manifest;
     let source_manifest_raw = pull_result.manifest_raw;

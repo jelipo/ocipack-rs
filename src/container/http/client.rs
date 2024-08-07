@@ -1,22 +1,22 @@
-use std::io::Read;
 use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use bytes::Bytes;
 use derive_builder::Builder;
 use reqwest::{Client, Response};
-use reqwest::redirect::Policy;
 use reqwest::{Method, Proxy, StatusCode};
+use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use tokio::io::AsyncReadExt;
+
+use crate::container::{BlobConfig, RegContentType};
+use crate::container::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::container::http::auth::{RegTokenHandler, TokenType};
 use crate::container::http::download::RegDownloader;
 use crate::container::http::upload::RegUploader;
-use crate::container::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::container::proxy::ProxyInfo;
-use crate::container::{BlobConfig, RegContentType};
 use crate::util::sha;
 
 pub struct RegistryHttpClient {
@@ -59,19 +59,19 @@ impl RegistryHttpClient {
         })
     }
 
-    pub fn _request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(&mut self, request: ClientRequest<T>) -> Result<R> {
-        let success_response = self.request_full_response(request)?;
+    pub async fn _request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(&mut self, request: ClientRequest<'_, T>) -> Result<R> {
+        let success_response = self.request_full_response(request).await?;
         let body_bytes = success_response._bytes_body();
         let _body_sha256 = format!("sha256:{}", sha::_sha256(body_bytes));
         success_response._json_body::<R>()
     }
 
-    pub fn request_full_response<T: Serialize + ?Sized>(&mut self, request: ClientRequest<T>) -> Result<FullRegistryResponse> {
-        self.do_request(request)
+    pub async fn request_full_response<T: Serialize + ?Sized>(&mut self, request: ClientRequest<'_, T>) -> Result<FullRegistryResponse> {
+        self.do_request(request).await
     }
 
-    pub fn simple_request<T: Serialize + ?Sized>(&mut self, request: ClientRequest<T>) -> Result<RawRegistryResponse> {
-        let http_response = self.do_request_raw(request)?;
+    pub async fn simple_request<T: Serialize + ?Sized>(&mut self, request: ClientRequest<'_, T>) -> Result<RawRegistryResponse> {
+        let http_response = self.do_request_raw(request).await?;
         Ok(RawRegistryResponse { response: http_response })
     }
 
@@ -109,9 +109,9 @@ impl RegistryHttpClient {
         }
     }
 
-    pub fn download(&mut self, path: &str, blob_down_config: BlobConfig, scope: &str, layer_size: Option<u64>) -> Result<RegDownloader> {
+    pub async fn download(&mut self, path: &str, blob_down_config: BlobConfig, scope: &str, layer_size: Option<u64>) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
-        let token = self.reg_token_handler.token(Some(scope), TokenType::Pull)?;
+        let token = self.reg_token_handler.token(Some(scope), TokenType::Pull).await?;
         let downloader = RegDownloader::new_reg(
             url,
             Some(HttpAuth::BearerToken { token }),
@@ -122,8 +122,8 @@ impl RegistryHttpClient {
         Ok(downloader)
     }
 
-    pub fn upload(&mut self, url: String, blob_config: BlobConfig, scope: &str, file_local_path: &Path) -> Result<RegUploader> {
-        let token = self.reg_token_handler.token(Some(scope), TokenType::PushAndPull)?;
+    pub async fn upload(&mut self, url: String, blob_config: BlobConfig, scope: &str, file_local_path: &Path) -> Result<RegUploader> {
+        let token = self.reg_token_handler.token(Some(scope), TokenType::PushAndPull).await?;
         Ok(RegUploader::new_uploader(
             url,
             HttpAuth::BearerToken { token },
@@ -194,6 +194,7 @@ impl FullRegistryResponse {
     }
 }
 
+#[async_trait]
 pub trait RegistryResponse {
     fn success(&self) -> bool;
 
@@ -201,7 +202,7 @@ pub trait RegistryResponse {
 
     fn status_code(&self) -> StatusCode;
 
-    fn string_body(self) -> String;
+    async fn string_body(self) -> Result<String>;
 }
 
 /// 一个简单的Registry的Response，只包含状态码
@@ -209,6 +210,7 @@ pub struct RawRegistryResponse {
     response: Response,
 }
 
+#[async_trait]
 impl RegistryResponse for RawRegistryResponse {
     fn success(&self) -> bool {
         self.response.status().is_success()
@@ -226,22 +228,9 @@ impl RegistryResponse for RawRegistryResponse {
         self.response.status()
     }
 
-    fn string_body(mut self) -> String {
-        match self.response.content_length() {
-            None => {
-                let mut string = String::new();
-                let _result = self.response.read_to_string(&mut string);
-                string
-            }
-            Some(len) => match len {
-                0 => String::default(),
-                _ => {
-                    let mut string = String::with_capacity(len as usize);
-                    let _result = self.response.read_to_string(&mut string);
-                    string
-                }
-            },
-        }
+    async fn string_body(mut self) -> Result<String> {
+        let string = self.response.text().await.unwrap_or_default();
+        Ok(string)
     }
 }
 
