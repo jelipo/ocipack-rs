@@ -110,7 +110,7 @@ pub struct TempLayerInfo {
     pub compressed_tar_sha256: String,
     pub tar_sha256: String,
     pub compress_layer_path: PathBuf,
-    pub compress_type: CompressType,
+    pub _compress_type: CompressType,
 }
 
 pub struct LocalLayer {

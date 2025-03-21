@@ -31,17 +31,17 @@ pub struct BuildInfo {
 
 pub struct TargetInfo {
     pub image_info: ImageInfo,
-    pub format: TargetFormat,
+    pub _format: TargetFormat,
 }
 
-pub trait SourceImageAdapter {
+pub trait _SourceImageAdapter {
     fn info(&self) -> &SourceInfo;
 
     fn into_info(self: Box<Self>) -> SourceInfo;
 }
 
 pub trait TargetImageAdapter {
-    fn info(&self) -> &TargetInfo;
+    fn _info(&self) -> &TargetInfo;
 }
 
 pub struct CopyFile {

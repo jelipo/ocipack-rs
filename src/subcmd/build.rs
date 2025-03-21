@@ -225,7 +225,7 @@ fn compress_layer_file(tar_file_path: &Path, home_dir: &HomeDir, compress_type: 
         compressed_tar_sha256,
         tar_sha256,
         compress_layer_path: compress_file_path,
-        compress_type,
+        _compress_type: compress_type,
     })
 }
 

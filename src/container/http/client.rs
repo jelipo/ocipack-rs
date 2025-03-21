@@ -195,7 +195,7 @@ impl FullRegistryResponse {
 }
 
 pub trait RegistryResponse {
-    fn success(&self) -> bool;
+    fn _success(&self) -> bool;
 
     fn content_type(&self) -> Option<String>;
 
@@ -210,7 +210,7 @@ pub struct RawRegistryResponse {
 }
 
 impl RegistryResponse for RawRegistryResponse {
-    fn success(&self) -> bool {
+    fn _success(&self) -> bool {
         self.response.status().is_success()
     }
 
