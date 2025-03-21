@@ -26,7 +26,7 @@ pub struct RegistryTargetAdapter {
 }
 
 impl TargetImageAdapter for RegistryTargetAdapter {
-    fn info(&self) -> &TargetInfo {
+    fn _info(&self) -> &TargetInfo {
         &self.info
     }
 }
@@ -59,7 +59,7 @@ impl RegistryTargetAdapter {
         };
         let auth = RegAuthType::build_auth(image_info.image_host.clone(), base_auth);
         Ok(RegistryTargetAdapter {
-            info: TargetInfo { image_info, format },
+            info: TargetInfo { image_info, _format: format },
             use_https,
             conn_timeout_second,
             target_manifest,

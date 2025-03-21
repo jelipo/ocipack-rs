@@ -87,7 +87,7 @@ impl Platform {
 
 pub struct BlobConfig {
     pub file_path: Box<Path>,
-    pub file_name: String,
+    pub _file_name: String,
     pub reg_digest: RegDigest,
     pub short_hash: String,
 }
@@ -96,7 +96,7 @@ impl BlobConfig {
     pub fn new(file_path: Box<Path>, file_name: String, digest: RegDigest) -> BlobConfig {
         BlobConfig {
             file_path,
-            file_name,
+            _file_name: file_name,
             short_hash: digest.sha256[..12].to_string(),
             reg_digest: digest,
         }
