@@ -7,9 +7,9 @@ use std::thread;
 use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
-use reqwest::blocking::{Client, Response};
+use reqwest::{Client, Response};
 use reqwest::Method;
-
+use tokio::{fs, io};
 use crate::container::http::{do_request_raw, get_header, HttpAuth};
 use crate::container::BlobConfig;
 use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
@@ -72,7 +72,7 @@ impl RegDownloader {
 }
 
 impl Processor<DownloadResult> for RegDownloader {
-    fn start(&self) -> Box<dyn ProcessorAsync<DownloadResult>> {
+    async fn start(&self) -> Box<dyn ProcessorAsync<DownloadResult>> {
         let blob_config = self.blob_down_config.clone();
         let file_path = blob_config.file_path.clone();
         let status = self.temp.clone();
@@ -141,7 +141,7 @@ fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloade
     //检查本地是否存在已有
     let parent_path = file_path.parent().expect("find file parent dir failed");
     if !parent_path.exists() {
-        let _create_result = std::fs::create_dir(parent_path);
+        let _create_result = fs::create_dir(parent_path);
     }
     // 请求HTTP下载
     let mut http_response = reg_http_downloader.do_request_raw()?;
@@ -152,7 +152,7 @@ fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloade
     }
     let file = File::create(file_path)?;
     let mut writer = RegDownloaderWriter { status, file };
-    let _copy_size = std::io::copy(&mut http_response, &mut writer)?;
+    let _copy_size = io::copy(&mut http_response, &mut writer)?;
     writer.flush()?;
     Ok(())
 }

@@ -2,11 +2,11 @@ use std::io::Read;
 use std::str::FromStr;
 
 use anyhow::Result;
-use reqwest::blocking::{Body, Client, Request, Response};
+use reqwest::{Body, Client, Request, Response};
 use reqwest::header::HeaderMap;
 use reqwest::{Method, Url};
 use serde::Serialize;
-
+use tokio::io::AsyncRead;
 use crate::container::RegContentType;
 
 pub mod auth;
@@ -46,7 +46,7 @@ fn do_request_raw<T: Serialize + ?Sized>(
     Ok(http_response)
 }
 
-fn do_request_raw_read<R: Read + Send + 'static>(
+async fn do_request_raw_read<R:  AsyncRead + Send + Unpin + 'static>(
     client: &Client,
     url: &str,
     method: Method,
@@ -58,7 +58,7 @@ fn do_request_raw_read<R: Read + Send + 'static>(
     let request_body = body.map(|read| RequestBody::Read(Body::sized(read, size)));
 
     let request = build_request::<String>(client, url, method, http_auth_opt, accepts, request_body, None)?;
-    let http_response = client.execute(request)?;
+    let http_response = client.execute(request).await?;
     Ok(http_response)
 }
 

@@ -1,26 +1,24 @@
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
-use std::str::FromStr;
-
+use crate::adapter::{BuildInfo, CopyFile, ImageInfo};
+use crate::const_data::DEFAULT_IMAGE_HOST;
 use anyhow::{anyhow, Result};
 use dockerfile_parser::{BreakableStringComponent, Dockerfile, Instruction, ShellOrExecExpr};
 use log::{debug, warn};
-
-use crate::adapter::{BuildInfo, CopyFile, ImageInfo};
-use crate::const_data::DEFAULT_IMAGE_HOST;
+use std::collections::HashMap;
+use std::path::Path;
+use std::str::FromStr;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 
 pub struct DockerfileAdapter {}
 
 impl DockerfileAdapter {
-    pub fn parse(path: &str) -> Result<(ImageInfo, BuildInfo)> {
+    pub async fn parse(path: &str) -> Result<(ImageInfo, BuildInfo)> {
         if !Path::new(path).exists() {
             return Err(anyhow!("Dockerfile not found:{}", path));
         }
-        let mut dockerfile_file = File::open(path)?;
+        let mut dockerfile_file = File::open(path).await?;
         let mut str_body = String::new();
-        let read_size = dockerfile_file.read_to_string(&mut str_body)?;
+        let read_size = dockerfile_file.read_to_string(&mut str_body).await?;
         debug!("Dockerfile size: {:?}", read_size);
         Self::parse_from_str(&str_body)
     }

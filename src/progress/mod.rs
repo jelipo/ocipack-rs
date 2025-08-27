@@ -7,7 +7,7 @@ use crate::container::BlobConfig;
 pub mod manager;
 
 pub trait Processor<R> {
-    fn start(&self) -> Box<dyn ProcessorAsync<R>>;
+    async fn start(&self) -> Box<dyn ProcessorAsync<R>>;
 
     fn process_status(&self) -> Box<dyn ProgressStatus>;
 }

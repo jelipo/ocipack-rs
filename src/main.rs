@@ -9,8 +9,8 @@ use home::home_dir;
 
 use crate::config::cmd::CmdArgs;
 use crate::config::global::GlobalAppConfig;
-use crate::container::home::HomeDir;
 use crate::container::CompressType;
+use crate::container::home::HomeDir;
 use crate::subcmd::build::BuildCommand;
 use crate::subcmd::clean::CleanCommand;
 use crate::subcmd::show_info::ShowInfoCommand;
@@ -31,12 +31,13 @@ pub static GLOBAL_CONFIG: LazyLock<GlobalAppConfig> = LazyLock::new(init_config)
 
 pub static CACHE_DIR_NAME: &str = "pack_cache";
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     init::init()?;
     let global_config = GLOBAL_CONFIG.deref();
     init::print_logo();
     match &global_config.cmd_args {
-        CmdArgs::Build(build_args) => BuildCommand::build(build_args)?,
+        CmdArgs::Build(build_args) => BuildCommand::build(build_args).await?,
         CmdArgs::Transform(transform_args) => TransformCommand::transform(transform_args)?,
         CmdArgs::Clean(clean_args) => CleanCommand::clean(clean_args)?,
         CmdArgs::ShowInfo(show_info_args) => ShowInfoCommand::show(show_info_args)?,

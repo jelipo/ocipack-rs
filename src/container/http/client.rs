@@ -1,23 +1,20 @@
-use std::io::Read;
-use std::path::Path;
-use std::time::Duration;
-
-use anyhow::{anyhow, Result};
-use bytes::Bytes;
-use derive_builder::Builder;
-use reqwest::blocking::{Client, Response};
-use reqwest::redirect::Policy;
-use reqwest::{Method, Proxy, StatusCode};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::container::http::auth::{RegTokenHandler, TokenType};
 use crate::container::http::download::RegDownloader;
 use crate::container::http::upload::RegUploader;
 use crate::container::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
 use crate::container::proxy::ProxyInfo;
 use crate::container::{BlobConfig, RegContentType};
-use crate::util::sha;
+use anyhow::{anyhow, Result};
+use bytes::Bytes;
+use derive_builder::Builder;
+use reqwest::redirect::Policy;
+use reqwest::{Client, Response};
+use reqwest::{Method, Proxy, StatusCode};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use std::path::Path;
+use std::time::Duration;
+use tokio::io::AsyncReadExt;
 
 pub struct RegistryHttpClient {
     registry_addr: String,
@@ -26,13 +23,13 @@ pub struct RegistryHttpClient {
 }
 
 impl RegistryHttpClient {
-    pub fn new(
+    pub async fn new(
         reg_addr: String,
         auth: Option<RegistryAuth>,
         conn_timeout_second: u64,
         proxy_info: Option<ProxyInfo>,
     ) -> Result<RegistryHttpClient> {
-        let mut builder = reqwest::blocking::ClientBuilder::new();
+        let mut builder = reqwest::ClientBuilder::new();
         if let Some(info) = proxy_info {
             let mut proxy_reqwest = Proxy::all(info.addr)?;
             if let Some(auth) = info.auth {
@@ -57,13 +54,6 @@ impl RegistryHttpClient {
             client: client.clone(),
             reg_token_handler: RegTokenHandler::new_reg_token_handler(reg_addr, http_auth_opt, client),
         })
-    }
-
-    pub fn _request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(&mut self, request: ClientRequest<T>) -> Result<R> {
-        let success_response = self.request_full_response(request)?;
-        let body_bytes = success_response._bytes_body();
-        let _body_sha256 = format!("sha256:{}", sha::_sha256(body_bytes));
-        success_response._json_body::<R>()
     }
 
     pub fn request_full_response<T: Serialize + ?Sized>(&mut self, request: ClientRequest<T>) -> Result<FullRegistryResponse> {
@@ -176,7 +166,7 @@ impl FullRegistryResponse {
         String::from_utf8_lossy(&self.body_bytes[..]).into()
     }
 
-    pub fn _bytes_body(&self) -> &Bytes {
+    pub fn bytes_body(&self) -> &Bytes {
         &self.body_bytes
     }
 

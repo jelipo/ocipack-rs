@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use fantasy_util::time::system_time::SystemLocalTime;
 use log::{debug, warn};
 use regex::Regex;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use reqwest::Method;
 use serde::Deserialize;
 

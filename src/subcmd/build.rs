@@ -1,11 +1,3 @@
-use std::fs::File;
-use std::path::{Path, PathBuf};
-
-use anyhow::{anyhow, Result};
-use colored::Colorize;
-use log::info;
-use tar::Builder;
-
 use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
 use crate::adapter::tar::TarTargetAdapter;
@@ -17,15 +9,24 @@ use crate::container::manifest::Manifest;
 use crate::container::proxy::ProxyInfo;
 use crate::container::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
-use crate::util::sha::{Sha256Reader, Sha256Writer};
+use crate::util::sha::{sha256_hex, Sha256Reader, Sha256Writer};
 use crate::util::{compress, random};
 use crate::{HomeDir, GLOBAL_CONFIG};
+use anyhow::{anyhow, Result};
+use colored::Colorize;
+use log::info;
+use sha2::{Digest, Sha256};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use tokio::fs::File;
+use tokio_tar::Builder;
+use tokio_util::io::{InspectReader, InspectWriter};
 
 pub struct BuildCommand {}
 
 impl BuildCommand {
-    pub fn build(build_args: &BuildCmdArgs) -> Result<()> {
-        let (source_info, build_info, source_auth) = build_source_info(build_args)?;
+    pub async fn build(build_args: &BuildCmdArgs) -> Result<()> {
+        let (source_info, build_info, source_auth) = build_source_info(build_args).await?;
         match handle(
             source_info,
             build_info,
@@ -33,7 +34,9 @@ impl BuildCommand {
             build_args,
             build_args.source_proxy.clone(),
             build_args.use_zstd,
-        ) {
+        )
+        .await
+        {
             Ok(_) => print_build_success(build_args),
             Err(err) => print_build_failed(err),
         }
@@ -75,9 +78,9 @@ Build job failed!
     );
 }
 
-fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
+async fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
     let (mut image_info, build_info) = match &build_args.source {
-        SourceType::Dockerfile { path } => DockerfileAdapter::parse(path)?,
+        SourceType::Dockerfile { path } => DockerfileAdapter::parse(path).await?,
         SourceType::Cmd { tag: _ } => {
             todo!()
         }
@@ -102,7 +105,7 @@ fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo
     ))
 }
 
-fn handle(
+async fn handle(
     source_info: SourceInfo,
     build_info: BuildInfo,
     source_auth: RegAuthType,
@@ -119,9 +122,10 @@ fn handle(
         proxy_info,
     )?;
     let compress_type = if use_zstd { CompressType::Zstd } else { CompressType::Tgz };
-    let temp_layer = build_top_tar(&build_info.copy_files, &home_dir)?
-        .map(|tar_path| compress_layer_file(&tar_path, &home_dir, compress_type))
-        .transpose()?;
+    let temp_layer = match build_top_tar(&build_info.copy_files, &home_dir).await? {
+        None => None,
+        Some(tar_path) => Some(compress_layer_file(&tar_path, &home_dir, compress_type).await?),
+    };
     let temp_local_layer = if let Some(temp_layer) = &temp_layer {
         home_dir.cache.blobs.move_to_blob(
             &temp_layer.compress_layer_path,
@@ -164,21 +168,21 @@ fn handle(
                 save_path: PathBuf::from(tar_arg.path.clone()),
                 use_gzip: tar_arg.usb_gzip,
             };
-            adapter.save()?;
+            adapter.save().await?;
         }
     }
     Ok(())
 }
 
 /// 构建一个tar layer
-fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<PathBuf>> {
+async fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<PathBuf>> {
     if copyfiles.is_empty() {
         return Ok(None);
     }
     info!("Building new tar...");
     let tar_file_name = random::random_str(10) + ".tar";
     let tar_temp_file_path = home_dir.cache.temp_dir.join(tar_file_name);
-    let tar_temp_file = File::create(tar_temp_file_path.as_path())?;
+    let tar_temp_file = File::create(tar_temp_file_path.as_path()).await?;
     let mut tar_builder = Builder::new(tar_temp_file);
     for copyfile in copyfiles {
         for source_path_str in &copyfile.source_path {
@@ -194,32 +198,38 @@ fn build_top_tar(copyfiles: &[CopyFile], home_dir: &HomeDir) -> Result<Option<Pa
             if source_path.is_file() {
                 let file_name = source_path.file_name().ok_or_else(|| anyhow!("error file name"))?.to_string_lossy();
                 let dest_file_path = PathBuf::from(dest_path).join(file_name.to_string()).to_string_lossy().to_string();
-                let mut sourcefile = File::open(source_path)?;
-                tar_builder.append_file(dest_file_path, &mut sourcefile)?;
+                let mut sourcefile = File::open(source_path).await?;
+                tar_builder.append_file(dest_file_path, &mut sourcefile).await?;
             } else if source_path.is_dir() {
-                tar_builder.append_dir(dest_path, source_path_str)?;
+                tar_builder.append_dir(dest_path, source_path_str).await?;
             } else {
                 return Err(anyhow!("copy only support file and dir".to_string()));
             }
         }
     }
-    tar_builder.finish()?;
+    tar_builder.finish().await?;
     info!("Build tar complete");
     Ok(Some(tar_temp_file_path))
 }
 
 /// 压缩tar layer文件为指定格式
-fn compress_layer_file(tar_file_path: &Path, home_dir: &HomeDir, compress_type: CompressType) -> Result<TempLayerInfo> {
-    let tar_file = File::open(tar_file_path)?;
-    let mut sha256_reader = Sha256Reader::new(tar_file);
+async fn compress_layer_file(tar_file_path: &Path, home_dir: &HomeDir, compress_type: CompressType) -> Result<TempLayerInfo> {
+    let tar_file = File::open(tar_file_path).await?;
+    let mut sha256_r = Sha256::new();
+    let mut sha256_reader = InspectReader::new(tar_file, |r| {
+        sha256_r.write(r);
+    });
     let compress_file_name = random::random_str(20) + ".compress";
     let compress_file_path = home_dir.cache.temp_dir.join(compress_file_name);
-    let compress_file = File::create(&compress_file_path)?;
-    let mut sha256_writer = Sha256Writer::new(compress_file);
+    let compress_file = File::create(&compress_file_path).await?;
+    let mut sha256_w = Sha256::new();
+    let mut sha256_writer = InspectWriter::new(compress_file, |r| {
+        sha256_w.write(r);
+    });
     info!("Compressing tar...  (compress-type={})", compress_type.to_string());
-    compress::compress(compress_type, &mut sha256_reader, &mut sha256_writer)?;
-    let tar_sha256 = sha256_reader.sha256()?;
-    let compressed_tar_sha256 = sha256_writer.sha256()?;
+    compress::async_compress(compress_type, &mut sha256_reader, &mut sha256_writer).await?;
+    let tar_sha256 = sha256_hex(sha256_r);
+    let compressed_tar_sha256 = sha256_hex(sha256_w);
     info!("Compress complete. (sha256={})", compressed_tar_sha256);
     Ok(TempLayerInfo {
         compressed_tar_sha256,
