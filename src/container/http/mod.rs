@@ -1,13 +1,14 @@
 use std::io::Read;
 use std::str::FromStr;
 
+use crate::container::RegContentType;
 use anyhow::Result;
-use reqwest::{Body, Client, Request, Response};
 use reqwest::header::HeaderMap;
+use reqwest::{Body, Client, Request, Response};
 use reqwest::{Method, Url};
 use serde::Serialize;
 use tokio::io::AsyncRead;
-use crate::container::RegContentType;
+use tokio_util::io::ReaderStream;
 
 pub mod auth;
 pub mod client;
@@ -26,12 +27,17 @@ pub enum HttpAuth {
     BearerToken { token: String },
 }
 
-pub enum RequestBody<'a, T: Serialize + ?Sized> {
-    Json(&'a T),
-    Read(Body),
+pub struct SizedBody {
+    reader: Body,
+    size: u64,
 }
 
-fn do_request_raw<T: Serialize + ?Sized>(
+pub enum RequestBody<'a, T: Serialize + ?Sized> {
+    Json(&'a T),
+    Read(SizedBody),
+}
+
+async fn do_request_raw<T: Serialize + ?Sized>(
     client: &Client,
     url: &str,
     method: Method,
@@ -42,11 +48,11 @@ fn do_request_raw<T: Serialize + ?Sized>(
 ) -> Result<Response> {
     let request_body = body.map(|json| RequestBody::Json(json));
     let request = build_request::<T>(client, url, method, http_auth_opt, accepts, request_body, content_type)?;
-    let http_response = client.execute(request)?;
+    let http_response = client.execute(request).await?;
     Ok(http_response)
 }
 
-async fn do_request_raw_read<R:  AsyncRead + Send + Unpin + 'static>(
+async fn do_request_raw_read<R: AsyncRead + Send + Unpin + 'static>(
     client: &Client,
     url: &str,
     method: Method,
@@ -55,7 +61,11 @@ async fn do_request_raw_read<R:  AsyncRead + Send + Unpin + 'static>(
     body: Option<R>,
     size: u64,
 ) -> Result<Response> {
-    let request_body = body.map(|read| RequestBody::Read(Body::sized(read, size)));
+    let request_body = body.map(|read| {
+        let stream = ReaderStream::new(read);
+        let body = Body::wrap_stream(stream);
+        RequestBody::Read(SizedBody { reader: body, size })
+    });
 
     let request = build_request::<String>(client, url, method, http_auth_opt, accepts, request_body, None)?;
     let http_response = client.execute(request).await?;
@@ -95,7 +105,7 @@ fn build_request<T: Serialize + ?Sized>(
             let json_str = serde_json::to_string(json_body)?;
             builder = builder.body(json_str)
         }
-        Some(RequestBody::Read(read)) => builder = builder.body(read),
+        Some(RequestBody::Read(body)) => builder = builder.header("Content-Length", body.size.to_string()).body(body.reader),
     }
     Ok(builder.build()?)
 }

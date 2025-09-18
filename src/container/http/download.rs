@@ -121,7 +121,7 @@ pub struct RegDownloadHandler {
 }
 
 impl ProcessorAsync<DownloadResult> for RegDownloadHandler {
-    fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
+    async fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
         let result = self.join.join();
         result.unwrap()
     }
@@ -132,19 +132,19 @@ pub struct RegFinishedDownloader {
 }
 
 impl ProcessorAsync<DownloadResult> for RegFinishedDownloader {
-    fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
+    async fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
         Ok(self.result)
     }
 }
 
-fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloader: RegHttpDownloader) -> Result<()> {
+async fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_downloader: RegHttpDownloader) -> Result<()> {
     //检查本地是否存在已有
     let parent_path = file_path.parent().expect("find file parent dir failed");
     if !parent_path.exists() {
         let _create_result = fs::create_dir(parent_path);
     }
     // 请求HTTP下载
-    let mut http_response = reg_http_downloader.do_request_raw()?;
+    let mut http_response = reg_http_downloader.do_request_raw().await?;
     check(&http_response)?;
     if let Some(len) = http_response.content_length() {
         let mut status_core = status.status_core.lock().expect("lock failed");
@@ -164,9 +164,9 @@ struct RegHttpDownloader {
 }
 
 impl RegHttpDownloader {
-    fn do_request_raw(&self) -> Result<Response> {
+    async fn do_request_raw(&self) -> Result<Response> {
         let url = self.url.as_str();
-        do_request_raw::<u8>(&self.client, url, Method::GET, self.auth.as_ref(), &[], None, None)
+        do_request_raw::<u8>(&self.client, url, Method::GET, self.auth.as_ref(), &[], None, None).await
     }
 }
 

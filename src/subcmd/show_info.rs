@@ -16,7 +16,7 @@ use crate::container::{ConfigBlobEnum, Platform, Reference, RegContentType, Regi
 pub struct ShowInfoCommand {}
 
 impl ShowInfoCommand {
-    pub fn show(show_info_args: &ShowInfoArgs) -> Result<()> {
+    pub async fn show(show_info_args: &ShowInfoArgs) -> Result<()> {
         if let TargetType::Registry(image) = &show_info_args.image {
             let proxy = show_info_args.proxy.clone();
             let (image_info, auth) = RegistryImageInfo::gen_image_info(image, show_info_args.auth.as_ref())?;
@@ -27,7 +27,7 @@ impl ShowInfoCommand {
                 auth,
                 proxy,
                 show_info_args.platform.clone(),
-            )?;
+            ).await?;
             info!("Request done.");
             print_image_detail(detail)?;
         } else {
@@ -96,7 +96,7 @@ impl RegistryImageInfo {
     }
 
     /// 获取
-    fn info(
+    async fn info(
         https: bool,
         image_info: ImageInfo,
         auth: RegAuthType,
@@ -109,45 +109,45 @@ impl RegistryImageInfo {
             proxy,
         };
 
-        let mut registry_client = Registry::open(https, &image_info.image_host, info)?;
+        let mut registry_client = Registry::open(https, &image_info.image_host, info).await?;
         let image_manager = &mut registry_client.image_manager;
         let reference = Reference {
-            image_name: &image_info.image_name,
-            reference: &image_info.reference,
+            image_name: image_info.image_name.clone(),
+            reference: image_info.reference.clone(),
         };
-        let response = image_manager.request_manifest(
-            &reference,
-            &[
-                RegContentType::OCI_MANIFEST,
-                RegContentType::DOCKER_MANIFEST,
-                RegContentType::DOCKER_MANIFEST_LIST,
-                RegContentType::OCI_INDEX,
-            ],
-        )?;
+        let response = image_manager
+            .request_manifest(
+                &reference,
+                &[
+                    RegContentType::OCI_MANIFEST,
+                    RegContentType::DOCKER_MANIFEST,
+                    RegContentType::DOCKER_MANIFEST_LIST,
+                    RegContentType::OCI_INDEX,
+                ],
+            )
+            .await?;
         let mut manifest_list_raw: Option<String> = None;
         let mut manifest_list_platforms: Option<Vec<Platform>> = None;
         let (manifest, manifest_raw) = match response.manifest() {
             ManifestResponseEnum::Manifest(manifest) => (manifest.clone(), response.raw_body().to_string()),
             ManifestResponseEnum::ManifestList(manifest_list) => {
                 manifest_list_raw = Some(response.raw_body().to_string());
-                manifest_list_platforms = Some(manifest_list.platforms().into_iter()
-                    .filter(|platform| !platform.is_unknown())
-                    .collect());
+                manifest_list_platforms = Some(manifest_list.platforms().into_iter().filter(|platform| !platform.is_unknown()).collect());
                 let pf = platform.unwrap_or_else(|| {
                     let pf = Platform::default();
                     info!("Platform is not set, use default platform {}.", pf.to_string().green());
                     pf
                 });
-                image_manager.select_manifest(&reference, manifest_list, pf)?
+                image_manager.select_manifest(&reference, manifest_list, pf).await?
             }
         };
         let (config_blob_enum, config_blob_raw) = match &manifest {
             Manifest::OciV1(_) => {
-                let (blob, raw) = image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, manifest.config_digest())?;
+                let (blob, raw) = image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, manifest.config_digest()).await?;
                 (ConfigBlobEnum::OciV1(blob), raw)
             }
             Manifest::DockerV2S2(_) => {
-                let (blob, raw) = image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, manifest.config_digest())?;
+                let (blob, raw) = image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, manifest.config_digest()).await?;
                 (ConfigBlobEnum::DockerV2S2(blob), raw)
             }
         };

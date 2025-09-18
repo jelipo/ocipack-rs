@@ -1,6 +1,6 @@
 use crate::container::BlobConfig;
 use crate::container::http::{HttpAuth, do_request_raw_read};
-use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
+use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProcessorAsyncEnum, ProgressStatus};
 use anyhow::{Result, anyhow};
 use reqwest::Client;
 use reqwest::Method;
@@ -26,7 +26,7 @@ pub struct RegFinishedUploader {
 }
 
 impl ProcessorAsync<UploadResult> for RegFinishedUploader {
-    fn wait_result(self: Box<Self>) -> Result<UploadResult> {
+    async fn wait_result(self: Box<Self>) -> Result<UploadResult> {
         Ok(self.upload_result)
     }
 }
@@ -95,12 +95,12 @@ impl RegUploader {
 }
 
 impl Processor<UploadResult> for RegUploader {
-    async fn start(&self) -> Box<dyn ProcessorAsync<UploadResult>> {
+    async fn start(&self) -> ProcessorAsyncEnum {
         return match &self.reg_uploader_enum {
             RegUploaderEnum::Finished {
                 _file_size: _,
                 finished_reason,
-            } => Box::new(RegFinishedUploader {
+            } => ProcessorAsyncEnum::RegFinishedUploader(RegFinishedUploader {
                 upload_result: UploadResult {
                     result_str: finished_reason.to_string(),
                 },
@@ -127,7 +127,7 @@ impl Processor<UploadResult> for RegUploader {
                         })
                     }
                 });
-                Box::new(RegUploadHandler { join: handle })
+                ProcessorAsyncEnum::RegUploadHandler(RegUploadHandler { join: handle })
             }
         };
     }
@@ -160,15 +160,11 @@ async fn uploading(
     .await?;
     let short_hash = &blob_config.short_hash;
     if response.status().is_success() {
-        let mut response_string = String::new();
-        let bytes = response.bytes().await?;
-        let response_string = String::from_utf8_lossy(&bytes);
-        let _read_size = response.read_to_string(&mut response_string)?;
+        let _body = response.text().await?;
         Ok(())
     } else {
         let status_code = response.status().as_u16();
-        let mut response_string = String::new();
-        let _read_size = response.read_to_string(&mut response_string)?;
+        let response_string = response.text().await?;
         Err(anyhow!(
             "{} upload request failed. code: {}, body: {}",
             short_hash,
@@ -213,8 +209,8 @@ pub struct RegUploadHandler {
 }
 
 impl ProcessorAsync<UploadResult> for RegUploadHandler {
-    fn wait_result(self: Box<Self>) -> Result<UploadResult> {
-        self.join.join().map_err(|_| anyhow!("join failed."))?
+    async fn wait_result(mut self: Box<Self>) -> Result<UploadResult> {
+        self.join.await?
     }
 }
 
