@@ -242,7 +242,7 @@ pub struct ClientRequest<'a, B: Serialize + ?Sized> {
 impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
     pub fn new(
         path: &'a str,
-        scope: Option<&'a str>,
+        scope: Option<String>,
         method: Method,
         accept: &'a [RegContentType],
         body: Option<&'a B>,

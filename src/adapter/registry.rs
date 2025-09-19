@@ -1,19 +1,19 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use dockerfile_parser::{Dockerfile, Instruction};
 use log::{debug, info};
 
+use crate::GLOBAL_CONFIG;
 use crate::adapter::{ImageInfo, TargetImageAdapter, TargetInfo};
-use crate::config::cmd::{BaseAuth, TargetFormat};
 use crate::config::RegAuthType;
+use crate::config::cmd::{BaseAuth, TargetFormat};
 use crate::const_data::DEFAULT_IMAGE_HOST;
 use crate::container::http::upload::UploadResult;
 use crate::container::manifest::Manifest;
 use crate::container::proxy::ProxyInfo;
 use crate::container::{ConfigBlobSerialize, Reference, RegDigest, Registry, RegistryCreateInfo};
-use crate::progress::manager::ProcessorManager;
 use crate::progress::ProcessResult;
 use crate::progress::Processor;
-use crate::GLOBAL_CONFIG;
+use crate::progress::manager::ProcessorManager;
 
 pub struct RegistryTargetAdapter {
     info: TargetInfo,
@@ -59,7 +59,10 @@ impl RegistryTargetAdapter {
         };
         let auth = RegAuthType::build_auth(image_info.image_host.clone(), base_auth);
         Ok(RegistryTargetAdapter {
-            info: TargetInfo { image_info, _format: format },
+            info: TargetInfo {
+                image_info,
+                _format: format,
+            },
             use_https,
             conn_timeout_second,
             target_manifest,
@@ -69,7 +72,7 @@ impl RegistryTargetAdapter {
         })
     }
 
-    pub fn upload(self) -> Result<()> {
+    pub async fn upload(self) -> Result<()> {
         let home_dir = GLOBAL_CONFIG.home_dir.clone();
         let target_info = self.info;
         let reg_auth = self.target_auth.get_auth()?;
@@ -79,7 +82,7 @@ impl RegistryTargetAdapter {
             conn_timeout_second: self.conn_timeout_second,
             proxy: self.target_proxy,
         };
-        let target_reg = Registry::open(self.use_https, &host, create_info)?;
+        let target_reg = Registry::open(self.use_https, &host, create_info).await?;
         let mut manager = target_reg.image_manager;
 
         let target_manifest = self.target_manifest;
@@ -89,7 +92,7 @@ impl RegistryTargetAdapter {
             let local_layer =
                 home_dir.cache.blobs.local_layer(&layer_digest).ok_or_else(|| anyhow!("local file not found {}", layer_digest.digest))?;
             let layer_path = local_layer.layer_path();
-            let reg_uploader = manager.layer_blob_upload(&target_info.image_info.image_name, &layer_digest, &layer_path)?;
+            let reg_uploader = manager.layer_blob_upload(&target_info.image_info.image_name, &layer_digest, &layer_path).await?;
             reg_uploader_vec.push(Box::new(reg_uploader))
         }
         let serialize = self.target_config_blob_serialize;
@@ -98,7 +101,7 @@ impl RegistryTargetAdapter {
         let config_blob_path = home_dir.cache.write_temp_file(config_blob_str)?;
         let config_blob_path_str = config_blob_path.to_string_lossy().to_string();
         let config_blob_uploader =
-            manager.layer_blob_upload(&target_info.image_info.image_name, &serialize.digest, &config_blob_path_str)?;
+            manager.layer_blob_upload(&target_info.image_info.image_name, &serialize.digest, &config_blob_path_str).await?;
         reg_uploader_vec.push(Box::new(config_blob_uploader));
         //
         let process_manager = ProcessorManager::new_processor_manager(reg_uploader_vec)?;
@@ -110,11 +113,11 @@ impl RegistryTargetAdapter {
         info!("Putting manifest...");
         let (status_code, body) = manager.put_manifest(
             &Reference {
-                image_name: target_info.image_info.image_name.as_str(),
-                reference: target_info.image_info.reference.as_str(),
+                image_name: target_info.image_info.image_name,
+                reference: target_info.image_info.reference,
             },
             target_manifest,
-        )?;
+        ).await?;
         if status_code.is_success() {
             info!("Upload image finished.");
             Ok(())

@@ -3,16 +3,15 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::thread::JoinHandle;
 
-use anyhow::{anyhow, Result};
-use reqwest::{Client, Response};
-use reqwest::Method;
-use tokio::{fs, io};
 use crate::container::http::{do_request_raw, get_header, HttpAuth};
 use crate::container::BlobConfig;
-use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProgressStatus};
+use crate::progress::{CoreStatus, ProcessResult, ProcessorAsyncEnum, ProgressStatus, ProgressStatusEnum};
+use anyhow::{anyhow, Result};
+use reqwest::Method;
+use reqwest::{Client, Response};
+use tokio::task::JoinHandle;
+use tokio::{fs, io};
 
 pub struct RegDownloader {
     finished: bool,
@@ -69,15 +68,13 @@ impl RegDownloader {
             blob_down_config: blob_down_config_arc,
         })
     }
-}
 
-impl Processor<DownloadResult> for RegDownloader {
-    async fn start(&self) -> Box<dyn ProcessorAsync<DownloadResult>> {
+    pub async fn start(&self) -> ProcessorAsyncEnum {
         let blob_config = self.blob_down_config.clone();
         let file_path = blob_config.file_path.clone();
         let status = self.temp.clone();
         if self.finished {
-            return Box::new(RegFinishedDownloader {
+            return ProcessorAsyncEnum::RegFinishedDownloader(RegFinishedDownloader {
                 result: DownloadResult {
                     file_path: Some(file_path.clone()),
                     _file_size: file_path.metadata().unwrap().len(),
@@ -92,9 +89,9 @@ impl Processor<DownloadResult> for RegDownloader {
             auth: self.auth.clone(),
             client: self.client.as_ref().unwrap().clone(),
         };
-        let handle = thread::spawn::<_, Result<DownloadResult>>(move || {
+        let handle = tokio::spawn(async {
             let downloader = reg_http_downloader;
-            let result = downloading(status.clone(), &file_path, downloader);
+            let result = downloading(status.clone(), &file_path, downloader).await;
             let status_core = &mut status.status_core.lock().unwrap();
             status_core.done = true;
             if let Err(err) = &result {
@@ -108,11 +105,11 @@ impl Processor<DownloadResult> for RegDownloader {
                 result_str: "complete".to_string(),
             })
         });
-        Box::new(RegDownloadHandler { join: handle })
+        ProcessorAsyncEnum::RegDownloadHandler(RegDownloadHandler { join: handle })
     }
 
-    fn process_status(&self) -> Box<dyn ProgressStatus> {
-        Box::new(self.temp.clone())
+    pub(crate) fn process_status(&self) -> ProgressStatusEnum {
+        ProgressStatusEnum::RegDownloaderStatus(self.temp.clone())
     }
 }
 
@@ -120,10 +117,9 @@ pub struct RegDownloadHandler {
     join: JoinHandle<Result<DownloadResult>>,
 }
 
-impl ProcessorAsync<DownloadResult> for RegDownloadHandler {
+impl RegDownloadHandler {
     async fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
-        let result = self.join.join();
-        result.unwrap()
+        self.join.await?
     }
 }
 
@@ -131,7 +127,7 @@ pub struct RegFinishedDownloader {
     result: DownloadResult,
 }
 
-impl ProcessorAsync<DownloadResult> for RegFinishedDownloader {
+impl RegFinishedDownloader {
     async fn wait_result(self: Box<Self>) -> Result<DownloadResult> {
         Ok(self.result)
     }
@@ -152,7 +148,7 @@ async fn downloading(status: RegDownloaderStatus, file_path: &Path, reg_http_dow
     }
     let file = File::create(file_path)?;
     let mut writer = RegDownloaderWriter { status, file };
-    let _copy_size = io::copy(&mut http_response, &mut writer)?;
+    let _copy_size = io::copy(&mut http_response, &mut writer).await?;
     writer.flush()?;
     Ok(())
 }

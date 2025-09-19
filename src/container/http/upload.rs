@@ -1,6 +1,6 @@
 use crate::container::BlobConfig;
 use crate::container::http::{HttpAuth, do_request_raw_read};
-use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProcessorAsyncEnum, ProgressStatus};
+use crate::progress::{CoreStatus, ProcessResult, Processor, ProcessorAsync, ProcessorAsyncEnum, ProgressStatus, ProgressStatusEnum};
 use anyhow::{Result, anyhow};
 use reqwest::Client;
 use reqwest::Method;
@@ -92,10 +92,8 @@ impl RegUploader {
             temp,
         }
     }
-}
 
-impl Processor<UploadResult> for RegUploader {
-    async fn start(&self) -> ProcessorAsyncEnum {
+    pub async fn start(&self) -> ProcessorAsyncEnum {
         return match &self.reg_uploader_enum {
             RegUploaderEnum::Finished {
                 _file_size: _,
@@ -132,8 +130,8 @@ impl Processor<UploadResult> for RegUploader {
         };
     }
 
-    fn process_status(&self) -> Box<dyn ProgressStatus> {
-        Box::new(self.temp.clone())
+    pub(crate) fn process_status(&self) -> ProgressStatusEnum {
+        ProgressStatusEnum::RegUploaderStatus(self.temp.clone())
     }
 }
 
