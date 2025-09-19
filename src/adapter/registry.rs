@@ -11,9 +11,9 @@ use crate::container::http::upload::UploadResult;
 use crate::container::manifest::Manifest;
 use crate::container::proxy::ProxyInfo;
 use crate::container::{ConfigBlobSerialize, Reference, RegDigest, Registry, RegistryCreateInfo};
-use crate::progress::ProcessResult;
 use crate::progress::Processor;
 use crate::progress::manager::ProcessorManager;
+use crate::progress::{ProcessResult, ProcessorEnum};
 
 pub struct RegistryTargetAdapter {
     info: TargetInfo,
@@ -86,14 +86,14 @@ impl RegistryTargetAdapter {
         let mut manager = target_reg.image_manager;
 
         let target_manifest = self.target_manifest;
-        let mut reg_uploader_vec = Vec::<Box<dyn Processor<UploadResult>>>::new();
+        let mut reg_uploader_vec = Vec::<ProcessorEnum>::new();
         for manifest_layer in target_manifest.layers() {
             let layer_digest = RegDigest::new_with_digest(manifest_layer.digest.to_string());
             let local_layer =
                 home_dir.cache.blobs.local_layer(&layer_digest).ok_or_else(|| anyhow!("local file not found {}", layer_digest.digest))?;
             let layer_path = local_layer.layer_path();
             let reg_uploader = manager.layer_blob_upload(&target_info.image_info.image_name, &layer_digest, &layer_path).await?;
-            reg_uploader_vec.push(Box::new(reg_uploader))
+            reg_uploader_vec.push(ProcessorEnum::RegUploader(reg_uploader))
         }
         let serialize = self.target_config_blob_serialize;
         let config_blob_str = serialize.json_str;
@@ -102,7 +102,7 @@ impl RegistryTargetAdapter {
         let config_blob_path_str = config_blob_path.to_string_lossy().to_string();
         let config_blob_uploader =
             manager.layer_blob_upload(&target_info.image_info.image_name, &serialize.digest, &config_blob_path_str).await?;
-        reg_uploader_vec.push(Box::new(config_blob_uploader));
+        reg_uploader_vec.push(ProcessorEnum::RegUploader(config_blob_uploader));
         //
         let process_manager = ProcessorManager::new_processor_manager(reg_uploader_vec)?;
         info!("Start pushing... (total={})", process_manager.size());
@@ -111,13 +111,15 @@ impl RegistryTargetAdapter {
             debug!("Upload done: {}", &upload_result.finished_info());
         }
         info!("Putting manifest...");
-        let (status_code, body) = manager.put_manifest(
-            &Reference {
-                image_name: target_info.image_info.image_name,
-                reference: target_info.image_info.reference,
-            },
-            target_manifest,
-        ).await?;
+        let (status_code, body) = manager
+            .put_manifest(
+                &Reference {
+                    image_name: target_info.image_info.image_name,
+                    reference: target_info.image_info.reference,
+                },
+                target_manifest,
+            )
+            .await?;
         if status_code.is_success() {
             info!("Upload image finished.");
             Ok(())

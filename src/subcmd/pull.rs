@@ -1,4 +1,3 @@
-use crate::GLOBAL_CONFIG;
 use crate::adapter::SourceInfo;
 use crate::config::RegAuthType;
 use crate::container::http::download::DownloadResult;
@@ -7,18 +6,17 @@ use crate::container::image::oci::OciConfigBlob;
 use crate::container::manifest::Manifest;
 use crate::container::proxy::ProxyInfo;
 use crate::container::{ConfigBlobEnum, Layer, Reference, RegContentType, RegDigest, Registry, RegistryCreateInfo};
-use crate::progress::Processor;
 use crate::progress::manager::ProcessorManager;
+use crate::progress::Processor;
 use crate::util::compress::{async_uncompress, uncompress};
-use anyhow::{Result, anyhow};
+use crate::GLOBAL_CONFIG;
+use anyhow::{anyhow, Result};
 use fantasy_util::asyncio::AsyncToSyncWrite;
 use log::info;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::Write;
 use tokio::fs::File;
-use tokio::io;
-use tokio_util::io::InspectWriter;
 
 pub async fn pull(
     source_info: &SourceInfo,
@@ -70,7 +68,7 @@ pub async fn pull(
         // 计算解压完的tar的sha256值
         let mut download_file = File::open(download_path)?;
         let mut sha256_encode = Sha256::new();
-       let mut writer =  AsyncToSyncWrite::new(|x| {
+        let mut writer = AsyncToSyncWrite::new(|x| {
             let _ = sha256_encode.write(x);
         });
         async_uncompress(layer_compress_type, &mut download_file, &mut writer).await?;
