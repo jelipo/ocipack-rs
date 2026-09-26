@@ -1,26 +1,38 @@
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::Result;
 
 use crate::container::BlobConfig;
+use crate::container::http::download::RegDownloaderStatus;
+use crate::container::http::upload::RegUploaderStatus;
 
 pub mod manager;
 
-pub trait Processor<R> {
-    fn start(&self) -> Box<dyn ProcessorAsync<R>>;
-
-    fn process_status(&self) -> Box<dyn ProgressStatus>;
-}
-
-pub trait ProcessorAsync<R> {
-    fn wait_result(self: Box<Self>) -> Result<R>;
+pub struct TransferJob<R> {
+    pub status: ProgressStatusEnum,
+    pub future: Pin<Box<dyn Future<Output = Result<R>> + Send>>,
 }
 
 pub struct CoreStatus {
     pub blob_config: Arc<BlobConfig>,
     pub full_size: u64,
     pub now_size: u64,
-    pub is_done: bool,
+}
+
+pub enum ProgressStatusEnum {
+    RegDownloaderStatus(RegDownloaderStatus),
+    RegUploaderStatus(RegUploaderStatus),
+}
+
+impl ProgressStatusEnum {
+    pub fn status(&self) -> CoreStatus {
+        match self {
+            Self::RegDownloaderStatus(status) => status.status(),
+            Self::RegUploaderStatus(status) => status.status(),
+        }
+    }
 }
 
 pub trait ProgressStatus {

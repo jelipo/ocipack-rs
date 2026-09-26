@@ -1,23 +1,19 @@
-use std::io::Read;
-use std::path::Path;
-use std::time::Duration;
-
-use anyhow::{anyhow, Result};
-use bytes::Bytes;
-use derive_builder::Builder;
-use reqwest::blocking::{Client, Response};
-use reqwest::redirect::Policy;
-use reqwest::{Method, Proxy, StatusCode};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::container::http::auth::{RegTokenHandler, TokenType};
 use crate::container::http::download::RegDownloader;
 use crate::container::http::upload::RegUploader;
-use crate::container::http::{do_request_raw, get_header, HttpAuth, RegistryAuth};
+use crate::container::http::{HttpAuth, RegistryAuth, do_request_raw, get_header};
 use crate::container::proxy::ProxyInfo;
 use crate::container::{BlobConfig, RegContentType};
-use crate::util::sha;
+use anyhow::{Result, anyhow};
+use bytes::Bytes;
+use derive_builder::Builder;
+use reqwest::redirect::Policy;
+use reqwest::{Client, Response};
+use reqwest::{Method, Proxy, StatusCode};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use std::path::Path;
+use std::time::Duration;
 
 pub struct RegistryHttpClient {
     registry_addr: String,
@@ -26,13 +22,13 @@ pub struct RegistryHttpClient {
 }
 
 impl RegistryHttpClient {
-    pub fn new(
+    pub async fn new(
         reg_addr: String,
         auth: Option<RegistryAuth>,
         conn_timeout_second: u64,
         proxy_info: Option<ProxyInfo>,
     ) -> Result<RegistryHttpClient> {
-        let mut builder = reqwest::blocking::ClientBuilder::new();
+        let mut builder = reqwest::ClientBuilder::new();
         if let Some(info) = proxy_info {
             let mut proxy_reqwest = Proxy::all(info.addr)?;
             if let Some(auth) = info.auth {
@@ -44,7 +40,6 @@ impl RegistryHttpClient {
             .timeout(Duration::from_secs(conn_timeout_second))
             .gzip(true)
             .connect_timeout(Duration::from_secs(10))
-            .danger_accept_invalid_certs(true)
             .deflate(true)
             .redirect(Policy::default())
             .build()?;
@@ -59,25 +54,18 @@ impl RegistryHttpClient {
         })
     }
 
-    pub fn _request_registry_body<T: Serialize + ?Sized, R: DeserializeOwned>(&mut self, request: ClientRequest<T>) -> Result<R> {
-        let success_response = self.request_full_response(request)?;
-        let body_bytes = success_response._bytes_body();
-        let _body_sha256 = format!("sha256:{}", sha::_sha256(body_bytes));
-        success_response._json_body::<R>()
+    pub async fn request_full_response<T: Serialize + ?Sized>(&mut self, request: ClientRequest<'_, T>) -> Result<FullRegistryResponse> {
+        self.do_request(request).await
     }
 
-    pub fn request_full_response<T: Serialize + ?Sized>(&mut self, request: ClientRequest<T>) -> Result<FullRegistryResponse> {
-        self.do_request(request)
-    }
-
-    pub fn simple_request<T: Serialize + ?Sized>(&mut self, request: ClientRequest<T>) -> Result<RawRegistryResponse> {
-        let http_response = self.do_request_raw(request)?;
+    pub async fn simple_request<T: Serialize + ?Sized>(&mut self, request: ClientRequest<'_, T>) -> Result<RawRegistryResponse> {
+        let http_response = self.do_request_raw(request).await?;
         Ok(RawRegistryResponse { response: http_response })
     }
 
-    fn do_request_raw<B: Serialize + ?Sized>(&mut self, request: ClientRequest<B>) -> Result<Response> {
+    async fn do_request_raw<B: Serialize + ?Sized>(&mut self, request: ClientRequest<'_, B>) -> Result<Response> {
         let url = self.registry_addr.clone() + request.path;
-        let token = self.reg_token_handler.token(request.scope, request.token_type)?;
+        let token = self.reg_token_handler.token(request.scope.as_deref(), request.token_type).await?;
         let auth = Some(HttpAuth::BearerToken { token });
         let http_response = do_request_raw(
             &self.client,
@@ -87,13 +75,14 @@ impl RegistryHttpClient {
             request.accept,
             request.body,
             request.request_content_type,
-        )?;
+        )
+        .await?;
         Ok(http_response)
     }
 
-    fn do_request<T: Serialize + ?Sized>(&mut self, request: ClientRequest<T>) -> Result<FullRegistryResponse> {
-        let http_response = self.do_request_raw(request)?;
-        let response = FullRegistryResponse::new_registry_response(http_response)?;
+    async fn do_request<T: Serialize + ?Sized>(&mut self, request: ClientRequest<'_, T>) -> Result<FullRegistryResponse> {
+        let http_response = self.do_request_raw(request).await?;
+        let response = FullRegistryResponse::new_registry_response(http_response).await?;
         if response.is_success() {
             Ok(response)
         } else {
@@ -109,9 +98,15 @@ impl RegistryHttpClient {
         }
     }
 
-    pub fn download(&mut self, path: &str, blob_down_config: BlobConfig, scope: &str, layer_size: Option<u64>) -> Result<RegDownloader> {
+    pub async fn download(
+        &mut self,
+        path: &str,
+        blob_down_config: BlobConfig,
+        scope: &str,
+        layer_size: Option<u64>,
+    ) -> Result<RegDownloader> {
         let url = format!("{}{}", &self.registry_addr, path);
-        let token = self.reg_token_handler.token(Some(scope), TokenType::Pull)?;
+        let token = self.reg_token_handler.token(Some(scope), TokenType::Pull).await?;
         let downloader = RegDownloader::new_reg(
             url,
             Some(HttpAuth::BearerToken { token }),
@@ -122,8 +117,8 @@ impl RegistryHttpClient {
         Ok(downloader)
     }
 
-    pub fn upload(&mut self, url: String, blob_config: BlobConfig, scope: &str, file_local_path: &Path) -> Result<RegUploader> {
-        let token = self.reg_token_handler.token(Some(scope), TokenType::PushAndPull)?;
+    pub async fn upload(&mut self, url: String, blob_config: BlobConfig, scope: &str, file_local_path: &Path) -> Result<RegUploader> {
+        let token = self.reg_token_handler.token(Some(scope), TokenType::PushAndPull).await?;
         Ok(RegUploader::new_uploader(
             url,
             HttpAuth::BearerToken { token },
@@ -140,23 +135,26 @@ pub struct FullRegistryResponse {
     _docker_content_digest: Option<String>,
     location_header: Option<String>,
     http_status: StatusCode,
+    response_url: reqwest::Url,
 }
 
 /// Registry的Response包装
 impl FullRegistryResponse {
-    pub fn new_registry_response(http_response: Response) -> Result<FullRegistryResponse> {
+    pub async fn new_registry_response(http_response: Response) -> Result<FullRegistryResponse> {
         let headers = http_response.headers();
         let content_type_opt = get_header(headers, "content-type");
         let docker_content_digest_opt = get_header(headers, "Docker-Content-Digest");
         let location_header = get_header(headers, "Location");
         let code = http_response.status();
-        let body_bytes = http_response.bytes()?;
+        let response_url = http_response.url().clone();
+        let body_bytes = http_response.bytes().await?;
         Ok(FullRegistryResponse {
             body_bytes,
             content_type: content_type_opt,
             _docker_content_digest: docker_content_digest_opt,
             location_header,
             http_status: code,
+            response_url,
         })
     }
 
@@ -176,7 +174,7 @@ impl FullRegistryResponse {
         String::from_utf8_lossy(&self.body_bytes[..]).into()
     }
 
-    pub fn _bytes_body(&self) -> &Bytes {
+    pub fn bytes_body(&self) -> &Bytes {
         &self.body_bytes
     }
 
@@ -192,6 +190,10 @@ impl FullRegistryResponse {
     pub fn location_header(&self) -> Option<&String> {
         self.location_header.as_ref()
     }
+
+    pub fn response_url(&self) -> &reqwest::Url {
+        &self.response_url
+    }
 }
 
 pub trait RegistryResponse {
@@ -201,7 +203,7 @@ pub trait RegistryResponse {
 
     fn status_code(&self) -> StatusCode;
 
-    fn string_body(self) -> String;
+    async fn string_body(self) -> String;
 }
 
 /// 一个简单的Registry的Response，只包含状态码
@@ -226,29 +228,15 @@ impl RegistryResponse for RawRegistryResponse {
         self.response.status()
     }
 
-    fn string_body(mut self) -> String {
-        match self.response.content_length() {
-            None => {
-                let mut string = String::new();
-                let _result = self.response.read_to_string(&mut string);
-                string
-            }
-            Some(len) => match len {
-                0 => String::default(),
-                _ => {
-                    let mut string = String::with_capacity(len as usize);
-                    let _result = self.response.read_to_string(&mut string);
-                    string
-                }
-            },
-        }
+    async fn string_body(mut self) -> String {
+        self.response.text().await.unwrap_or_else(|e| format!("read response body failed: {}", e))
     }
 }
 
 #[derive(Builder)]
 pub struct ClientRequest<'a, B: Serialize + ?Sized> {
     path: &'a str,
-    scope: Option<&'a str>,
+    scope: Option<String>,
     method: Method,
     accept: &'a [RegContentType],
     body: Option<&'a B>,
@@ -259,7 +247,7 @@ pub struct ClientRequest<'a, B: Serialize + ?Sized> {
 impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
     pub fn new(
         path: &'a str,
-        scope: Option<&'a str>,
+        scope: Option<String>,
         method: Method,
         accept: &'a [RegContentType],
         body: Option<&'a B>,
@@ -276,7 +264,7 @@ impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
         }
     }
 
-    pub fn new_head_request(path: &'a str, scope: Option<&'a str>, token_type: TokenType) -> ClientRequest<'a, B> {
+    pub fn new_head_request(path: &'a str, scope: Option<String>, token_type: TokenType) -> ClientRequest<'a, B> {
         ClientRequest {
             path,
             scope,
@@ -288,7 +276,7 @@ impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
         }
     }
 
-    pub fn new_get_request(path: &'a str, scope: Option<&'a str>, accept: &'a [RegContentType]) -> ClientRequest<'a, B> {
+    pub fn new_get_request(path: &'a str, scope: Option<String>, accept: &'a [RegContentType]) -> ClientRequest<'a, B> {
         ClientRequest {
             path,
             scope,
@@ -302,7 +290,7 @@ impl<'a, B: Serialize + ?Sized> ClientRequest<'a, B> {
 
     pub fn new_with_content_type(
         path: &'a str,
-        scope: Option<&'a str>,
+        scope: Option<String>,
         method: Method,
         accept: &'a [RegContentType],
         body: Option<&'a B>,

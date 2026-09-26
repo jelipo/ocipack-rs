@@ -1,49 +1,93 @@
-use std::io;
-use std::io::{Read, Write};
-
 use anyhow::Result;
-use flate2::read::GzDecoder;
-use flate2::write::GzEncoder;
-use flate2::Compression;
-use zstd::{stream, DEFAULT_COMPRESSION_LEVEL};
+use async_compression::Level::{Default, Fastest};
+use async_compression::tokio::write::{GzipDecoder, GzipEncoder};
+use async_compression::tokio::write::{ZstdDecoder, ZstdEncoder};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::container::CompressType;
 
-pub fn uncompress<R: Read, W: Write>(compress_type: CompressType, tar_input: &mut R, output_writer: &mut W) -> Result<()> {
+pub async fn async_uncompress<R, W>(compress_type: CompressType, tar_input: &mut R, output_writer: &mut W) -> Result<()>
+where
+    R: AsyncRead + Unpin + ?Sized,
+    W: AsyncWrite + Unpin + ?Sized,
+{
     match compress_type {
-        CompressType::Tar => io::copy(tar_input, output_writer).map(|_| ())?,
-        CompressType::Tgz => uncompress_gz(tar_input, output_writer)?,
-        CompressType::Zstd => stream::copy_decode(tar_input, output_writer)?,
+        CompressType::Tar => tokio::io::copy(tar_input, output_writer).await.map(|_| ())?,
+        CompressType::Tgz => async_uncompress_gz(tar_input, output_writer).await?,
+        CompressType::Zstd => {
+            let mut decoder = ZstdDecoder::new(output_writer);
+            tokio::io::copy(tar_input, &mut decoder).await?;
+            decoder.shutdown().await?;
+        }
     };
     Ok(())
 }
 
-pub fn compress<R: Read, W: ?Sized + Write>(compress_type: CompressType, tar_input_reader: &mut R, output_writer: &mut W) -> Result<()> {
+pub async fn async_compress<R, W>(compress_type: CompressType, reader: &mut R, writer: &mut W) -> Result<()>
+where
+    R: AsyncRead + Unpin + ?Sized,
+    W: AsyncWrite + Unpin + ?Sized,
+{
     match compress_type {
-        CompressType::Tar => io::copy(tar_input_reader, output_writer).map(|_| ())?,
-        CompressType::Tgz => compress_gz(tar_input_reader, output_writer)?,
-        CompressType::Zstd => stream::copy_encode(tar_input_reader, output_writer, DEFAULT_COMPRESSION_LEVEL)?,
-    }
-    Ok(())
-}
-
-pub fn uncompress_gz<R: Read, W: ?Sized + Write>(input: R, output_writer: &mut W) -> Result<()> {
-    let mut decoder = GzDecoder::new(input);
-
-    let mut buffer = vec![0u8; 1024 * 4].into_boxed_slice();
-    loop {
-        let read_size = decoder.read(&mut buffer)?;
-        if read_size == 0 {
-            break;
+        CompressType::Tar => tokio::io::copy(reader, writer).await.map(|_| ())?,
+        CompressType::Tgz => async_compress_gz(reader, writer).await?,
+        CompressType::Zstd => {
+            let mut encoder = ZstdEncoder::with_quality(writer, Default);
+            tokio::io::copy(reader, &mut encoder).await?;
+            encoder.shutdown().await?;
         }
-        output_writer.write_all(&buffer[..read_size])?;
     }
-    output_writer.flush()?;
     Ok(())
 }
 
-pub fn compress_gz<R: Read, W: ?Sized + Write>(tar_input_reader: &mut R, output_writer: &mut W) -> Result<()> {
-    let mut encoder = GzEncoder::new(output_writer, Compression::fast());
-    let _ = io::copy(tar_input_reader, &mut encoder)?;
+pub async fn async_uncompress_gz<R, W>(input: &mut R, output_writer: &mut W) -> Result<()>
+where
+    R: AsyncRead + Unpin + ?Sized,
+    W: AsyncWrite + Unpin + ?Sized,
+{
+    let mut decoder = GzipDecoder::new(output_writer);
+    tokio::io::copy(input, &mut decoder).await?;
+    decoder.shutdown().await?;
     Ok(())
+}
+
+pub async fn async_compress_gz<R, W>(reader: &mut R, writer: &mut W) -> Result<()>
+where
+    R: AsyncRead + Unpin + ?Sized,
+    W: AsyncWrite + Unpin + ?Sized,
+{
+    let mut encoder = GzipEncoder::with_quality(writer, Fastest);
+    tokio::io::copy(reader, &mut encoder).await?;
+    encoder.shutdown().await?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Read;
+
+    #[tokio::test]
+    async fn compressed_layers_have_complete_gzip_and_zstd_frames() -> Result<()> {
+        let input = b"layer content".repeat(4096);
+        for kind in [CompressType::Tgz, CompressType::Zstd] {
+            let mut compressed = Vec::new();
+            async_compress(kind, &mut input.as_slice(), &mut compressed).await?;
+            let decoded = match kind {
+                CompressType::Tgz => {
+                    let mut decoded = Vec::new();
+                    flate2::read::GzDecoder::new(compressed.as_slice()).read_to_end(&mut decoded)?;
+                    decoded
+                }
+                CompressType::Zstd => zstd::stream::decode_all(compressed.as_slice())?,
+                CompressType::Tar => unreachable!(),
+            };
+            assert_eq!(decoded, input);
+
+            let mut async_decoded = Vec::new();
+            async_uncompress(kind, &mut compressed.as_slice(), &mut async_decoded).await?;
+            assert_eq!(async_decoded, input);
+        }
+        Ok(())
+    }
 }

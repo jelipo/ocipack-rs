@@ -1,13 +1,13 @@
-use anyhow::anyhow;
 use anyhow::Result;
+use anyhow::anyhow;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::CompressType;
 use crate::container::image::docker::{DockerManifest, DockerManifestList};
 use crate::container::image::oci::{OciManifest, OciManifestIndex};
 use crate::container::manifest::ManifestList::{Docker, Oci};
 use crate::container::{ConfigBlobSerialize, FindPlatform, Layer, LayerConvert, Platform, RegContentType, RegDigest};
-use crate::CompressType;
 
 #[derive(Clone, Debug)]
 pub enum Type {
@@ -100,33 +100,27 @@ impl Manifest {
     pub fn add_top_layer(&mut self, size: u64, compressed_tar_sha256: String, compress_type: CompressType) -> Result<()> {
         let reg_digest = RegDigest::new_with_sha256(compressed_tar_sha256);
         match self {
-            Manifest::OciV1(oci) => oci.layers.insert(
-                0,
-                CommonManifestLayer {
-                    media_type: match compress_type {
-                        CompressType::Tar => RegContentType::OCI_LAYER_TAR.val(),
-                        CompressType::Tgz => RegContentType::OCI_LAYER_TGZ.val(),
-                        CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val(),
-                    }
-                    .to_string(),
-                    size,
-                    digest: reg_digest.digest,
-                },
-            ),
+            Manifest::OciV1(oci) => oci.layers.push(CommonManifestLayer {
+                media_type: match compress_type {
+                    CompressType::Tar => RegContentType::OCI_LAYER_TAR.val(),
+                    CompressType::Tgz => RegContentType::OCI_LAYER_TGZ.val(),
+                    CompressType::Zstd => RegContentType::OCI_LAYER_ZSTD.val(),
+                }
+                .to_string(),
+                size,
+                digest: reg_digest.digest,
+            }),
             Manifest::DockerV2S2(docker) => {
                 let media_type = match compress_type {
                     CompressType::Tar => return Err(anyhow!("Docker image Manifest V 2, Schema 2 not support tar media.")),
                     CompressType::Tgz => RegContentType::DOCKER_LAYER_TGZ.val().to_string(),
                     CompressType::Zstd => return Err(anyhow!("Docker image Manifest V 2, Schema 2 not support zstd.")),
                 };
-                docker.layers.insert(
-                    0,
-                    CommonManifestLayer {
-                        media_type,
-                        size,
-                        digest: reg_digest.digest,
-                    },
-                )
+                docker.layers.push(CommonManifestLayer {
+                    media_type,
+                    size,
+                    digest: reg_digest.digest,
+                })
             }
         }
         Ok(())
@@ -175,6 +169,34 @@ fn set_config_blob(common_config: &mut CommonManifestConfig, config_blob_seriali
     common_config.media_type = media_type.to_string();
     common_config.digest = config_blob_serialize.digest.digest.clone();
     common_config.size = config_blob_serialize.size;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_layer_follows_the_base_layer_in_manifest() -> Result<()> {
+        let base = CommonManifestLayer {
+            media_type: RegContentType::OCI_LAYER_TGZ.val().to_string(),
+            size: 10,
+            digest: "sha256:base".to_string(),
+        };
+        let mut manifest = Manifest::OciV1(OciManifest {
+            schema_version: 2,
+            media_type: Some(RegContentType::OCI_MANIFEST.val().to_string()),
+            config: CommonManifestConfig {
+                media_type: RegContentType::OCI_IMAGE_CONFIG.val().to_string(),
+                size: 1,
+                digest: "sha256:config".to_string(),
+            },
+            layers: vec![base],
+        });
+        manifest.add_top_layer(20, "top".to_string(), CompressType::Tgz)?;
+        let digests: Vec<_> = manifest.layers().iter().map(|layer| layer.digest.to_string()).collect();
+        assert_eq!(digests, ["sha256:base", "sha256:top"]);
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug)]

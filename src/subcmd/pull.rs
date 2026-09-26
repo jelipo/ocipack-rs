@@ -1,10 +1,4 @@
-use std::collections::HashMap;
-use std::fs::File;
-
-use anyhow::{anyhow, Result};
-use log::info;
-use sha2::{Digest, Sha256};
-
+use crate::GLOBAL_CONFIG;
 use crate::adapter::SourceInfo;
 use crate::config::RegAuthType;
 use crate::container::http::download::DownloadResult;
@@ -14,11 +8,15 @@ use crate::container::manifest::Manifest;
 use crate::container::proxy::ProxyInfo;
 use crate::container::{ConfigBlobEnum, Layer, Reference, RegContentType, RegDigest, Registry, RegistryCreateInfo};
 use crate::progress::manager::ProcessorManager;
-use crate::progress::Processor;
-use crate::util::compress::uncompress;
-use crate::GLOBAL_CONFIG;
+use crate::util::compress::async_uncompress;
+use anyhow::{Result, anyhow};
+use log::info;
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
+use tokio::fs::File;
+use tokio_util::io::InspectWriter;
 
-pub fn pull(
+pub async fn pull(
     source_info: &SourceInfo,
     source_auth: RegAuthType,
     use_https: bool,
@@ -28,8 +26,8 @@ pub fn pull(
     let image_info = &source_info.image_info;
     let image_host = &image_info.image_host;
     let from_image_reference = Reference {
-        image_name: &image_info.image_name,
-        reference: image_info.reference.as_str(),
+        image_name: image_info.image_name.clone(),
+        reference: image_info.reference.clone(),
     };
     info!(
         "Source image info. host='{}' name='{}' reference='{}'",
@@ -41,21 +39,26 @@ pub fn pull(
         conn_timeout_second: read_timeout_second,
         proxy,
     };
-    let mut from_registry = Registry::open(use_https, image_host, info)?;
+    let mut from_registry = Registry::open(use_https, image_host, info).await?;
     info!("Get source image manifest info.");
-    let (manifest, manifest_raw) = from_registry.image_manager.manifests(&from_image_reference, source_info.platform.clone())?;
+    let (manifest, manifest_raw) = from_registry.image_manager.manifests(&from_image_reference, source_info.platform.clone()).await?;
     info!("Source image type: {}", manifest.manifest_type());
     let config_digest = manifest.config_digest();
     let layers = manifest.layers();
-    let mut reg_downloader_vec = Vec::<Box<dyn Processor<DownloadResult>>>::new();
+    let mut reg_downloader_vec = Vec::new();
+    let mut scheduled = HashSet::new();
     for layer in &layers {
-        let digest = RegDigest::new_with_digest(layer.digest.to_string());
-        let downloader = from_registry.image_manager.layer_blob_download(from_image_reference.image_name, &digest, Some(layer.size))?;
-        reg_downloader_vec.push(Box::new(downloader))
+        if !scheduled.insert(layer.digest) {
+            continue;
+        }
+        let digest = RegDigest::new_with_digest(layer.digest.to_string())?;
+        let downloader =
+            from_registry.image_manager.layer_blob_download(&from_image_reference.image_name, &digest, Some(layer.size)).await?;
+        reg_downloader_vec.push(downloader.into_job());
     }
-    let manager = ProcessorManager::new_processor_manager(reg_downloader_vec)?;
+    let manager = ProcessorManager::<DownloadResult>::new_processor_manager(reg_downloader_vec);
     info!("Start pulling... (total={})", manager.size());
-    let download_results = manager.wait_all_done()?;
+    let download_results = manager.wait_all_done().await?;
     let layer_digest_map = layer_to_map(&layers);
     for download_result in &download_results {
         if download_result.local_existed {
@@ -63,12 +66,15 @@ pub fn pull(
         }
         let manifest_layer = layer_digest_map.get(download_result.blob_config.reg_digest.digest.as_str()).expect("internal error");
         let layer_compress_type = RegContentType::compress_type(manifest_layer.media_type)?;
-        let digest = RegDigest::new_with_digest(manifest_layer.digest.to_string());
+        let digest = RegDigest::new_with_digest(manifest_layer.digest.to_string())?;
         let download_path = download_result.file_path.as_ref().ok_or_else(|| anyhow!("can not found download file"))?;
         // 计算解压完的tar的sha256值
-        let mut download_file = File::open(download_path)?;
+        let mut download_file = File::open(download_path).await?;
         let mut sha256_encode = Sha256::new();
-        uncompress(layer_compress_type, &mut download_file, &mut sha256_encode)?;
+        let mut writer = InspectWriter::new(tokio::io::sink(), |bytes: &[u8]| {
+            sha256_encode.update(bytes);
+        });
+        async_uncompress(layer_compress_type, &mut download_file, &mut writer).await?;
         let sha256 = &sha256_encode.finalize()[..];
         let tar_sha256 = hex::encode(sha256);
         GLOBAL_CONFIG.home_dir.cache.blobs.create_layer_config(&tar_sha256, &digest.sha256, layer_compress_type)?;
@@ -77,11 +83,11 @@ pub fn pull(
 
     let config_blob_enum = match &manifest {
         Manifest::OciV1(_) => {
-            let (blob, _) = from_registry.image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, config_digest)?;
+            let (blob, _) = from_registry.image_manager.config_blob::<OciConfigBlob>(&image_info.image_name, config_digest).await?;
             ConfigBlobEnum::OciV1(blob)
         }
         Manifest::DockerV2S2(_) => {
-            let (blob, _) = from_registry.image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, config_digest)?;
+            let (blob, _) = from_registry.image_manager.config_blob::<DockerConfigBlob>(&image_info.image_name, config_digest).await?;
             ConfigBlobEnum::DockerV2S2(blob)
         }
     };

@@ -25,6 +25,7 @@ pub struct BuildInfo {
     pub user: Option<String>,
     pub workdir: Option<String>,
     pub cmd: Option<Vec<String>>,
+    pub entrypoint: Option<Vec<String>>,
     pub copy_files: Vec<CopyFile>,
     pub ports: Option<Vec<String>>,
 }

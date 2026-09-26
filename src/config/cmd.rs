@@ -2,12 +2,12 @@ use std::env;
 use std::str::FromStr;
 
 use anyhow::Result;
-use anyhow::{anyhow, Error};
+use anyhow::{Error, anyhow};
 use clap::Parser;
 use url::Url;
 
-use crate::container::proxy::{ProxyAuth, ProxyInfo};
 use crate::container::Platform;
+use crate::container::proxy::{ProxyAuth, ProxyInfo};
 
 #[derive(Parser)]
 #[clap(about = "Fast build docker/oci image", version, author = "jelipo (github.com/jelipo)", long_about = None)]
@@ -247,12 +247,9 @@ impl FromStr for ProxyInfo {
         } else {
             None
         };
-        let addr = format!(
-            "{}://{}:{}",
-            url.scheme(),
-            url.host_str().unwrap_or("127.0.0.1"),
-            url.port().unwrap_or(80)
-        );
+        let host = url.host_str().ok_or_else(|| anyhow!("proxy URL has no host"))?;
+        let port = url.port_or_known_default().ok_or_else(|| anyhow!("proxy URL needs an explicit port"))?;
+        let addr = format!("{}://{}:{}", url.scheme(), host, port);
         Ok(ProxyInfo::new(addr, auth_opt))
     }
 }
@@ -321,5 +318,12 @@ fn value_or_env(param: &str) -> Result<String> {
 #[test]
 fn it_works() -> Result<()> {
     println!("{:?}", value_or_env("${PATH}")?);
+    Ok(())
+}
+
+#[test]
+fn https_proxy_uses_https_default_port() -> Result<()> {
+    let proxy = ProxyInfo::from_str("https://proxy.example")?;
+    assert_eq!(proxy.addr, "https://proxy.example:443");
     Ok(())
 }

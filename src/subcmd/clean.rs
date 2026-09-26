@@ -1,6 +1,6 @@
 use crate::config::cmd::CleanCmdArgs;
 use crate::util::file::PathExt;
-use crate::{HomeDir, GLOBAL_CONFIG};
+use crate::{GLOBAL_CONFIG, HomeDir};
 use anyhow::Result;
 use colored::Colorize;
 use log::info;
@@ -10,10 +10,8 @@ pub struct CleanCommand {}
 
 impl CleanCommand {
     pub fn clean(clean_args: &CleanCmdArgs) -> Result<()> {
-        match main_clean(clean_args) {
-            Ok(_) => print_build_success(),
-            Err(err) => print_build_failed(err),
-        }
+        main_clean(clean_args)?;
+        print_build_success();
         Ok(())
     }
 }
@@ -63,19 +61,5 @@ fn print_build_success() {
 Clean successful!
 "#
         .green()
-    );
-}
-
-fn print_build_failed(err: anyhow::Error) {
-    println!(
-        "{}",
-        format!(
-            r#"
-Clean failed.
-{}
-"#,
-            err
-        )
-        .red()
     );
 }
