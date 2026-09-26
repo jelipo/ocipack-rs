@@ -1,5 +1,3 @@
-#![feature(seek_stream_len)]
-
 use std::ops::Deref;
 use std::sync::{Arc, LazyLock};
 
