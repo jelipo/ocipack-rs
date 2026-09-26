@@ -6,6 +6,12 @@ on:
   push:
     branches: [master]
     tags: ['*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version without v, for example 0.8.0 or 0.8.0-rc.1'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -16,7 +22,7 @@ env:
 jobs:
   verify:
     name: Check and build
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    if: ${{ github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -33,7 +39,7 @@ jobs:
 
   build:
     name: ${{ matrix.target }}
-    if: startsWith(github.ref, 'refs/tags/')
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -55,9 +61,17 @@ jobs:
             target: aarch64-apple-darwin
             asset: arm64_darwin
     env:
-      RELEASE_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
+      REQUESTED_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Set release version
+        if: runner.os != 'Windows'
+        run: python3 .github/scripts/release_version.py "$REQUESTED_VERSION"
+
+      - name: Set release version on Windows
+        if: runner.os == 'Windows'
+        run: python .github/scripts/release_version.py $env:REQUESTED_VERSION
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
@@ -110,7 +124,7 @@ jobs:
 
   release:
     name: Publish release
-    if: startsWith(github.ref, 'refs/tags/')
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     needs: build
     runs-on: ubuntu-24.04
     permissions:
@@ -125,8 +139,25 @@ jobs:
       - name: Generate checksums
         run: cd dist && sha256sum ocipack-* > SHA256SUMS
 
+      - name: Reject an existing manual release tag
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RELEASE_TAG: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG")
+          if [ "$status" != 404 ]; then
+            echo "Refusing to reuse $RELEASE_TAG (GitHub returned HTTP $status)" >&2
+            exit 1
+          fi
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: dist/*
           fail_on_unmatched_files: true
