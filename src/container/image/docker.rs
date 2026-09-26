@@ -97,6 +97,8 @@ pub struct Config {
     pub exposed_ports: Option<HashMap<String, Value>>,
     #[serde(rename = "Env")]
     pub env: Option<Vec<String>>,
+    #[serde(rename = "Labels")]
+    pub labels: Option<HashMap<String, String>>,
     #[serde(rename = "Entrypoint")]
     pub entrypoint: Option<Vec<String>>,
     #[serde(rename = "Cmd")]

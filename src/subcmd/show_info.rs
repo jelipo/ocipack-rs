@@ -1,12 +1,12 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use colored::Colorize;
 use log::info;
 use serde_json::Value;
 
-use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::ImageInfo;
-use crate::config::cmd::{BaseAuth, ShowInfoArgs, TargetType};
+use crate::adapter::docker::DockerfileAdapter;
 use crate::config::RegAuthType;
+use crate::config::cmd::{BaseAuth, ShowInfoArgs, TargetType};
 use crate::container::image::docker::DockerConfigBlob;
 use crate::container::image::oci::OciConfigBlob;
 use crate::container::manifest::{Manifest, ManifestResponseEnum};
@@ -27,7 +27,8 @@ impl ShowInfoCommand {
                 auth,
                 proxy,
                 show_info_args.platform.clone(),
-            ).await?;
+            )
+            .await?;
             info!("Request done.");
             print_image_detail(detail)?;
         } else {

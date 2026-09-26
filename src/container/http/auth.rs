@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::option::Option::Some;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use fantasy_util::time::system_time::SystemLocalTime;
 use log::{debug, warn};
 use regex::Regex;
@@ -10,7 +10,7 @@ use reqwest::Client;
 use reqwest::Method;
 use serde::Deserialize;
 
-use crate::container::http::{do_request_raw, get_header, HttpAuth};
+use crate::container::http::{HttpAuth, do_request_raw, get_header};
 
 pub struct RegTokenHandler {
     registry_addr: String,
@@ -46,7 +46,8 @@ impl RegTokenHandler {
     async fn get_remote_token(&mut self, scope_opt: Option<&str>, token_type: TokenType) -> Result<(String, u64)> {
         let adapter = match &self.authenticate_adapter {
             None => {
-                let new_adapter = AuthenticateAdapter::new_authenticate_adapter(&self.registry_addr, &self.client).await
+                let new_adapter = AuthenticateAdapter::new_authenticate_adapter(&self.registry_addr, &self.client)
+                    .await
                     .map_err(|err| anyhow!("get token failed: {}", err))?;
                 self.authenticate_adapter = Some(new_adapter);
                 self.authenticate_adapter.as_ref().unwrap()

@@ -2,21 +2,20 @@ use crate::adapter::docker::DockerfileAdapter;
 use crate::adapter::registry::RegistryTargetAdapter;
 use crate::adapter::tar::TarTargetAdapter;
 use crate::adapter::{BuildInfo, CopyFile, SourceInfo};
-use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::config::RegAuthType;
+use crate::config::cmd::{BuildCmdArgs, SourceType, TargetFormat, TargetType};
 use crate::container::home::{LocalLayer, TempLayerInfo};
 use crate::container::manifest::Manifest;
 use crate::container::proxy::ProxyInfo;
 use crate::container::{CompressType, ConfigBlobEnum, ConfigBlobSerialize};
 use crate::subcmd::pull::pull;
-use crate::util::sha::{sha256_hex, Sha256Reader, Sha256Writer};
+use crate::util::sha::sha256_hex;
 use crate::util::{compress, random};
-use crate::{HomeDir, GLOBAL_CONFIG};
-use anyhow::{anyhow, Result};
+use crate::{GLOBAL_CONFIG, HomeDir};
+use anyhow::{Result, anyhow};
 use colored::Colorize;
 use log::info;
 use sha2::{Digest, Sha256};
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio_tar::Builder;
@@ -27,7 +26,7 @@ pub struct BuildCommand {}
 impl BuildCommand {
     pub async fn build(build_args: &BuildCmdArgs) -> Result<()> {
         let (source_info, build_info, source_auth) = build_source_info(build_args).await?;
-        match handle(
+        handle(
             source_info,
             build_info,
             source_auth,
@@ -35,11 +34,8 @@ impl BuildCommand {
             build_args.source_proxy.clone(),
             build_args.use_zstd,
         )
-        .await
-        {
-            Ok(_) => print_build_success(build_args),
-            Err(err) => print_build_failed(err),
-        }
+        .await?;
+        print_build_success(build_args);
         Ok(())
     }
 }
@@ -63,27 +59,10 @@ Target image:
     );
 }
 
-fn print_build_failed(err: anyhow::Error) {
-    println!(
-        "{}",
-        format!(
-            r#"
-Build job failed!
-
-{}
-"#,
-            err
-        )
-        .red()
-    );
-}
-
 async fn build_source_info(build_args: &BuildCmdArgs) -> Result<(SourceInfo, BuildInfo, RegAuthType)> {
     let (mut image_info, build_info) = match &build_args.source {
         SourceType::Dockerfile { path } => DockerfileAdapter::parse(path).await?,
-        SourceType::Cmd { tag: _ } => {
-            todo!()
-        }
+        SourceType::Cmd { .. } => return Err(anyhow!("cmd source is not supported")),
         SourceType::Registry { image } => {
             let fake_dockerfile_body = format!("FROM {}", image);
             DockerfileAdapter::parse_from_str(&fake_dockerfile_body)?
@@ -120,7 +99,8 @@ async fn handle(
         !build_cmds.allow_insecure,
         build_cmds.conn_timeout,
         proxy_info,
-    )?;
+    )
+    .await?;
     let compress_type = if use_zstd { CompressType::Zstd } else { CompressType::Tgz };
     let temp_layer = match build_top_tar(&build_info.copy_files, &home_dir).await? {
         None => None,
@@ -140,7 +120,6 @@ async fn handle(
     };
     let target_config_blob = build_target_config_blob(build_info, &pull_result.config_blob, temp_layer.as_ref(), &build_cmds.format);
     let source_manifest = pull_result.manifest;
-    let source_manifest_raw = pull_result.manifest_raw;
     let target_config_blob_serialize = target_config_blob.serialize()?;
     info!("Build a new target manifest.");
     let target_manifest = build_target_manifest(source_manifest, &build_cmds.format, temp_local_layer, &target_config_blob_serialize)?;
@@ -156,14 +135,13 @@ async fn handle(
                 build_cmds.conn_timeout,
                 build_cmds.target_proxy.clone(),
             )?;
-            registry_adapter.upload()?
+            registry_adapter.upload().await?
         }
         TargetType::Tar(tar_arg) => {
             let image_raw_name = source_info.image_info.image_raw_name.ok_or_else(|| anyhow!("must set a raw name"))?;
             let adapter = TarTargetAdapter {
                 image_raw_name,
                 target_manifest,
-                manifest_raw: source_manifest_raw,
                 target_config_blob_serialize,
                 save_path: PathBuf::from(tar_arg.path.clone()),
                 use_gzip: tar_arg.usb_gzip,
@@ -217,14 +195,14 @@ async fn compress_layer_file(tar_file_path: &Path, home_dir: &HomeDir, compress_
     let tar_file = File::open(tar_file_path).await?;
     let mut sha256_r = Sha256::new();
     let mut sha256_reader = InspectReader::new(tar_file, |r| {
-        sha256_r.write(r);
+        sha256_r.update(r);
     });
     let compress_file_name = random::random_str(20) + ".compress";
     let compress_file_path = home_dir.cache.temp_dir.join(compress_file_name);
     let compress_file = File::create(&compress_file_path).await?;
     let mut sha256_w = Sha256::new();
     let mut sha256_writer = InspectWriter::new(compress_file, |r| {
-        sha256_w.write(r);
+        sha256_w.update(r);
     });
     info!("Compressing tar...  (compress-type={})", compress_type.to_string());
     compress::async_compress(compress_type, &mut sha256_reader, &mut sha256_writer).await?;
@@ -259,6 +237,9 @@ pub fn build_target_config_blob(
     target_config_blob.add_envs(build_info.envs);
     if let Some(cmds) = build_info.cmd {
         target_config_blob.overwrite_cmd(cmds)
+    }
+    if let Some(entrypoint) = build_info.entrypoint {
+        target_config_blob.overwrite_entrypoint(entrypoint);
     }
     if let Some(port_exposes) = build_info.ports {
         target_config_blob.add_ports(port_exposes);

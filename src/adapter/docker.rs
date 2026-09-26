@@ -1,6 +1,6 @@
 use crate::adapter::{BuildInfo, CopyFile, ImageInfo};
 use crate::const_data::DEFAULT_IMAGE_HOST;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use dockerfile_parser::{BreakableStringComponent, Dockerfile, Instruction, ShellOrExecExpr};
 use log::{debug, warn};
 use std::collections::HashMap;
@@ -35,6 +35,7 @@ impl DockerfileAdapter {
         let mut workdir = None;
         let mut envs_map = HashMap::<String, String>::new();
         let mut cmd = None;
+        let mut entrypoint = None;
         let mut copy_files = Vec::new();
         let mut ports: Vec<String> = Vec::new();
         for instruction in dockerfile.instructions {
@@ -60,28 +61,8 @@ impl DockerfileAdapter {
                         let _ = label_map.insert(label.name.content, label.value.content);
                     }
                 }
-                Instruction::Entrypoint(entrypoint) => match &entrypoint.expr {
-                    ShellOrExecExpr::Shell(_shell) => {}
-                    ShellOrExecExpr::Exec(_exec) => {}
-                },
-                Instruction::Cmd(cmd_i) => {
-                    cmd = Some(match cmd_i.expr {
-                        ShellOrExecExpr::Shell(shell) => {
-                            let mut shells = shell
-                                .components
-                                .into_iter()
-                                .map(|component| match component {
-                                    BreakableStringComponent::String(str) => str.content,
-                                    BreakableStringComponent::Comment(comment) => comment.content,
-                                })
-                                .collect::<Vec<String>>();
-                            shells.insert(0, "/bin/sh".to_string());
-                            shells.insert(1, "-c".to_string());
-                            shells
-                        }
-                        ShellOrExecExpr::Exec(exec) => exec.elements.into_iter().map(|str| str.content).collect::<Vec<String>>(),
-                    })
-                }
+                Instruction::Entrypoint(value) => entrypoint = Some(command_from_expr(value.expr)),
+                Instruction::Cmd(cmd_i) => cmd = Some(command_from_expr(cmd_i.expr)),
                 Instruction::Copy(copy) => {
                     if !copy.flags.is_empty() {
                         return Err(anyhow!("copy not support flag"));
@@ -142,9 +123,55 @@ impl DockerfileAdapter {
                 user,
                 workdir,
                 cmd,
+                entrypoint,
                 copy_files,
                 ports: if ports.is_empty() { None } else { Some(ports) },
             },
         ))
+    }
+}
+
+fn command_from_expr(expr: ShellOrExecExpr) -> Vec<String> {
+    match expr {
+        ShellOrExecExpr::Shell(shell) => {
+            let mut parts = shell
+                .components
+                .into_iter()
+                .map(|component| match component {
+                    BreakableStringComponent::String(string) => string.content,
+                    BreakableStringComponent::Comment(comment) => comment.content,
+                })
+                .collect::<Vec<String>>();
+            parts.insert(0, "/bin/sh".to_string());
+            parts.insert(1, "-c".to_string());
+            parts
+        }
+        ShellOrExecExpr::Exec(exec) => exec.elements.into_iter().map(|element| element.content).collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_exec_entrypoint() -> Result<()> {
+        let (_, build) = DockerfileAdapter::parse_from_str("FROM alpine:3\nENTRYPOINT [\"/bin/echo\", \"hello\"]")?;
+        assert_eq!(build.entrypoint, Some(vec!["/bin/echo".to_string(), "hello".to_string()]));
+        Ok(())
+    }
+
+    #[test]
+    fn shell_commands_are_a_single_shell_argument() -> Result<()> {
+        let (_, build) = DockerfileAdapter::parse_from_str("FROM alpine:3\nENTRYPOINT echo hello world\nCMD echo ready")?;
+        assert_eq!(
+            build.entrypoint,
+            Some(vec!["/bin/sh".to_string(), "-c".to_string(), "echo hello world".to_string()])
+        );
+        assert_eq!(
+            build.cmd,
+            Some(vec!["/bin/sh".to_string(), "-c".to_string(), "echo ready".to_string()])
+        );
+        Ok(())
     }
 }

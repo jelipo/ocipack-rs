@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow};
 use dockerfile_parser::{Dockerfile, Instruction};
 use log::{debug, info};
+use std::collections::HashSet;
 
 use crate::GLOBAL_CONFIG;
 use crate::adapter::{ImageInfo, TargetImageAdapter, TargetInfo};
@@ -11,9 +12,8 @@ use crate::container::http::upload::UploadResult;
 use crate::container::manifest::Manifest;
 use crate::container::proxy::ProxyInfo;
 use crate::container::{ConfigBlobSerialize, Reference, RegDigest, Registry, RegistryCreateInfo};
-use crate::progress::Processor;
+use crate::progress::ProcessResult;
 use crate::progress::manager::ProcessorManager;
-use crate::progress::{ProcessResult, ProcessorEnum};
 
 pub struct RegistryTargetAdapter {
     info: TargetInfo,
@@ -86,14 +86,18 @@ impl RegistryTargetAdapter {
         let mut manager = target_reg.image_manager;
 
         let target_manifest = self.target_manifest;
-        let mut reg_uploader_vec = Vec::<ProcessorEnum>::new();
+        let mut reg_uploader_vec = Vec::new();
+        let mut scheduled = HashSet::new();
         for manifest_layer in target_manifest.layers() {
-            let layer_digest = RegDigest::new_with_digest(manifest_layer.digest.to_string());
+            if !scheduled.insert(manifest_layer.digest.to_string()) {
+                continue;
+            }
+            let layer_digest = RegDigest::new_with_digest(manifest_layer.digest.to_string())?;
             let local_layer =
                 home_dir.cache.blobs.local_layer(&layer_digest).ok_or_else(|| anyhow!("local file not found {}", layer_digest.digest))?;
             let layer_path = local_layer.layer_path();
             let reg_uploader = manager.layer_blob_upload(&target_info.image_info.image_name, &layer_digest, &layer_path).await?;
-            reg_uploader_vec.push(ProcessorEnum::RegUploader(reg_uploader))
+            reg_uploader_vec.push(reg_uploader.into_job());
         }
         let serialize = self.target_config_blob_serialize;
         let config_blob_str = serialize.json_str;
@@ -102,11 +106,11 @@ impl RegistryTargetAdapter {
         let config_blob_path_str = config_blob_path.to_string_lossy().to_string();
         let config_blob_uploader =
             manager.layer_blob_upload(&target_info.image_info.image_name, &serialize.digest, &config_blob_path_str).await?;
-        reg_uploader_vec.push(ProcessorEnum::RegUploader(config_blob_uploader));
+        reg_uploader_vec.push(config_blob_uploader.into_job());
         //
-        let process_manager = ProcessorManager::new_processor_manager(reg_uploader_vec)?;
+        let process_manager = ProcessorManager::<UploadResult>::new_processor_manager(reg_uploader_vec);
         info!("Start pushing... (total={})", process_manager.size());
-        let upload_results = process_manager.wait_all_done()?;
+        let upload_results = process_manager.wait_all_done().await?;
         for upload_result in upload_results {
             debug!("Upload done: {}", &upload_result.finished_info());
         }

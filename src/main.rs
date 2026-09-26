@@ -38,9 +38,9 @@ async fn main() -> Result<()> {
     init::print_logo();
     match &global_config.cmd_args {
         CmdArgs::Build(build_args) => BuildCommand::build(build_args).await?,
-        CmdArgs::Transform(transform_args) => TransformCommand::transform(transform_args)?,
+        CmdArgs::Transform(transform_args) => TransformCommand::transform(transform_args).await?,
         CmdArgs::Clean(clean_args) => CleanCommand::clean(clean_args)?,
-        CmdArgs::ShowInfo(show_info_args) => ShowInfoCommand::show(show_info_args)?,
+        CmdArgs::ShowInfo(show_info_args) => ShowInfoCommand::show(show_info_args).await?,
     }
     Ok(())
 }

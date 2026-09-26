@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use crate::container::home::HomeDir;
 use crate::CmdArgs;
+use crate::container::home::HomeDir;
 
 /// 全局App共享的config
 pub struct GlobalAppConfig {

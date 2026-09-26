@@ -117,11 +117,15 @@ impl RegDigest {
         }
     }
 
-    pub fn new_with_digest(digest: String) -> RegDigest {
-        RegDigest {
-            sha256: digest.as_str()[7..].to_string(),
-            digest,
+    pub fn new_with_digest(digest: String) -> Result<RegDigest> {
+        let sha256 = digest.strip_prefix("sha256:").ok_or_else(|| anyhow!("unsupported digest: {digest}"))?;
+        if sha256.len() != 64 || !sha256.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) {
+            return Err(anyhow!("invalid sha256 digest: {digest}"));
         }
+        Ok(RegDigest {
+            sha256: sha256.to_string(),
+            digest,
+        })
     }
 }
 
@@ -211,7 +215,7 @@ impl MyImageManager {
 
     pub async fn request_manifest(&mut self, refe: &Reference, accepts: &[RegContentType]) -> Result<ManifestResponse> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
-        let scope = Some(refe.image_name);
+        let scope = Some(refe.image_name.clone());
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&path, scope, accepts);
         let response = self.reg_client.simple_request(request).await?;
         let content_type = response.content_type().ok_or_else(|| anyhow!("manifest content-type header not found"))?;
@@ -234,6 +238,7 @@ impl MyImageManager {
         let request: ClientRequest<u8> = ClientRequest::new_get_request(&url_path, Some(name.to_string()), accepts);
         let response = self.reg_client.simple_request(request).await?;
         let str_body = response.string_body().await;
+        verify_blob_digest(blob_digest, str_body.as_bytes())?;
         Ok((serde_json::from_str::<T>(&str_body)?, str_body))
     }
 
@@ -275,17 +280,15 @@ impl MyImageManager {
     /// 向仓库获取上传blob的URL
     pub async fn layer_blob_upload_ready(&mut self, name: &str) -> Result<Url> {
         let url_path = format!("/v2/{}/blobs/uploads/", name);
-        let scope = Some(name);
+        let scope = Some(name.to_string());
         let request = ClientRequest::new(&url_path, scope, Method::POST, &[], None, TokenType::PushAndPull);
         let success_resp = self.reg_client.request_full_response::<u8>(request).await?;
-        let location = success_resp.location_header().expect("location header not found");
-        let url = Url::parse(location)?;
-        Ok(url)
+        resolve_upload_location(success_resp.response_url(), success_resp.location_header().map(String::as_str))
     }
 
     pub async fn put_manifest(&mut self, refe: &Reference, manifest: Manifest) -> Result<(StatusCode, String)> {
         let path = format!("/v2/{}/manifests/{}", refe.image_name, refe.reference);
-        let scope = Some(refe.image_name);
+        let scope = Some(refe.image_name.clone());
         let response = match manifest {
             Manifest::OciV1(oci_manifest) => {
                 let request = ClientRequest::new_with_content_type(
@@ -314,6 +317,20 @@ impl MyImageManager {
         };
         Ok((response.status_code(), response.string_body().await))
     }
+}
+
+fn resolve_upload_location(response_url: &Url, location: Option<&str>) -> Result<Url> {
+    let location = location.ok_or_else(|| anyhow!("upload response missing Location header"))?;
+    Ok(response_url.join(location)?)
+}
+
+fn verify_blob_digest(expected: &str, bytes: &[u8]) -> Result<()> {
+    let expected_sha256 = expected.strip_prefix("sha256:").ok_or_else(|| anyhow!("unsupported blob digest: {expected}"))?;
+    let actual_sha256 = bytes_sha256(bytes);
+    if expected_sha256 != actual_sha256 {
+        return Err(anyhow!("blob digest mismatch: expected {expected}, got sha256:{actual_sha256}"));
+    }
+    Ok(())
 }
 
 fn exited(simple_response: &RawRegistryResponse) -> Result<bool> {
@@ -352,8 +369,8 @@ pub enum ConfigBlobEnum {
 impl ConfigBlobEnum {
     pub fn add_diff_layer(&mut self, new_tar_digest: String) {
         match self {
-            ConfigBlobEnum::OciV1(oci) => oci.rootfs.diff_ids.insert(0, new_tar_digest),
-            ConfigBlobEnum::DockerV2S2(docker) => docker.rootfs.diff_ids.insert(0, new_tar_digest),
+            ConfigBlobEnum::OciV1(oci) => oci.rootfs.diff_ids.push(new_tar_digest),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.rootfs.diff_ids.push(new_tar_digest),
         }
     }
 
@@ -366,7 +383,10 @@ impl ConfigBlobEnum {
                 None => oci.config.labels = Some(new_labels),
                 Some(source) => source.extend(new_labels),
             },
-            ConfigBlobEnum::DockerV2S2(_) => (),
+            ConfigBlobEnum::DockerV2S2(docker) => match &mut docker.config.labels {
+                None => docker.config.labels = Some(new_labels),
+                Some(source) => source.extend(new_labels),
+            },
         };
     }
 
@@ -391,6 +411,13 @@ impl ConfigBlobEnum {
         match self {
             ConfigBlobEnum::OciV1(oci) => oci.config.cmd = Some(cmds),
             ConfigBlobEnum::DockerV2S2(docker) => docker.config.cmd = Some(cmds),
+        }
+    }
+
+    pub fn overwrite_entrypoint(&mut self, entrypoint: Vec<String>) {
+        match self {
+            ConfigBlobEnum::OciV1(oci) => oci.config.entrypoint = Some(entrypoint),
+            ConfigBlobEnum::DockerV2S2(docker) => docker.config.entrypoint = Some(entrypoint),
         }
     }
 
@@ -558,5 +585,67 @@ impl FromStr for CompressType {
             "ZSTD" => Ok(CompressType::Zstd),
             _ => Err(anyhow!("unknown compress type:{}", str)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn upload_location_accepts_absolute_and_relative_urls() -> Result<()> {
+        let response_url = Url::parse("https://registry.example/v2/demo/blobs/uploads/")?;
+        let relative = resolve_upload_location(&response_url, Some("/v2/demo/blobs/uploads/uuid?state=1"))?;
+        assert_eq!(relative.as_str(), "https://registry.example/v2/demo/blobs/uploads/uuid?state=1");
+        let absolute = resolve_upload_location(&response_url, Some("https://uploads.example/session?id=2"))?;
+        assert_eq!(absolute.as_str(), "https://uploads.example/session?id=2");
+        assert!(resolve_upload_location(&response_url, None).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn blob_digest_verification_rejects_corrupt_body() {
+        let expected = format!("sha256:{}", bytes_sha256(b"valid"));
+        assert!(verify_blob_digest(&expected, b"valid").is_ok());
+        assert!(verify_blob_digest(&expected, b"other").is_err());
+    }
+
+    #[test]
+    fn malformed_registry_digests_return_errors() {
+        assert!(RegDigest::new_with_digest("sha256:short".to_string()).is_err());
+        assert!(RegDigest::new_with_digest("sha256:é".to_string()).is_err());
+        assert!(RegDigest::new_with_digest("sha512:bad".to_string()).is_err());
+        assert!(RegDigest::new_with_digest(format!("sha256:{}", "a".repeat(64))).is_ok());
+    }
+
+    #[test]
+    fn new_layer_follows_existing_diff_ids() {
+        let mut oci = OciConfigBlob::default();
+        oci.rootfs.diff_ids = vec!["sha256:base".to_string()];
+        let mut config = ConfigBlobEnum::OciV1(oci);
+        config.add_diff_layer("sha256:top".to_string());
+        let ConfigBlobEnum::OciV1(config) = config else { unreachable!() };
+        assert_eq!(config.rootfs.diff_ids, ["sha256:base", "sha256:top"]);
+
+        let mut docker = DockerConfigBlob::default();
+        docker.rootfs.diff_ids = vec!["sha256:base".to_string()];
+        let mut config = ConfigBlobEnum::DockerV2S2(docker);
+        config.add_diff_layer("sha256:top".to_string());
+        let ConfigBlobEnum::DockerV2S2(config) = config else {
+            unreachable!()
+        };
+        assert_eq!(config.rootfs.diff_ids, ["sha256:base", "sha256:top"]);
+    }
+
+    #[test]
+    fn docker_labels_are_written_and_existing_labels_are_preserved() -> Result<()> {
+        let mut docker = DockerConfigBlob::default();
+        docker.config.labels = Some(HashMap::from([("base".to_string(), "yes".to_string())]));
+        let mut config = ConfigBlobEnum::DockerV2S2(docker);
+        config.add_labels(HashMap::from([("new".to_string(), "yes".to_string())]));
+        let json: Value = serde_json::from_str(&config.to_json_string()?)?;
+        assert_eq!(json["config"]["Labels"]["base"], "yes");
+        assert_eq!(json["config"]["Labels"]["new"], "yes");
+        Ok(())
     }
 }
