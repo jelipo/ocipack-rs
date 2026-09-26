@@ -13,7 +13,7 @@ strip = true
 
 [dependencies]
 chrono = "0.4"
-reqwest = { version = "0.13", features = ["gzip", "json", "deflate", "socks", "rustls", "stream"] }
+reqwest = { version = "0.13", features = ["gzip", "json", "deflate", "socks", "rustls", "stream"], default-features = false }
 anyhow = { version = "1.0", features = ["backtrace"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }

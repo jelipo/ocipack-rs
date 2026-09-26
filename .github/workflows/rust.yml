@@ -1,98 +1,164 @@
 name: Rust
 
 on:
+  pull_request:
+    branches: [master]
   push:
-    tags:
-      - '*' # Push events to matching v*, i.e. v1.0, v20.15.10
+    branches: [master]
+    tags: ['*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version without v, for example 0.8.0 or 0.8.0-rc.1'
+        required: true
+        type: string
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-amd64-linux:
-    runs-on: ubuntu-20.04
+  verify:
+    name: Check and build
+    if: ${{ github.event_name != 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v3
-      - name: Install musl
-        run: sudo apt install musl musl-dev musl-tools make gcc -y
-      - name: Set env
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-      - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
-        with:
-          target: x86_64-unknown-linux-musl
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
-      - name: Run cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --target=x86_64-unknown-linux-musl
-      - name: Tar
-        run: tar -czvf ocipack-${{ env.RELEASE_VERSION }}-amd64_linux.tar.gz -C ./target/x86_64-unknown-linux-musl/release/ ocipack
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: ./ocipack-${{ env.RELEASE_VERSION }}-amd64_linux.tar.gz
-  build-amd64-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Env
-        run: SET RELEASE_VERSION=$($env:GITHUB_REF -replace "refs/tags/")
-      - name: Print Env
+      - uses: actions/checkout@v7
+      - name: Install protoc
         run: |
-          chcp 65001 #set code page to utf-8
-          echo ("RELEASE_VERSION=" + $env:GITHUB_REF.replace('refs/tags/', '')) >> $env:GITHUB_ENV
-      - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
-      - name: Run cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release
-      - name: Rename
-        run: cp ./target/release/ocipack.exe ./
-      - name: Run UPX
-        uses: crazy-max/ghaction-upx@v2
-        with:
-          version: latest
-          files: |
-            ./ocipack.exe
-      - name: Zip
-        run: Compress-Archive ./ocipack.exe ocipack-${{ env.RELEASE_VERSION }}-amd64_windows.zip
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: ./ocipack-${{ env.RELEASE_VERSION }}-amd64_windows.zip
-  build-amd64-macos:
-    runs-on: macos-latest
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+      - name: Install Rust nightly
+        run: rustup toolchain install nightly --profile minimal
+      - name: Check
+        run: cargo check
+      - name: Build
+        run: cargo build
+
+  build:
+    name: ${{ matrix.target }}
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            asset: amd64_linux
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            asset: arm64_linux
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            asset: amd64_windows
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            asset: arm64_windows
+          - runner: macos-15
+            target: aarch64-apple-darwin
+            asset: arm64_darwin
+    env:
+      REQUESTED_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
     steps:
-      - uses: actions/checkout@v3
-      - name: Set env
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-      - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v7
+
+      - name: Set release version
+        if: runner.os != 'Windows'
+        run: python3 .github/scripts/release_version.py "$REQUESTED_VERSION"
+
+      - name: Set release version on Windows
+        if: runner.os == 'Windows'
+        run: python .github/scripts/release_version.py $env:REQUESTED_VERSION
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools protobuf-compiler
+
+      - name: Install macOS build dependencies
+        if: runner.os == 'macOS'
+        run: brew install protobuf
+
+      - name: Install Windows build dependencies
+        if: runner.os == 'Windows'
+        run: choco install protoc --version=36.1.0 --yes --no-progress
+
+      - name: Install Rust nightly and target
+        run: rustup toolchain install nightly --profile minimal --target ${{ matrix.target }}
+
+      - name: Check toolchain and protoc
+        run: |
+          rustc -vV
+          protoc --version
+
+      - name: Test
+        run: cargo test --target ${{ matrix.target }}
+
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package Linux and macOS
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p dist
+          tar -czf "dist/ocipack-${RELEASE_VERSION}-${{ matrix.asset }}.tar.gz" -C "target/${{ matrix.target }}/release" ocipack
+
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path "target/${{ matrix.target }}/release/ocipack.exe" -DestinationPath "dist/ocipack-$($env:RELEASE_VERSION)-${{ matrix.asset }}.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
         with:
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
-      - name: Run cargo build
-        uses: actions-rs/cargo@v1
+          name: ocipack-${{ matrix.asset }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
         with:
-          command: build
-          args: --release
-      - name: Tar
-        run: tar -czvf ocipack-${{ env.RELEASE_VERSION }}-amd64_darwin.tar.gz -C ./target/release/ ocipack
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+          pattern: ocipack-*
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: cd dist && sha256sum ocipack-* > SHA256SUMS
+
+      - name: Reject an existing manual release tag
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          RELEASE_TAG: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG")
+          if [ "$status" != 404 ]; then
+            echo "Refusing to reuse $RELEASE_TAG (GitHub returned HTTP $status)" >&2
+            exit 1
+          fi
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v3
         with:
-          files: ./ocipack-${{ env.RELEASE_VERSION }}-amd64_darwin.tar.gz
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ contains(github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name, '-') }}
+          files: dist/*
+          fail_on_unmatched_files: true
